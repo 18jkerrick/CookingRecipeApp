@@ -1,11 +1,13 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // You'll need to replace these with your actual API keys
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const TIKTOK_API_KEY = process.env.TIKTOK_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const INSTAGRAM_API_KEY = process.env.INSTAGRAM_API_KEY;
 
 // Cache for storing results to avoid repeated API calls
 const cacheResults = async (url, data) => {
@@ -141,6 +143,112 @@ export const extractVideoInfo = async (url) => {
           status: apiError.response.status,
           data: apiError.response.data
         } : 'No response');
+      }
+    } else if (platform === 'instagram') {
+      console.log('Extracted Instagram post url:', url);
+      
+      try {
+        // Use RapidAPI for Instagram data extraction
+        console.log('Using RapidAPI for Instagram data extraction');
+        
+        const options = {
+          method: 'GET',
+          url: 'instagram-looter2.p.rapidapi.com/post',
+          params: {
+            url: url  // Use the full URL instead of just the post ID
+          },
+          headers: {
+            'x-rapidapi-key': INSTAGRAM_API_KEY,
+            'x-rapidapi-host': 'instagram-looter2.p.rapidapi.com'
+          }
+        };
+        
+        console.log('RapidAPI request options:', {
+          url: options.url,
+          params: options.params
+        });
+        
+        const response = await axios.request(options);
+        
+        // Log the response status
+        console.log('RapidAPI response status:', response.status);
+        
+        // Check if we have the expected structure in the response
+        if (response.data && response.data.data && response.data.data.items && response.data.data.items.length > 0) {
+          const post = response.data.data.items[0];
+          
+          // Extract caption/description
+          const caption = post.caption ? post.caption.text : '';
+          
+          console.log('Extracted caption:', caption ? caption.substring(0, 100) + '...' : 'No caption found');
+          
+          // Extract video URL if available
+          let videoUrl = '';
+          if (post.video_versions && post.video_versions.length > 0) {
+            videoUrl = post.video_versions[0].url;
+          } else if (post.carousel_media) {
+            // Handle carousel posts with videos
+            const videoMedia = post.carousel_media.find(media => 
+              media.media_type === 2 && media.video_versions && media.video_versions.length > 0
+            );
+            if (videoMedia) {
+              videoUrl = videoMedia.video_versions[0].url;
+            }
+          }
+          
+          return {
+            caption,
+            videoUrl,
+            title: caption.split('\n')[0] || 'Instagram Video'
+          };
+        } else {
+          console.log('Full response data:', JSON.stringify(response.data || {}).substring(0, 1000) + '...');
+          console.error('Unexpected response structure from RapidAPI');
+        }
+      } catch (apiError) {
+        console.error('RapidAPI request failed:', apiError.message);
+        console.log('Error details:', apiError.response ? {
+          status: apiError.response.status,
+          data: apiError.response.data
+        } : 'No response');
+        
+        // Try alternative API if first one fails
+        try {
+          console.log('Trying alternative Instagram API');
+          
+          const altOptions = {
+            method: 'GET',
+            url: 'https://instagram-data-scraper.p.rapidapi.com/posts/info',
+            params: {
+              post_id: postId
+            },
+            headers: {
+              'X-RapidAPI-Key': INSTAGRAM_API_KEY,
+              'X-RapidAPI-Host': 'instagram-data-scraper.p.rapidapi.com'
+            }
+          };
+          
+          const altResponse = await axios.request(altOptions);
+          
+          if (altResponse.data && altResponse.data.data) {
+            const post = altResponse.data.data;
+            
+            const caption = post.caption || '';
+            let videoUrl = '';
+            
+            if (post.is_video && post.video_url) {
+              videoUrl = post.video_url;
+            }
+            
+            return {
+              caption,
+              videoUrl,
+              title: caption.split('\n')[0] || 'Instagram Video'
+            };
+          }
+        } catch (altError) {
+          console.error('Alternative Instagram API failed:', altError.message);
+        }
       }
     }
     
