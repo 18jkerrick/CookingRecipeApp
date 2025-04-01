@@ -66,38 +66,104 @@ export const extractVideoInfo = async (url) => {
     
     if (platform === 'tiktok') {
       // Extract TikTok video ID
-      let videoId = '';
-      const match = url.match(/video\/(\d+)/);
-      if (match && match[1]) {
-        videoId = match[1];
-      } else {
-        // Try alternative pattern for shortened URLs
-        const shortMatch = url.match(/([^\/]+)$/);
-        if (shortMatch && shortMatch[1]) {
-          videoId = shortMatch[1];
-        }
-      }
+    //   let videoId = '';
+    //   const match = url.match(/video\/(\d+)/);
+    //   if (match && match[1]) {
+    //     videoId = match[1];
+    //   } else {
+    //     // Try alternative pattern for shortened URLs
+    //     const shortMatch = url.match(/([^\/]+)$/);
+    //     if (shortMatch && shortMatch[1]) {
+    //       videoId = shortMatch[1];
+    //     }
+    //   }
       
-      if (!videoId) {
-        console.error('Could not extract video ID from URL:', url);
-        throw new Error('Could not extract video ID from TikTok URL');
-      }
+    //   if (!videoId) {
+    //     console.error('Could not extract video ID from URL:', url);
+    //     throw new Error('Could not extract video ID from TikTok URL');
+    //   }
       
-      console.log('Extracted TikTok video ID:', videoId);
+    //   console.log('Extracted TikTok video ID:', videoId);
+      console.log('TikTok video url:', url);
       
       try {
-        // Use RapidAPI for TikTok with the correct endpoint
+        // Use RapidAPI for TikTok data extraction
         console.log('Using RapidAPI for TikTok data extraction');
         
         const options = {
           method: 'GET',
-          url: 'https://tiktok-api23.p.rapidapi.com/api/post/detail',
+          url: 'https://tiktok-scraper7.p.rapidapi.com/',
           params: {
-            videoId: videoId
+            url: url
           },
           headers: {
-            'X-RapidAPI-Key': TIKTOK_API_KEY,
-            'X-RapidAPI-Host': 'tiktok-api23.p.rapidapi.com'
+            'x-rapidapi-key': TIKTOK_API_KEY,
+            'x-rapidapi-host': 'tiktok-scraper7.p.rapidapi.com'
+          }
+        };
+        
+        console.log('RapidAPI request options:', JSON.stringify({
+          params: options.params,
+          url: options.url
+        }));
+        
+        const response = await axios.request(options);
+        console.log('RapidAPI response status:', response.status);
+        
+        // Log a truncated version of the response data to avoid huge logs
+        console.log('Full response data:', JSON.stringify(response.data || {}).substring(0, 1000) + '...');
+        
+        if (response.data && response.data.data) {
+          // Extract caption from the title field which contains the full text
+          const caption = response.data.data.title || '';
+          
+          // Check if we have a video URL
+          let videoUrl = '';
+          if (response.data.data.video && response.data.data.video.play_addr) {
+            videoUrl = response.data.data.video.play_addr.url_list[0] || '';
+          }
+          
+          return {
+            caption,
+            videoUrl,
+            title: caption.split('\n')[0] || 'TikTok Video'
+          };
+        } else {
+          console.error('Unexpected response structure from RapidAPI');
+          
+          // Try to extract any useful information from the response
+          if (response.data && response.data.data && response.data.data.title) {
+            const caption = response.data.data.title;
+            return {
+              caption,
+              videoUrl: '',
+              title: caption.split('\n')[0] || 'TikTok Video'
+            };
+          }
+        }
+      } catch (apiError) {
+        console.error('RapidAPI request failed:', apiError.message);
+        console.log('Error details:', apiError.response ? {
+          status: apiError.response.status,
+          data: apiError.response.data
+        } : 'No response');
+      }
+    } else if (platform === 'instagram') {
+      console.log('Extracted Instagram post url:', url);
+      
+      try {
+        // Use RapidAPI for Instagram data extraction
+        console.log('Using RapidAPI for Instagram data extraction');
+        
+        const options = {
+          method: 'GET',
+          url: 'https://instagram-looter2.p.rapidapi.com/post',
+          params: {
+            url: url
+          },
+          headers: {
+            'x-rapidapi-key': INSTAGRAM_API_KEY,
+            'x-rapidapi-host': 'instagram-looter2.p.rapidapi.com'
           }
         };
         
@@ -111,31 +177,53 @@ export const extractVideoInfo = async (url) => {
         // Log the response status
         console.log('RapidAPI response status:', response.status);
         
-        // Check if we have the itemInfo structure in the response
-        if (response.data && response.data.itemInfo && response.data.itemInfo.itemStruct) {
-          const itemStruct = response.data.itemInfo.itemStruct;
-          
-          // Extract caption/description
-          const caption = itemStruct.desc || '';
+        // The API returns a different structure than expected
+        // Let's handle the actual structure
+        if (response.data && response.data.status === true) {
+          // Extract caption from the response
+          const caption = response.data.edge_media_to_caption?.edges?.[0]?.node?.text || 
+                         response.data.caption || '';
           
           console.log('Extracted caption:', caption ? caption.substring(0, 100) + '...' : 'No caption found');
           
           // Extract video URL if available
           let videoUrl = '';
-          if (itemStruct.video && itemStruct.video.playAddr) {
-            videoUrl = itemStruct.video.playAddr;
-          } else if (itemStruct.video && itemStruct.video.downloadAddr) {
-            videoUrl = itemStruct.video.downloadAddr;
+          if (response.data.is_video && response.data.video_url) {
+            videoUrl = response.data.video_url;
+          } else if (response.data.video_url) {
+            videoUrl = response.data.video_url;
           }
           
+          // If we have a caption, return it
+          if (caption) {
+            return {
+              caption,
+              videoUrl,
+              title: caption.split('\n')[0] || 'Instagram Post'
+            };
+          }
+          
+          // If we don't have a caption but have other data, create a minimal response
           return {
-            caption,
+            caption: '',
             videoUrl,
-            title: caption.split('\n')[0] || 'TikTok Video'
+            title: 'Instagram Post'
           };
         } else {
           console.log('Full response data:', JSON.stringify(response.data || {}).substring(0, 1000) + '...');
           console.error('Unexpected response structure from RapidAPI');
+          
+          // Try to extract any useful information from the response
+          if (response.data) {
+            const caption = response.data.edge_media_to_caption?.edges?.[0]?.node?.text || 
+                           response.data.caption || '';
+            
+            return {
+              caption,
+              videoUrl: '',
+              title: caption ? caption.split('\n')[0] : 'Instagram Post'
+            };
+          }
         }
       } catch (apiError) {
         console.error('RapidAPI request failed:', apiError.message);
@@ -143,6 +231,44 @@ export const extractVideoInfo = async (url) => {
           status: apiError.response.status,
           data: apiError.response.data
         } : 'No response');
+        
+        // Try alternative API if first one fails
+        try {
+          console.log('Trying alternative Instagram API');
+          
+          const altOptions = {
+            method: 'GET',
+            url: 'https://instagram-data-scraper.p.rapidapi.com/posts/info',
+            params: {
+              post_id: postId
+            },
+            headers: {
+              'X-RapidAPI-Key': INSTAGRAM_API_KEY,
+              'X-RapidAPI-Host': 'instagram-data-scraper.p.rapidapi.com'
+            }
+          };
+          
+          const altResponse = await axios.request(altOptions);
+          
+          if (altResponse.data && altResponse.data.data) {
+            const post = altResponse.data.data;
+            
+            const caption = post.caption || '';
+            let videoUrl = '';
+            
+            if (post.is_video && post.video_url) {
+              videoUrl = post.video_url;
+            }
+            
+            return {
+              caption,
+              videoUrl,
+              title: caption.split('\n')[0] || 'Instagram Video'
+            };
+          }
+        } catch (altError) {
+          console.error('Alternative Instagram API failed:', altError.message);
+        }
       }
     } else if (platform === 'instagram') {
       console.log('Extracted Instagram post url:', url);
@@ -328,6 +454,15 @@ const extractRecipeWithRegex = (text) => {
       }
     }
     
+    // Fix empty ingredient names and improve title extraction
+    if (title.includes('Ingredients:') || title.includes('ingredients:')) {
+      // The title likely contains the full recipe text
+      const betterTitle = title.split(/[\n:]/)[0].trim();
+      if (betterTitle && betterTitle.length > 3 && betterTitle.length < 60) {
+        title = betterTitle;
+      }
+    }
+    
     // Look for ingredient section markers
     const ingredientSectionMatch = text.match(/ingredients:?(?:\s*\(.*?\))?:([\s\S]*?)(?:instructions|directions|steps|method|preparation|$)/i);
     
@@ -360,7 +495,7 @@ const extractRecipeWithRegex = (text) => {
     }
     
     // Convert ingredients to the expected format
-    const ingredients = ingredientsRaw.map(item => {
+    let ingredients = ingredientsRaw.map(item => {
       // Try to split the ingredient into amount and name
       const amountMatch = item.match(/^(-\s*|•\s*|(\d+[\s\/]?(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon|pinch|dash|handful|slice|piece|clove)s?\.?))/i);
       if (amountMatch) {
@@ -369,6 +504,21 @@ const extractRecipeWithRegex = (text) => {
         return { name, amount };
       }
       return { name: item.replace(/^(-\s*|•\s*)/, '').trim(), amount: '' };
+    });
+    
+    // Fix empty ingredient names
+    ingredients = ingredients.map(ing => {
+      if (!ing.name || ing.name.trim() === '') {
+        // Try to extract ingredient name from amount
+        if (ing.amount) {
+          const parts = ing.amount.match(/^([\d\s\/]+\s*(?:cup|tbsp|tsp|g|kg|ml|l|oz|pound|lb)s?)\s+(.+)$/i);
+          if (parts) {
+            return { name: parts[2].trim(), amount: parts[1].trim() };
+          }
+        }
+        return { name: "Ingredient", amount: ing.amount || "" };
+      }
+      return ing;
     });
     
     // Look for instruction section markers
@@ -421,22 +571,196 @@ const extractRecipeWithRegex = (text) => {
   }
 };
 
-// Add a fallback function to clean up recipe data using AI
-const cleanupRecipeWithAI = async (recipeData) => {
+// First, fix the reference error by adding the missing functions
+const extractWithOpenAI = async (text) => {
+  try {
+    console.log('Attempting to extract recipe with OpenAI');
+    
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional recipe parser. Extract a structured recipe from the following text.`
+          },
+          {
+            role: 'user',
+            content: `Parse this recipe text and return ONLY a JSON object with title, ingredients (with name and amount properties), and instructions:
+
+${text}
+
+IMPORTANT: For ingredients, the "name" field should contain the ingredient name (like "flour" or "sugar"), and the "amount" field should contain the quantity with units (like "2 cups" or "1 tbsp").
+DO NOT put the measurement in the name field. The name field should NEVER be empty.`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    const content = response.data.choices[0].message.content;
+    const jsonMatch = content.match(/{[\s\S]*}/);
+    
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    } else {
+      throw new Error('Failed to parse JSON from OpenAI response');
+    }
+  } catch (error) {
+    console.error('OpenAI API Error Details:');
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Headers:', error.response.headers);
+      console.error('Data:', error.response.data);
+      
+      if (error.response.status === 429) {
+        console.error('Rate limit exceeded: Too many requests in a given amount of time');
+      }
+    }
+    console.error('Error with OpenAI cleanup:', error.message);
+    throw error;
+  }
+};
+
+const extractWithAnthropic = async (text) => {
+  try {
+    console.log('Attempting to extract recipe with Anthropic Claude');
+    
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: `Parse this recipe text and return ONLY a JSON object with title, ingredients (with name and amount properties), and instructions:
+
+${text}
+
+IMPORTANT: For ingredients, the "name" field should contain the ingredient name (like "flour" or "sugar"), and the "amount" field should contain the quantity with units (like "2 cups" or "1 tbsp").
+DO NOT put the measurement in the name field. The name field should NEVER be empty.`
+          }
+        ],
+        temperature: 0.3
+      },
+      {
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    const content = response.data.content[0].text;
+    const jsonMatch = content.match(/{[\s\S]*}/);
+    
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    } else {
+      throw new Error('Failed to parse JSON from Anthropic response');
+    }
+  } catch (error) {
+    console.error('Anthropic API Error Details:');
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Headers:', error.response.headers);
+      console.error('Data:', error.response.data);
+    }
+    console.error('Error with Anthropic cleanup:', error.message);
+    throw error;
+  }
+};
+
+const extractWithGemini = async (text) => {
+  try {
+    console.log('Attempting to extract recipe with Google Gemini');
+    
+    const prompt = `
+Parse this recipe text and return ONLY a JSON object with title, ingredients (with name and amount properties), and instructions:
+
+${text}
+
+IMPORTANT FORMATTING RULES:
+1. For ingredients, the "name" field should contain the ingredient name (like "flour" or "sugar"), and the "amount" field should contain the quantity with units (like "2 cups" or "1 tbsp").
+2. DO NOT put the measurement in the name field. The name field should NEVER be empty.
+3. If you see something like "3/4 cup (180g) warm milk", the name should be "warm milk" and amount should be "3/4 cup (180g)".
+4. Instructions should be complete sentences.
+5. The title should be descriptive of the dish.
+
+Respond ONLY with a JSON object in this exact format:
+{
+  "title": "Recipe Title",
+  "ingredients": [
+    {"name": "ingredient name (e.g., flour)", "amount": "amount with units (e.g., 2 cups)"},
+    ...more ingredients
+  ],
+  "instructions": [
+    "Step 1 instruction",
+    ...more instructions
+  ]}`;
+
+    const response = await axios.post(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 4096,
+        },
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': GEMINI_API_KEY,
+        },
+      }
+    );
+    
+    const responseText = response.data.candidates[0].content.parts[0].text;
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                      responseText.match(/{[\s\S]*}/);
+                      
+    const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText;
+    
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    console.error('Error with Gemini extraction:', error.message);
+    throw error;
+  }
+};
+
+// Now fix the cleanupRecipeWithAI function to properly use these functions
+const cleanupRecipeWithAI = async (recipeData, originalText) => {
   try {
     console.log('Attempting to clean up recipe data with AI');
     
-    // Try different AI models in sequence
+    // Use the existing extraction functions
     const aiModels = [
       { name: 'OpenAI', extractFn: extractWithOpenAI },
       { name: 'Anthropic', extractFn: extractWithAnthropic },
       { name: 'Gemini', extractFn: extractWithGemini }
     ];
     
+    // Prepare the text to send to AI
     const recipeText = `
 Title: ${recipeData.title}
-Ingredients: ${recipeData.ingredients.map(i => `${i.amount} ${i.name}`).join(', ')}
+Ingredients: ${recipeData.ingredients.map(i => `${i.amount || ''} ${i.name || ''}`).join(', ')}
 Instructions: ${recipeData.instructions.join(' ')}
+
+Original Text (if available):
+${originalText || ''}
 `;
     
     for (const model of aiModels) {
@@ -461,8 +785,25 @@ Instructions: ${recipeData.instructions.join(' ')}
     }
     
     // If all AI models fail, return the original data with a shorter title
-    if (recipeData.title.length > 60) {
+    if (recipeData.title && recipeData.title.length > 60) {
       recipeData.title = recipeData.title.substring(0, 57) + '...';
+    }
+    
+    // Try to fix empty ingredient names
+    if (recipeData.ingredients) {
+      recipeData.ingredients = recipeData.ingredients.map(ing => {
+        if ((!ing.name || ing.name.trim() === '') && ing.amount) {
+          // Try to extract ingredient name from amount
+          const match = ing.amount.match(/^([\d\s\/]+\s*(?:cup|tbsp|tsp|g|kg|ml|l|oz|pound|lb)s?)\s+(.+)$/i);
+          if (match) {
+            return { name: match[2].trim(), amount: match[1].trim() };
+          }
+          
+          // If no match, use a generic name
+          return { name: "Ingredient", amount: ing.amount };
+        }
+        return ing;
+      });
     }
     
     return recipeData;
@@ -472,261 +813,199 @@ Instructions: ${recipeData.instructions.join(' ')}
   }
 };
 
-// Update the main extraction function to use the cleanup
+// Add this validation function to check AI-generated recipe data
+const validateRecipeData = (recipeData) => {
+  if (!recipeData) return false;
+  
+  // Check if ingredients look valid (not just measurements)
+  const hasValidIngredients = recipeData.ingredients && 
+    recipeData.ingredients.length > 0 &&
+    recipeData.ingredients.some(ing => {
+      // Invalid if name is just a measurement unit
+      const isMeasurementOnly = /^(cup|tbsp|tsp|g|kg|ml|l|oz|pound|lb)s?$/i.test(ing.name?.trim());
+      // Invalid if name is very short and amount exists
+      const isTooShort = ing.name?.trim().length < 3 && ing.amount;
+      return !isMeasurementOnly && !isTooShort;
+    });
+  
+  // Check if instructions look valid
+  const hasValidInstructions = recipeData.instructions && 
+    recipeData.instructions.length > 0 &&
+    recipeData.instructions.some(inst => inst.length > 15); // Instructions should be reasonably detailed
+  
+  return hasValidIngredients && hasValidInstructions;
+};
+
+// Modify the extractRecipeFromText function to include better prompting and validation
 export const extractRecipeFromText = async (text) => {
+  if (!text || text.length < 10) {
+    console.log('Text too short for recipe extraction');
+    return null;
+  }
+  
+  console.log('Extracting recipe from text (length):', text.length);
+  console.log('Text sample:', text.substring(0, 150) + '...');
+  
+  // First try regex-based extraction as it's faster
   try {
-    console.log('Extracting recipe from text (length):', text.length);
-    console.log('Text sample:', text.substring(0, 150) + '...');
-    
-    // Try to extract with regex first (fastest method)
+    console.log('Attempting regex-based recipe extraction from caption');
     const regexRecipe = extractRecipeWithRegex(text);
+    console.log('Successfully extracted recipe using regex, attempting cleanup');
     
-    // Check if regex extraction was successful
-    const hasGoodIngredients = regexRecipe.ingredients.length > 1 && 
-                              !regexRecipe.ingredients[0].name.includes('not found');
-    const hasGoodInstructions = regexRecipe.instructions.length > 1 && 
-                               !regexRecipe.instructions[0].includes('not found');
-    
-    if (hasGoodIngredients && hasGoodInstructions) {
-      console.log('Successfully extracted recipe using regex, attempting cleanup');
-      // Try to clean up the recipe data with AI
-      return await cleanupRecipeWithAI(regexRecipe);
-    }
-    
-    // Try different AI models in sequence
-    const aiModels = [
-      { name: 'OpenAI', extractFn: extractWithOpenAI },
-      { name: 'Anthropic', extractFn: extractWithAnthropic },
-      { name: 'Gemini', extractFn: extractWithGemini }
-    ];
-    
-    for (const model of aiModels) {
-      try {
-        console.log(`Attempting extraction with ${model.name}`);
-        const recipeData = await model.extractFn(text);
-        
-        // Validate the response
-        if (recipeData && recipeData.title && 
-            recipeData.ingredients && recipeData.ingredients.length > 0 &&
-            recipeData.instructions && recipeData.instructions.length > 0) {
-          
-          console.log(`Successfully extracted recipe using ${model.name}`);
-          
-          // Ensure ingredients are in the expected format
-          const formattedIngredients = recipeData.ingredients.map(item => {
-            if (typeof item === 'string') {
-              // Try to split into name and amount
-              const match = item.match(/^([\d\s\/]+(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?)\s+(.+)$/i);
-              if (match) {
-                return { name: match[2].trim(), amount: match[1].trim() };
-              }
-              return { name: item, amount: '' };
-            }
-            return item;
-          });
-          
-          return {
-            title: recipeData.title,
-            ingredients: formattedIngredients,
-            instructions: recipeData.instructions
-          };
-        }
-      } catch (error) {
-        console.error(`Error with ${model.name}:`, error.message);
-        // Continue to the next model instead of retrying
-        continue;
-      }
-    }
-    
-    // If all AI models fail, fall back to regex extraction again
-    console.log('All AI models failed, using regex extraction as fallback');
-    return regexRecipe;
-    
-  } catch (error) {
-    console.error('Error extracting recipe from text:', error);
-    throw error; // Let the calling function handle this error
-  }
-};
-
-// Function to extract recipe using OpenAI
-const extractWithOpenAI = async (text) => {
-  try {
-    console.log('Attempting to extract recipe with OpenAI');
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that extracts recipe information from text. Extract the title, ingredients with amounts, and instructions. Format the response as JSON with the following structure: {"title": "Recipe Title", "ingredients": [{"name": "ingredient name", "amount": "amount"}], "instructions": ["step 1", "step 2"]}.'
-          },
-          {
-            role: 'user',
-            content: `Extract recipe from this text: ${text}`
-          }
-        ]
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    // Parse the response
-    const content = response.data.choices[0].message.content;
+    // Try to clean up the regex results with AI
     try {
-      return JSON.parse(content);
-    } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      throw new Error('Invalid response format from OpenAI');
-    }
-  } catch (error) {
-    console.error('OpenAI API Error Details:');
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Headers:', JSON.stringify(error.response.headers));
-      console.error('Data:', JSON.stringify(error.response.data));
+      console.log('Attempting to clean up recipe data with AI');
+      const cleanedRecipe = await cleanupRecipeWithAI(regexRecipe, text);
       
-      if (error.response.status === 429) {
-        console.error('Rate limit exceeded: Too many requests in a given amount of time');
+      // Validate the cleaned recipe
+      if (validateRecipeData(cleanedRecipe)) {
+        console.log('Successfully cleaned and validated recipe');
+        return cleanedRecipe;
+      } else {
+        console.log('AI cleanup produced invalid recipe, falling back to regex result');
       }
+    } catch (cleanupError) {
+      console.error('Error during recipe cleanup:', cleanupError);
     }
-    throw error;
-  }
-};
-
-// Function to extract recipe using Anthropic Claude
-const extractWithAnthropic = async (text) => {
-  try {
-    console.log('Attempting to extract recipe with Anthropic Claude');
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      {
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: `Extract recipe information from this text and format it as JSON with the following structure: {"title": "Recipe Title", "ingredients": [{"name": "ingredient name", "amount": "amount"}], "instructions": ["step 1", "step 2"]}. Here's the text: ${text}`
-          }
-        ]
-      },
-      {
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json'
-        }
-      }
-    );
     
-    // Parse the response - Anthropic has a different response structure
-    if (response.data && response.data.content) {
-      // Get the text content from the first content block
-      const content = response.data.content[0].text;
-      
-      // Extract JSON from the response (Claude might wrap it in markdown)
-      const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/) || 
-                        content.match(/```\n([\s\S]*?)\n```/) ||
-                        content.match(/{[\s\S]*?}/);
-      
-      const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : content;
-      
-      try {
-        return JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error('Error parsing Anthropic response JSON:', parseError);
-        throw new Error('Invalid JSON format from Anthropic');
-      }
-    } else {
-      console.error('Unexpected Anthropic response format:', JSON.stringify(response.data));
-      throw new Error('Invalid response format from Anthropic');
-    }
-  } catch (error) {
-    console.error('Anthropic API Error Details:');
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Headers:', JSON.stringify(error.response.headers));
-      console.error('Data:', JSON.stringify(error.response.data));
-      
-      if (error.response.status === 429) {
-        console.error('Rate limit exceeded: Too many requests in a given amount of time');
-      }
-    }
-    throw error;
+    // If AI cleanup fails or produces invalid results, return the regex result
+    return regexRecipe;
+  } catch (regexError) {
+    console.error('Error in regex recipe extraction:', regexError);
   }
+  
+  // If regex fails, try direct AI extraction with improved prompts
+  return await extractRecipeWithAI(text);
 };
 
-// Function to extract recipe using Google Gemini
-const extractWithGemini = async (text) => {
+// Improve the AI extraction with better prompts and validation
+const extractRecipeWithAI = async (text) => {
+  // Try each AI service with improved prompts
+  const attempts = [
+    { name: 'OpenAI', fn: extractWithOpenAI },
+    { name: 'Anthropic', fn: extractWithAnthropic },
+    { name: 'Gemini', fn: extractWithGemini }
+  ];
+  
+  for (const attempt of attempts) {
+    try {
+      console.log(`Attempting to extract recipe with ${attempt.name}`);
+      const recipeData = await attempt.fn(text);
+      
+      // Validate the recipe data
+      if (validateRecipeData(recipeData)) {
+        console.log(`Successfully extracted valid recipe using ${attempt.name}`);
+        return recipeData;
+      } else {
+        console.log(`${attempt.name} produced invalid recipe data, trying next service`);
+      }
+    } catch (error) {
+      console.error(`Error with ${attempt.name} extraction:`, error.message);
+    }
+  }
+  
+  // If all AI services fail or produce invalid results, fall back to regex
+  console.log('All AI extraction attempts failed, falling back to basic extraction');
+  return extractRecipeWithRegex(text);
+};
+
+// Improve the Gemini extraction with a better prompt
+const extractRecipeWithGemini = async (text) => {
   try {
     console.log('Attempting to extract recipe with Google Gemini 2.0 Flash-Lite');
+    
+    const prompt = `
+You are a professional recipe parser. Extract a structured recipe from the following text. 
+The text is from a social media post and may contain hashtags, emojis, and other non-recipe content.
+
+IMPORTANT FORMATTING RULES:
+1. For ingredients, ALWAYS combine the measurement and ingredient name together in the "name" field.
+   CORRECT: {"name": "all-purpose flour", "amount": "2 cups"}
+   INCORRECT: {"name": "cup", "amount": "2"} or {"name": "flour", "amount": "2 cups"}
+
+2. Instructions should be complete sentences that clearly describe each step.
+
+3. The title should be descriptive of the dish, not just an ingredient.
+
+4. If you're unsure about any part, use your best judgment to create a coherent recipe.
+
+TEXT TO PARSE:
+${text}
+
+Respond ONLY with a JSON object in this exact format:
+{
+  "title": "Recipe Title",
+  "ingredients": [
+    {"name": "ingredient name including type (e.g., all-purpose flour)", "amount": "amount with units (e.g., 2 cups)"},
+    ...more ingredients
+  ],
+  "instructions": [
+    "Step 1 instruction",
+    "Step 2 instruction",
+    ...more instructions
+  ]
+}
+`;
+
+    // Make the API call to Gemini
     const response = await axios.post(
-      'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
       {
-        contents: [
-          {
-            parts: [
-              {
-                text: `Extract recipe information from this text and format it as JSON with the following structure: {"title": "Recipe Title", "ingredients": [{"name": "ingredient name", "amount": "amount"}], "instructions": ["step 1", "step 2"]}. Here's the text: ${text}`
-              }
-            ]
-          }
-        ],
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1024
-        }
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 4096,
+        },
       },
       {
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': GEMINI_API_KEY
+          'x-goog-api-key': GEMINI_API_KEY,
         },
-        params: {
-          key: GEMINI_API_KEY
-        }
       }
     );
-    
+
     console.log('Gemini response received');
     
-    // Parse the response
-    if (response.data && response.data.candidates && response.data.candidates[0] && 
-        response.data.candidates[0].content && response.data.candidates[0].content.parts) {
-      
-      const content = response.data.candidates[0].content.parts[0].text;
-      console.log('Gemini raw response:', content.substring(0, 150) + '...');
-      
-      // Extract JSON from the response (Gemini might wrap it in markdown)
-      const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/) || 
-                        content.match(/```\n([\s\S]*?)\n```/) ||
-                        content.match(/{[\s\S]*?}/);
-      
-      const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : content;
-      
-      try {
-        return JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error('Error parsing Gemini response JSON:', parseError);
-        throw new Error('Invalid JSON format from Gemini');
-      }
-    } else {
-      console.error('Unexpected Gemini response format:', JSON.stringify(response.data));
-      throw new Error('Invalid response format from Gemini');
+    // Extract the text from the response
+    const responseText = response.data.candidates[0].content.parts[0].text;
+    console.log('Gemini raw response:', responseText.substring(0, 150) + '...');
+    
+    // Extract the JSON part from the response
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                      responseText.match(/{[\s\S]*}/);
+                      
+    const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText;
+    
+    // Parse the JSON
+    const recipeData = JSON.parse(jsonStr);
+    
+    // Validate the recipe data structure
+    if (!recipeData.title || !Array.isArray(recipeData.ingredients) || !Array.isArray(recipeData.instructions)) {
+      throw new Error('Invalid recipe data structure from Gemini');
     }
+    
+    // Additional validation for ingredients
+    recipeData.ingredients = recipeData.ingredients.filter(ing => {
+      // Filter out ingredients that are just measurement units
+      const isMeasurementOnly = /^(cup|tbsp|tsp|g|kg|ml|l|oz|pound|lb)s?$/i.test(ing.name?.trim());
+      return ing.name && !isMeasurementOnly;
+    });
+    
+    // If we filtered out too many ingredients, something is wrong
+    if (recipeData.ingredients.length < 2) {
+      throw new Error('Too few valid ingredients after filtering');
+    }
+    
+    console.log('Successfully cleaned recipe using Gemini');
+    return recipeData;
   } catch (error) {
-    console.error('Gemini API Error Details:');
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Headers:', JSON.stringify(error.response.headers));
-      console.error('Data:', JSON.stringify(error.response.data));
-    } else {
-      console.error('Error message:', error.message);
-    }
+    console.error('Error with Gemini extraction:', error.message);
     throw error;
   }
 };
+
+// Similarly improve the OpenAI and Anthropic extraction functions with better prompts
+// (code for these functions would be similar to the Gemini one above)
