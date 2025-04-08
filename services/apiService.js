@@ -8,6 +8,7 @@ const TIKTOK_API_KEY = process.env.TIKTOK_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const INSTAGRAM_API_KEY = process.env.INSTAGRAM_API_KEY;
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 // Cache for storing results to avoid repeated API calls
 const cacheResults = async (url, data) => {
@@ -378,6 +379,216 @@ export const extractVideoInfo = async (url) => {
       }
     }
     
+    // Add YouTube handling
+    if (platform === 'youtube') {
+      console.log('Extracting YouTube video info');
+      
+      // Extract video ID from YouTube URL
+      let videoId = '';
+      if (url.includes('youtube.com/watch')) {
+        const urlObj = new URL(url);
+        videoId = urlObj.searchParams.get('v');
+      } else if (url.includes('youtu.be/')) {
+        // Handle shortened URLs
+        videoId = url.split('youtu.be/')[1].split('?')[0];
+      }
+      
+      if (!videoId) {
+        console.error('Could not extract video ID from URL:', url);
+        throw new Error('Could not extract video ID from YouTube URL');
+      }
+      
+      console.log('Extracted YouTube video ID:', videoId);
+      
+      try {
+        // First, get video details
+        const videoDetailsResponse = await axios.get(
+          `https://www.googleapis.com/youtube/v3/videos`,
+          {
+            params: {
+              part: 'snippet,contentDetails',
+              id: videoId,
+              key: YOUTUBE_API_KEY
+            }
+          }
+        );
+        
+        if (!videoDetailsResponse.data.items || videoDetailsResponse.data.items.length === 0) {
+          throw new Error('Video not found');
+        }
+        
+        const videoDetails = videoDetailsResponse.data.items[0];
+        const title = videoDetails.snippet.title;
+        const description = videoDetails.snippet.description;
+        
+        console.log('Video title:', title);
+        console.log('Description length:', description.length);
+        
+        // Get captions/transcript
+        let transcript = '';
+        try {
+          // Try to get captions using the YouTube Data API
+          const captionsResponse = await axios.get(
+            `https://www.googleapis.com/youtube/v3/captions`,
+            {
+              params: {
+                part: 'snippet',
+                videoId: videoId,
+                key: YOUTUBE_API_KEY
+              }
+            }
+          );
+          
+          if (captionsResponse.data.items && captionsResponse.data.items.length > 0) {
+            // Get the first available caption track (preferably in English)
+            const captionTracks = captionsResponse.data.items;
+            const englishTrack = captionTracks.find(track => 
+              track.snippet.language === 'en' || track.snippet.language.startsWith('en-')
+            ) || captionTracks[0];
+            
+            // Get the actual caption content
+            const captionId = englishTrack.id;
+            const captionContent = await axios.get(
+              `https://www.googleapis.com/youtube/v3/captions/${captionId}`,
+              {
+                params: {
+                  key: YOUTUBE_API_KEY
+                },
+                headers: {
+                  'Accept': 'text/plain'
+                }
+              }
+            );
+            
+            transcript = captionContent.data;
+          }
+        } catch (captionError) {
+          console.error('Error fetching captions:', captionError);
+          console.log('Falling back to description for recipe extraction');
+        }
+        
+        // If we couldn't get captions, use the description
+        if (!transcript) {
+          transcript = description;
+        }
+        
+        // Combine title and transcript/description for better recipe extraction
+        const combinedText = `${title}\n\n${transcript}`;
+        
+        // Try to extract recipe from description using regex
+        const regexRecipe = extractRecipeWithRegex(combinedText);
+        
+        // Filter out non-food items from ingredients
+        if (regexRecipe && regexRecipe.ingredients) {
+          const nonFoodItems = [
+            'scale', 'digital scale', 'escali', 'thermometer', 'amazon', 'affiliate', 
+            'link', 'subscribe', 'channel', 'follow', 'instagram', 'tiktok', 'youtube',
+            'website', 'blog', 'equipment', 'tools', 'amazon basics', 'kitchenaid',
+            'food processor', 'blender', 'mixer', 'spatula', 'whisk', 'bowl', 'pan',
+            'pot', 'skillet', 'knife', 'cutting board', 'measuring cup', 'measuring spoon'
+          ];
+          
+          regexRecipe.ingredients = regexRecipe.ingredients.filter(ing => {
+            if (!ing.name) return false;
+            const lowerName = ing.name.toLowerCase();
+            return !nonFoodItems.some(item => lowerName.includes(item.toLowerCase()));
+          });
+        }
+        
+        return {
+          caption: combinedText,
+          videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+          title: title,
+          recipe: regexRecipe.ingredients.length > 2 ? regexRecipe : null
+        };
+      } catch (youtubeError) {
+        console.error('YouTube API request failed:', youtubeError.message);
+        console.log('Error details:', youtubeError.response ? {
+          status: youtubeError.response.status,
+          data: youtubeError.response.data
+        } : 'No response');
+        
+        // Try alternative method - web scraping or third-party service
+        try {
+          console.log('Trying alternative YouTube data extraction method');
+          
+          // For this fallback, we'll use a third-party service that can extract YouTube transcripts
+          const rapidApiResponse = await axios.get(
+            'https://youtube-transcript-api-proxy.p.rapidapi.com/transcript',
+            {
+              params: {
+                videoId: videoId,
+                lang: 'en'
+              },
+              headers: {
+                'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+                'X-RapidAPI-Host': 'youtube-transcript-api-proxy.p.rapidapi.com'
+              }
+            }
+          );
+          
+          if (rapidApiResponse.data && rapidApiResponse.data.transcript) {
+            // Format the transcript
+            const transcript = rapidApiResponse.data.transcript
+              .map(item => item.text)
+              .join(' ');
+            
+            console.log('Successfully retrieved YouTube transcript via RapidAPI');
+            
+            // Try to get the video title using a simple fetch
+            let title = 'YouTube Video';
+            try {
+              const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`);
+              const titleMatch = response.data.match(/<title>(.*?)<\/title>/);
+              if (titleMatch && titleMatch[1]) {
+                title = titleMatch[1].replace(' - YouTube', '');
+              }
+            } catch (titleError) {
+              console.error('Error fetching video title:', titleError);
+            }
+            
+            // Combine title and transcript for better recipe extraction
+            const combinedText = `${title}\n\n${transcript}`;
+            
+            // Try to extract recipe from transcript using regex
+            const regexRecipe = extractRecipeWithRegex(combinedText);
+            
+            return {
+              caption: combinedText,
+              videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+              title: title,
+              recipe: regexRecipe.ingredients.length > 2 ? regexRecipe : null
+            };
+          }
+        } catch (altError) {
+          console.error('Alternative YouTube extraction failed:', altError.message);
+        }
+        
+        // If all else fails, try to at least get the video title
+        try {
+          const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`);
+          const titleMatch = response.data.match(/<title>(.*?)<\/title>/);
+          if (titleMatch && titleMatch[1]) {
+            const title = titleMatch[1].replace(' - YouTube', '');
+            return {
+              caption: '',
+              videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+              title: title
+            };
+          }
+        } catch (titleError) {
+          console.error('Error fetching video title:', titleError);
+        }
+      }
+      
+      // Return a minimal object with empty values as last resort
+      return {
+        caption: '',
+        videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+        title: 'YouTube Video'
+      };
+    }
+    
     // Fallback methods and general page scraping remain the same...
     // ...
     
@@ -407,7 +618,57 @@ export const transcribeAudio = async (audioUrl) => {
   try {
     console.log('Attempting to transcribe audio from URL:', audioUrl.substring(0, 50) + '...');
     
-    // This would use OpenAI's Whisper API or another transcription service
+    // Special handling for YouTube URLs
+    if (audioUrl.includes('youtube.com/watch') || audioUrl.includes('youtu.be/')) {
+      console.log('Detected YouTube URL, using YouTube-specific transcription');
+      
+      // Extract video ID
+      let videoId = '';
+      if (audioUrl.includes('youtube.com/watch')) {
+        const urlObj = new URL(audioUrl);
+        videoId = urlObj.searchParams.get('v');
+      } else if (audioUrl.includes('youtu.be/')) {
+        videoId = audioUrl.split('youtu.be/')[1].split('?')[0];
+      }
+      
+      if (!videoId) {
+        console.error('Could not extract video ID from URL:', audioUrl);
+        return null;
+      }
+      
+      try {
+        // Try to use a third-party service that provides YouTube transcripts
+        // This is a placeholder - you would need to implement or find a service that does this
+        const transcriptResponse = await axios.get(
+          `https://youtube-transcript-api-proxy.p.rapidapi.com/transcript`,
+          {
+            params: {
+              videoId: videoId,
+              lang: 'en'
+            },
+            headers: {
+              'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+              'X-RapidAPI-Host': 'youtube-transcript-api-proxy.p.rapidapi.com'
+            }
+          }
+        );
+        
+        if (transcriptResponse.data && transcriptResponse.data.transcript) {
+          // Format the transcript
+          const transcriptText = transcriptResponse.data.transcript
+            .map(item => item.text)
+            .join(' ');
+          
+          console.log('Successfully retrieved YouTube transcript');
+          return transcriptText;
+        }
+      } catch (transcriptError) {
+        console.error('Error fetching YouTube transcript:', transcriptError);
+      }
+    }
+    
+    // Fall back to OpenAI's Whisper API for other platforms or if YouTube-specific method fails
+    console.log('Using OpenAI Whisper for audio transcription');
     const response = await axios.post(
       'https://api.openai.com/v1/audio/transcriptions',
       {
@@ -429,137 +690,87 @@ export const transcribeAudio = async (audioUrl) => {
   }
 };
 
-// Improved regex extraction function
+// Enhance the extractRecipeWithRegex function to better handle YouTube descriptions
 const extractRecipeWithRegex = (text) => {
   try {
-    console.log('Attempting regex-based recipe extraction from caption');
+    // Try to find a title (usually at the beginning or in all caps)
+    const titleMatch = text.match(/^([A-Z][^.!?]*)/m) || 
+                      text.match(/([A-Z][A-Z\s]+[A-Z])/);
+    const title = titleMatch ? titleMatch[0].trim() : 'Recipe';
     
-    // Extract a cleaner title - look for a short phrase at the beginning or in all caps
-    let title = 'Recipe';
-    const titlePatterns = [
-      /^([A-Z][^.!?]{3,50})/m,                  // First sentence starting with capital
-      /([A-Z][A-Z\s]{3,50}[A-Z])/,              // ALL CAPS phrase
-      /((?:chocolate|cookie|cake|bread|pie|soup|salad|chicken|beef|pork|fish|vegan|vegetarian|gluten-free|keto|low-carb|healthy|homemade|easy|quick|best|favorite)[\s\w]{3,40})/i  // Common recipe keywords
+    // Filter out common non-food items and equipment mentions
+    const nonFoodItems = [
+      'scale', 'digital scale', 'escali', 'thermometer', 'amazon', 'affiliate', 
+      'link', 'subscribe', 'channel', 'follow', 'instagram', 'tiktok', 'youtube',
+      'website', 'blog', 'equipment', 'tools', 'amazon basics', 'kitchenaid',
+      'food processor', 'blender', 'mixer', 'spatula', 'whisk', 'bowl', 'pan',
+      'pot', 'skillet', 'knife', 'cutting board', 'measuring cup', 'measuring spoon'
     ];
     
-    for (const pattern of titlePatterns) {
-      const match = text.match(pattern);
-      if (match && match[0]) {
-        // Limit title length and remove hashtags
-        title = match[0].replace(/#\w+/g, '').trim();
-        if (title.length > 60) {
-          title = title.substring(0, 57) + '...';
-        }
-        break;
-      }
-    }
+    // Clean the text by removing lines with non-food items
+    const cleanedText = text.split('\n')
+      .filter(line => {
+        const lowerLine = line.toLowerCase();
+        return !nonFoodItems.some(item => lowerLine.includes(item.toLowerCase()));
+      })
+      .join('\n');
     
-    // Fix empty ingredient names and improve title extraction
-    if (title.includes('Ingredients:') || title.includes('ingredients:')) {
-      // The title likely contains the full recipe text
-      const betterTitle = title.split(/[\n:]/)[0].trim();
-      if (betterTitle && betterTitle.length > 3 && betterTitle.length < 60) {
-        title = betterTitle;
-      }
-    }
-    
-    // Look for ingredient section markers
-    const ingredientSectionMatch = text.match(/ingredients:?(?:\s*\(.*?\))?:([\s\S]*?)(?:instructions|directions|steps|method|preparation|$)/i);
-    
-    // Extract ingredients with better pattern matching
-    let ingredientsText = ingredientSectionMatch ? ingredientSectionMatch[1] : text;
-    
-    // Look for ingredient patterns with measurements
-    const ingredientPatterns = [
-      /(\d+[\s\/]?(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?[\s\w]+)/gi,  // Standard measurements
-      /(\d+[\s\/]?(?:pinch|dash|handful|slice|piece|clove)s?[\s\w]+)/gi,  // Other common measurements
-      /(-\s*[\w\s]+)/g,  // Bullet points
-      /(•\s*[\w\s]+)/g   // Bullet points with bullet character
-    ];
-    
-    let ingredientsRaw = [];
-    for (const pattern of ingredientPatterns) {
-      const matches = Array.from(ingredientsText.matchAll(pattern), m => m[0].trim());
-      if (matches.length > 0) {
-        ingredientsRaw = matches;
-        break;
-      }
-    }
-    
-    // If no ingredients found with patterns, try splitting by lines or commas
-    if (ingredientsRaw.length === 0 && ingredientSectionMatch) {
-      ingredientsRaw = ingredientSectionMatch[1]
-        .split(/\n|,/)
-        .map(line => line.trim())
-        .filter(line => line.length > 3 && !line.match(/instructions|directions|steps|method/i));
-    }
-    
-    // Convert ingredients to the expected format
-    let ingredients = ingredientsRaw.map(item => {
-      // Try to split the ingredient into amount and name
-      const amountMatch = item.match(/^(-\s*|•\s*|(\d+[\s\/]?(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon|pinch|dash|handful|slice|piece|clove)s?\.?))/i);
-      if (amountMatch) {
-        const amount = amountMatch[0].replace(/^(-\s*|•\s*)/, '').trim();
-        const name = item.substring(amountMatch[0].length).trim();
-        return { name, amount };
-      }
-      return { name: item.replace(/^(-\s*|•\s*)/, '').trim(), amount: '' };
-    });
-    
-    // Fix empty ingredient names
-    ingredients = ingredients.map(ing => {
-      if (!ing.name || ing.name.trim() === '') {
-        // Try to extract ingredient name from amount
-        if (ing.amount) {
-          const parts = ing.amount.match(/^([\d\s\/]+\s*(?:cup|tbsp|tsp|g|kg|ml|l|oz|pound|lb)s?)\s+(.+)$/i);
-          if (parts) {
-            return { name: parts[2].trim(), amount: parts[1].trim() };
-          }
-        }
-        return { name: "Ingredient", amount: ing.amount || "" };
-      }
-      return ing;
-    });
-    
-    // Look for instruction section markers
-    const instructionSectionMatch = text.match(/(?:instructions|directions|steps|method|preparation):?([\s\S]*?)(?:notes|tips|enjoy|$)/i);
-    
-    // Extract instructions
-    let instructionsText = instructionSectionMatch ? instructionSectionMatch[1] : text;
-    
-    // Look for numbered steps
-    const instructionMatches = instructionsText.matchAll(/(\d+[\.)]\s*[^.!?]+[.!?])/g);
-    let instructions = Array.from(instructionMatches, m => m[0].trim());
-    
-    // If no numbered steps found, try bullet points
-    if (instructions.length === 0) {
-      const bulletMatches = instructionsText.matchAll(/(-\s*|•\s*)([^.!?]+[.!?])/g);
-      instructions = Array.from(bulletMatches, m => m[2].trim());
-    }
-    
-    // If still no instructions, split by periods or line breaks
-    if (instructions.length === 0) {
-      instructions = instructionsText
-        .split(/\.\s+|\n+/)
-        .map(line => line.trim())
-        .filter(line => 
-          line.length > 15 && 
-          !line.match(/^ingredients/i) &&
-          !ingredientsRaw.some(ing => line.includes(ing))
-        );
-    }
-    
-    // Clean up instructions
-    instructions = instructions.map(instruction => 
-      instruction.replace(/^(-\s*|•\s*|\d+[\.)]\s*)/, '').trim()
+    // Look for ingredient patterns with improved regex
+    // This handles both "30g or 2Tbsp soy sauce" and "2 Tbsp soy sauce" formats
+    const ingredientMatches = cleanedText.matchAll(
+      /([0-9¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞]+[\s\/]?(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?(?:\s+or\s+[0-9¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞]+[\s\/]?(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?)?[\s\w]+)/gi
     );
     
-    console.log('Successfully extracted recipe using regex');
+    const ingredientsRaw = Array.from(ingredientMatches, m => m[0].trim());
+    
+    // Convert ingredients to the expected format with name and amount properties
+    const ingredients = ingredientsRaw.map(item => {
+      // Handle "or" statements in measurements
+      if (item.toLowerCase().includes(' or ')) {
+        // Extract the full measurement part including both options
+        const measurementMatch = item.match(
+          /^([\d\s\/¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞]+(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?\s+or\s+[\d\s\/¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞]+(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?)/i
+        );
+        
+        if (measurementMatch) {
+          const amount = measurementMatch[1].trim();
+          const name = item.substring(amount.length).trim();
+          return { name, amount };
+        }
+      }
+      
+      // Try to split the ingredient into amount and name (standard case)
+      const amountMatch = item.match(/^([\d\s\/¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞]+(?:cup|tbsp|tsp|oz|g|kg|ml|lb|pound|tablespoon|teaspoon)s?\.?)/i);
+      if (amountMatch) {
+        const amount = amountMatch[1].trim();
+        const name = item.substring(amount.length).trim();
+        return { name, amount };
+      }
+      
+      return { name: item, amount: '' };
+    });
+    
+    // Filter out non-food items from ingredients
+    const filteredIngredients = ingredients.filter(ing => {
+      const lowerName = ing.name.toLowerCase();
+      return !nonFoodItems.some(item => lowerName.includes(item.toLowerCase()));
+    });
+    
+    // Look for numbered steps or instructions
+    const instructionMatches = text.matchAll(/(\d+\.\s*[^.!?]+[.!?])/g);
+    const instructions = Array.from(instructionMatches, m => m[0].trim());
+    
+    // If no structured instructions found, split by periods or line breaks
+    const fallbackInstructions = instructions.length === 0 ? 
+      text.split(/\.\s+|\n+/).filter(line => 
+        line.length > 15 && 
+        !ingredientsRaw.some(ing => line.includes(ing))
+      ) : instructions;
     
     return {
       title,
-      ingredients: ingredients.length > 0 ? ingredients : [{ name: 'Ingredients not found', amount: '' }],
-      instructions: instructions.length > 0 ? instructions : ['Instructions not found']
+      ingredients: filteredIngredients.length > 0 ? filteredIngredients : [{ name: 'Ingredients not found', amount: '' }],
+      instructions: fallbackInstructions.length > 0 ? fallbackInstructions : ['Instructions not found']
     };
   } catch (error) {
     console.error('Error in regex recipe extraction:', error);

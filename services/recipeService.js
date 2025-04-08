@@ -332,6 +332,17 @@ const parseAmount = (amountStr) => {
   // Clean the string and convert fractions
   const cleanStr = amountStr.trim().toLowerCase();
   
+  // Handle "or" statements in measurements
+  if (cleanStr.includes(' or ')) {
+    // Keep the full "or" statement as a special format
+    return { 
+      value: 0, // We'll use the special format instead
+      unit: '',
+      originalText: amountStr,
+      isSpecialFormat: true
+    };
+  }
+  
   // Check for special descriptive amounts like "packet", "to taste", etc.
   const descriptiveMatch = cleanStr.match(/(packet|to taste|as needed|pinch|dash|sprinkle|handful)/i);
   if (descriptiveMatch) {
@@ -593,6 +604,16 @@ const deduplicateIngredients = (ingredients) => {
     // Normalize ingredient name (lowercase, trim, remove extra spaces)
     const normalizedName = ingredient.name.toLowerCase().trim().replace(/\s+/g, ' ');
     
+    // Filter out non-food items and equipment
+    const nonFoodItems = [
+      'scale', 'digital scale', 'escali', 'thermometer', 'amazon', 'affiliate', 
+      'link', 'subscribe', 'channel', 'follow', 'instagram', 'tiktok', 'youtube'
+    ];
+    
+    if (nonFoodItems.some(item => normalizedName.includes(item))) {
+      return; // Skip this ingredient
+    }
+    
     // Special case for "juice of X" - extract just the main ingredient
     let specialIngredient = null;
     const juiceMatch = normalizedName.match(/juice of .*(lemon|lime|orange)/i);
@@ -606,8 +627,21 @@ const deduplicateIngredients = (ingredients) => {
     // Parse the amount
     const parsedAmount = parseAmount(ingredient.amount);
     
-    // Debug log to check parsing
-    console.log(`Parsed amount for ${ingredient.name}: `, parsedAmount);
+    // Log the parsed amount for debugging
+    console.log(`Parsed amount for ${ingredient.name}: `, JSON.stringify(parsedAmount));
+    
+    // If this is a special format with "or" statement, just keep it as is
+    if (parsedAmount.isSpecialFormat || 
+        (ingredient.amount && ingredient.amount.toLowerCase().includes(' or '))) {
+      ingredientMap.set(mapKey, { 
+        value: 0, 
+        unit: '', 
+        name: ingredient.name,
+        amount: ingredient.amount, // Keep the original amount string
+        isSpecialFormat: true
+      });
+      return;
+    }
     
     if (ingredientMap.has(mapKey)) {
       const existing = ingredientMap.get(mapKey);
@@ -695,6 +729,14 @@ const deduplicateIngredients = (ingredients) => {
   
   // Convert back to the expected format
   return Array.from(ingredientMap.values()).map(item => {
+    // If this is a special format, just return the original
+    if (item.isSpecialFormat) {
+      return {
+        name: item.name,
+        amount: item.amount
+      };
+    }
+    
     // Choose the best unit for the measurement
     const optimized = chooseBestUnit(item.value, item.unit);
     item.value = optimized.value;
