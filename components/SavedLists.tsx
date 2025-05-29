@@ -75,9 +75,16 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
           (error instanceof Error && (
             error.message.includes('fetch') ||
             error.message.includes('Failed to fetch') ||
-            error.message.includes('Network')
+            error.message.includes('Network error') ||
+            error.message.includes('HTTP 5') ||
+            error.message.includes('Server unavailable')
           ));
       
+      if (!isNetworkError) {
+        console.error('Failed to fetch lists:', error);
+      }
+      
+      // Show user-friendly error message for different error types
       if (isNetworkError) {
         // Network-related errors (disconnected wifi, server down, etc.)
         alert('Unable to load grocery lists. Please check your internet connection and try again.');
