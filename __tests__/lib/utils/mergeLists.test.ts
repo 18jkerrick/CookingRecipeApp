@@ -44,7 +44,7 @@ describe('mergeLists', () => {
 
   test('handles empty lists', () => {
     const listA = [{ name: 'eggs', quantity: 2, unit: '' }]
-    const listB = []
+    const listB = [] as typeof listA
     
     const result = mergeLists(listA, listB)
     

@@ -58,6 +58,7 @@ export default function Home() {
         } else {
           // Success case
           setRecipe({
+            platform: data.platform,
             ingredients: data.ingredients,
             instructions: data.instructions
           });
