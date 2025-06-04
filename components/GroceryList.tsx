@@ -17,13 +17,28 @@ interface GroceryListProps {
 }
 
 export default function GroceryList({ items, onAddToExisting, onCreateNew }: GroceryListProps) {
+  console.log('GroceryList received items:', items);
+  console.log('Items length:', items?.length);
+  
   // Initialize with display values
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>(
     items.map(item => ({
       ...item,
-      displayQuantity: item.quantity.toString()
+      displayQuantity: item.displayQuantity || item.quantity.toString()
     }))
   );
+
+  // Add this useEffect to sync with incoming props
+  useEffect(() => {
+    console.log('GroceryList useEffect - updating internal state with:', items);
+    setGroceryItems(
+      items.map(item => ({
+        ...item,
+        displayQuantity: item.displayQuantity || item.quantity.toString()
+      }))
+    );
+  }, [items]);
+
   const [listName, setListName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [itemsToDelete, setItemsToDelete] = useState<Set<number>>(new Set());

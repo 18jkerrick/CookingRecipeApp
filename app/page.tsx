@@ -14,12 +14,15 @@ import { exportTxt } from '../lib/utils/exportTxt';
 
 export default function Home() {
   const [recipe, setRecipe] = useState<{
+    platform: string;
     ingredients: string[];
     instructions: string[];
   } | null>(null);
   const [showMergePopup, setShowMergePopup] = useState(false);
   const [currentGroceryItems, setCurrentGroceryItems] = useState<any[]>([]);
   const savedListsRef = useRef<{ refreshLists: () => void }>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
   // Test parseIngredients function
   useEffect(() => {
@@ -30,33 +33,44 @@ export default function Home() {
   }, []);
 
   const handleParse = async (url: string) => {
+    setIsLoading(true);
+    setLoadingMessage('Extracting recipe from URL...');
+    setRecipe(null);
+    setCurrentGroceryItems([]);
+
     try {
       const response = await fetch('/api/parse-url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ url }),
       });
 
       const data = await response.json();
-      console.log('Received recipe data:', data);
 
-      if (!response.ok) {
-        // Handle API errors (like "Unsupported platform")
-        alert(data.error || 'Failed to parse recipe');
-        return; // Don't try to set recipe data
+      if (response.ok) {
+        if (data.needAudio) {
+          // Handle audio extraction case
+          setLoadingMessage('No recipe found in captions. Would you like to try audio transcription?');
+          // TODO: Implement audio extraction flow
+          console.log('Audio extraction needed for:', data.url);
+        } else {
+          // Success case
+          setRecipe({
+            ingredients: data.ingredients,
+            instructions: data.instructions
+          });
+          setLoadingMessage('');
+        }
+      } else {
+        throw new Error(data.error || 'Unknown error');
       }
-      
-      // Add validation
-      if (!data.ingredients || !Array.isArray(data.ingredients)) {
-        console.error('Invalid ingredients data:', data.ingredients);
-        alert('Recipe ingredients could not be parsed');
-        return; // Don't try to set recipe data
-      }
-
-      setRecipe(data);
     } catch (error) {
-      console.error('Error parsing recipe:', error);
-      alert('Failed to parse recipe. Please try a different URL.');
+      console.error('Error parsing URL:', error);
+      setLoadingMessage('Error parsing URL. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -68,10 +82,46 @@ export default function Home() {
     });
   }, []);
 
+  useEffect(() => {
+    console.log('Recipe changed:', recipe);
+    if (recipe && recipe.ingredients.length > 0) {
+      console.log('Recipe ingredients:', recipe.ingredients);
+      // Convert recipe ingredients to grocery items when recipe is set
+      const groceryItems = parseIngredients(recipe.ingredients);
+      console.log('Parsed grocery items:', groceryItems);
+      setCurrentGroceryItems(groceryItems);
+    }
+  }, [recipe]);
+
+  // Add debugging for currentGroceryItems changes
+  useEffect(() => {
+    console.log('currentGroceryItems state changed:', currentGroceryItems);
+    console.log('Length:', currentGroceryItems.length);
+  }, [currentGroceryItems]);
+
+  // Add this test BEFORE the recipe useEffect
+  useEffect(() => {
+    console.log('Testing setCurrentGroceryItems works...');
+    try {
+      setCurrentGroceryItems([{name: 'test item', quantity: 1, unit: 'cup'}]);
+      console.log('setCurrentGroceryItems call succeeded');
+    } catch (error) {
+      console.error('Error calling setCurrentGroceryItems:', error);
+    }
+  }, []);
+
   const handleAddToExisting = (currentItems: any[]) => {
-    console.log('handleAddToExisting called with:', currentItems);
+    console.log('=== handleAddToExisting called ===');
+    console.log('currentItems:', currentItems);
+    console.log('currentItems type:', typeof currentItems);
+    console.log('currentItems is array:', Array.isArray(currentItems));
+    console.log('currentItems length:', currentItems?.length);
+    console.log('currentGroceryItems state before:', currentGroceryItems);
+    
     setCurrentGroceryItems(currentItems);
+    console.log('About to set showMergePopup to true');
     setShowMergePopup(true);
+    console.log('showMergePopup should now be true');
   };
 
   const handleCreateNew = async (name: string, items: any[]) => {
@@ -196,38 +246,46 @@ export default function Home() {
         <h1 className="text-2xl font-bold">Recipe Extractor</h1>
         <UrlInput onSubmit={handleParse} />
         
-        {/* Display recipe if available */}
-        {recipe && (
-          <>
+        {isLoading && (
+          <div className="text-center mb-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
+            <p className="text-gray-600">{loadingMessage}</p>
+          </div>
+        )}
+
+        {recipe && !isLoading && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <RecipeCard 
               ingredients={recipe.ingredients}
               instructions={recipe.instructions}
             />
-            
-            {/* Display grocery list */}
             <GroceryList 
-              items={parseIngredients(recipe.ingredients)}
+              items={currentGroceryItems} 
               onAddToExisting={handleAddToExisting}
               onCreateNew={handleCreateNew}
             />
-            
-            {/* Merge List Manager Popup */}
-            {showMergePopup && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                  <MergeListManager 
-                    items={currentGroceryItems}
-                    onMergeWith={handleMergeWith}
-                    onClose={() => setShowMergePopup(false)}
-                  />
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
         
         {/* Display saved lists */}
         <SavedLists ref={savedListsRef} />
+        
+        {/* Merge popup */}
+        {(() => {
+          console.log('Checking merge popup conditions:');
+          console.log('showMergePopup:', showMergePopup);
+          console.log('currentGroceryItems:', currentGroceryItems);
+          console.log('Array.isArray(currentGroceryItems):', Array.isArray(currentGroceryItems));
+          const shouldShow = showMergePopup && currentGroceryItems && Array.isArray(currentGroceryItems);
+          console.log('Should show merge popup:', shouldShow);
+          return shouldShow ? (
+            <MergeListManager 
+              items={currentGroceryItems}
+              onMergeWith={handleMergeWith}
+              onClose={() => setShowMergePopup(false)}
+            />
+          ) : null;
+        })()}
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
         <a

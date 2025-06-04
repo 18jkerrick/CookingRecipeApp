@@ -1,205 +1,165 @@
-🎯 MVP Build Plan
+🚀 MVP2 Build Plan
 
-A granular, step-by-step checklist where each task is small, testable, and has a clear start and end. Pass each task to your engineering LLM one at a time, test, then move on.
+A granular, step-by-step checklist for adding intelligent recipe extraction (caption → audio → video). Each task is single-concern, testable, with a clear start and end.
 
-1. Project Initialization
+1. Caption-Based Extraction
 
-**Task 1.1: Initialize Next.js
+**Task 1.1: Fetch Raw Captions
 
-Start: No project folder exists.
+Start: No caption-fetch function exists.
 
-Action: Run npx create-next-app@latest recipe-app --typescript --app.
+Action: In lib/parser/youtube.ts, implement async function fetchCaptions(url: string): Promise<string> using youtube-dl (or appropriate API) to return raw caption text.
 
-End: npm run dev starts without errors at http://localhost:3000.
+End: Calling fetchCaptions(youtubeUrl) resolves with caption text (verified via unit test).
 
-**Task 1.2: Install Tailwind CSS
+**Task 1.2: Normalize Captions
 
-Start: In recipe-app root.
+Start: Raw caption text returned.
 
-Action: Follow [Tailwind Next.js guide]: install tailwindcss, generate tailwind.config.js, add @tailwind directives in globals.css.
+Action: In lib/ai/cleanCaption.ts, write async function cleanCaption(raw: string): Promise<string> that calls OpenAI chat completion with prompt to tidy and unify format.
 
-End: Add <div className="bg-pink-500 w-16 h-16" /> to app/page.tsx and confirm styling is applied.
+End: Given messy caption, cleanCaption returns cleaned-up text (assert expected formatted string).
 
-**Task 1.3: Setup Supabase Client
+**Task 1.3: Parse Recipe from Caption
 
-Start: .env.local empty.
+Start: Cleaned caption string.
 
-Action: Install @supabase/supabase-js, create supabase/client.ts with:
+Action: In lib/ai/extractFromCaption.ts, write async function extractRecipeFromCaption(text: string): Promise<{ ingredients: string[]; instructions: string[] }> calling OpenAI with a schema prompt.
 
-import { createClient } from '@supabase/supabase-js';
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+End: Returns structured recipe object; verified via mock prompt and unit test returning expected arrays.
 
-End: Import supabase in any file and log supabase.auth.getUser() without missing key errors.
+**Task 1.4: Caption-Fallback Logic Flag
 
-2. URL Input & Parsing
+Start: No fallback condition.
 
-**Task 2.1: Create URL Input Component
+Action: In /api/parse-url, after caption extraction, check if ingredients.length > 0; if true, return result; else set needAudio = true.
 
-Start: No components/UrlInput.tsx.
+End: When caption yields no ingredients, API responds with { needAudio: true }; unit test covers both paths.
 
-Action: Implement a text input and submit button, exposing onSubmit(url: string) prop.
+2. Audio-Based Extraction
 
-End: Rendered in isolation and invoking onSubmit with the typed URL.
+**Task 2.1: Download Audio Stream
 
-**Task 2.2: Homepage Integration
+Start: No audio-extraction utility.
 
-Start: Default app/page.tsx.
+Action: In lib/parser/audio.ts, implement async function fetchAudio(url: string): Promise<Blob> using ffmpeg.wasm or server-side extractor to return audio blob.
 
-Action: Import UrlInput, wire onSubmit to a stubbed handleParse(url).
+End: Calling fetchAudio(videoUrl) returns a Blob; test by checking blob MIME type.
 
-End: Console logs the URL on submit.
+**Task 2.2: Transcribe Audio
 
-**Task 2.3: Stub Parser Functions
+Start: Raw audio blob available.
 
-Start: No parser files.
+Action: In lib/ai/transcribeAudio.ts, write async function transcribeAudio(blob: Blob): Promise<string> that sends audio to OpenAI Whisper API and returns transcript text.
 
-Action: In lib/parser/youtube.ts, export getYoutubeCaptions(url): Promise<string> returning "dummy transcript". Repeat for TikTok/Instagram.
+End: Given sample audio blob, transcribeAudio returns transcript string; verify via mock Whisper response.
 
-End: Invoking getYoutubeCaptions(anyUrl) returns a promise resolving to "dummy transcript".
+**Task 2.3: Parse Recipe from Transcript
 
-**Task 2.4: Stub AI Extractor
+Start: Transcript text returned.
 
-Start: No extractRecipe.ts.
+Action: In lib/ai/extractFromTranscript.ts, implement async function extractRecipeFromTranscript(text: string): Promise<{ ingredients: string[]; instructions: string[] }> via OpenAI schema prompt.
 
-Action: In lib/ai/extractRecipe.ts, export extractRecipe(transcript: string) → Promise<{ ingredients: string[]; instructions: string[] }> returning hardcoded arrays.
+End: Returns structured recipe object; unit test for expected arrays.
 
-End: Calling extractRecipe("...") returns { ingredients: ["1 egg"], instructions: ["Beat egg"] }.
+**Task 2.4: Audio-Fallback Logic Flag
 
-**Task 2.5: Build /api/parse-url Route
+Start: Fallback flag not implemented.
 
-Start: No API route.
+Action: In /api/parse-url, if needAudio and ingredients.length > 0 after transcript extraction, return result; else set needVideo = true.
 
-Action: Create app/api/parse-url/route.ts with a POST handler that:
+End: When transcript yields no ingredients, API responds with { needVideo: true }; tests cover both cases.
 
-Reads { url } from the body.
+3. Video-Based Extraction
 
-Determines platform via regex.
+**Task 3.1: Research Video-to-Text Capability
 
-Calls appropriate parser stub and extractRecipe.
+Start: Unknown if OpenAI supports direct video analysis.
 
-Returns JSON { ingredients, instructions }.
+Action: Check OpenAI docs for video endpoints; if none, list alternative services (e.g., Google Video AI).
 
-End: fetch('/api/parse-url', { method: 'POST', body: JSON.stringify({ url }) }) returns valid JSON.
+End: Document results in docs/video-capabilities.md with service names and sample API calls.
 
-3. Displaying Recipes
+**Task 3.2: Extract Key Frames (if needed)
 
-**Task 3.1: RecipeCard Component
+Start: Need to sample video.
 
-Start: No components/RecipeCard.tsx.
+Action: In lib/parser/video.ts, write async function extractFrames(url: string, intervalSec: number): Promise<Buffer[]> using ffmpeg server-side to return array of image buffers.
 
-Action: Render props: ingredients: string[], instructions: string[] as two lists.
+End: Calling with sample video URL returns at least one buffer; test by checking buffer length > 0.
 
-End: Import in a test page and confirm lists render correctly.
+**Task 3.3: OCR on Frames (if needed)
 
-**Task 3.2: Frontend Fetch & Render
+Start: Frames array available.
 
-Start: URL input wired to fetch.
+Action: In lib/ai/ocrFrames.ts, implement async function ocrFrames(frames: Buffer[]): Promise<string> using Tesseract.js or similar to return concatenated text.
 
-Action: In app/page.tsx, call fetch('/api/parse-url'), parse JSON, store in local React state, and pass into RecipeCard.
+End: Given test frame (with overlaid text), ocrFrames returns correct string; unit test validates.
 
-End: Typing a URL, submitting, and seeing the stubbed recipe displayed.
+**Task 3.4: Extract Recipe from Video Text
 
-4. Grocery List Generation
+Start: Text from OCR/video API.
 
-**Task 4.1: Transform Ingredients
+Action: In lib/ai/extractFromVideo.ts, write async function extractRecipeFromVideo(text: string): Promise<{ ingredients: string[]; instructions: string[] }> via OpenAI prompt.
 
-Start: Array of ingredient strings in frontend state.
+End: Returns structured recipe object; test via mock data.
 
-Action: Write lib/utils/parseIngredients.ts exporting parseIngredients(arr: string[]): { name: string; quantity: number; unit?: string }[] that splits amount and name (stub logic: assume first token is quantity).
+4. Orchestration & API Integration
 
-End: Calling parseIngredients(['2 eggs']) returns [ { name: 'eggs', quantity: 2 } ].
+**Task 4.1: Sequence Extraction Steps
 
-**Task 4.2: GroceryList Component
+Start: API route has isolated steps.
 
-Start: No components/GroceryList.tsx.
+Action: In app/api/parse-url/route.ts, implement sequential logic:
 
-Action: Accepts parsed items, renders editable table (name, quantity input).
+Try caption extraction
 
-End: Table displays items and allows adjusting quantity.
+If needAudio, try audio extraction
 
-**Task 4.3: Display GroceryList
+If needVideo, try video extraction
 
-Start: Recipe displayed.
+Return first successful { ingredients, instructions } or error if all fail.
 
-Action: After RecipeCard, pass ingredients through parseIngredients and render GroceryList.
+End: Hitting the API returns recipe from correct source; test all three flows with mocks.
 
-End: Grocery list appears under recipe.
+**Task 4.2: Error Handling & Timeouts
 
-5. Saving & Master Lists
+Start: No robust error handling.
 
-**Task 5.1: Name & Save Grocery List (UI)
+Action: Wrap each extraction step in try/catch with per-step timeout (e.g., 15s); log errors and proceed to next step.
 
-Start: GroceryList displayed.
+End: Timeout or error invokes next step; test by forcing timeout in each mock.
 
-Action: Add text input for listName and “Save” button, exposing onSave(name, items).
+**Task 4.3: Unit & Integration Tests
 
-End: Clicking “Save” logs name and item array.
+Start: No tests for new features.
 
-**Task 5.2: DB Schema for Lists
+Action: Write Jest tests for each lib function and API route with mocked dependencies.
 
-Start: Empty supabase/schema.sql.
+End: Achieve >90% coverage on new modules; all tests pass.
 
-Action: Add:
+5. Frontend & UI Updates
 
-CREATE TABLE lists (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id),
-  name text,
-  items jsonb,
-  created_at timestamptz DEFAULT now()
-);
+**Task 5.1: Loading & Fallback Indicators
 
-End: supabase db push applies without errors.
+Start: RecipeCard handles only success.
 
-**Task 5.3: Supabase Insert Function
+Action: In RecipeCard, add UI states for "Parsing captions…", "Transcribing audio…", "Analyzing video…" and for errors.
 
-Start: No save function.
+End: Simulate each state via props; verify correct label appears.
 
-Action: In supabase/client.ts, add export async function saveList(name, items) { return supabase.from('lists').insert({ name, items }); }.
+**Task 5.2: Performance Metrics Logging
 
-End: Calling saveList('Test', [{ name: 'eggs', quantity: 2 }]) returns inserted row.
+Start: No metrics collected.
 
-**Task 5.4: Connect Save to DB
+Action: Instrument timing for each extraction step and send to console or analytics (e.g., timing.start()/end()).
 
-Start: onSave logs only.
+End: Trigger URL parse; console logs durations for each step.
 
-Action: Import saveList, call it in GroceryList save handler, show success toast on response.
+**Task 5.3: Cost-Optimization Flag
 
-End: Saved list appears in Supabase table; toast displays.
+Start: No option to skip expensive steps.
 
-**Task 5.5: Master List Manager (UI)
+Action: Add toggle in UI for "Fast mode (captions only)"; skip audio/video when enabled.
 
-Start: No MasterListManager.tsx.
-
-Action: Create component with dropdown to select existing master list or input to create new.
-
-End: Emits onAddToMaster(masterIdOrName, items).
-
-**Task 5.6: Merge Logic Function
-
-Start: No merge util.
-
-Action: Write lib/utils/mergeLists(a, b) that returns aggregated items (sum quantities on identical name).
-
-End: mergeLists([{eggs:2}], [{eggs:3}]) returns [{eggs:5}].
-
-6. Export & Wrap-Up
-
-**Task 6.1: Export as TXT
-
-Start: Grocery list in state.
-
-Action: Write lib/utils/exportTxt(list) that creates a Blob, URL, and triggers download as list.txt.
-
-End: Clicking “Export TXT” downloads the correct file.
-
-**Task 6.2: MVP Test
-
-Start: All above features implemented.
-
-Action: End-to-end: paste URL, view recipe, generate list, save list, merge into master, export.
-
-End: No errors and each step functions as expected.
+End: When toggled, the API call includes mode: 'fast'; backend respects and exits after caption.
