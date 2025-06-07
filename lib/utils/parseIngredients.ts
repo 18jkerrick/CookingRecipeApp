@@ -61,37 +61,52 @@ export function parseIngredients(ingredients: string[]) {
     // Remove extra whitespace and normalize
     const cleanIngredient = ingredient.trim();
     
-    // Regular expression to match mixed numbers, fractions, and decimals at the start
-    const quantityMatch = cleanIngredient.match(/^(\d+(?:\s+\d+\/\d+|\.\d+|\/\d+)?|\d+\/\d+)/);
+    // Updated regex to match ranges, mixed numbers, fractions, and decimals at the start
+    // This will match: "10-15", "1-2", "1 1/2", "1/2", "1.5", "10", etc.
+    const quantityMatch = cleanIngredient.match(/^(\d+(?:-\d+)?(?:\s+\d+\/\d+|\.\d+|\/\d+)?|\d+\/\d+)/);
     
     if (!quantityMatch) {
       // No quantity found, treat as 1 unit
       return {
         name: cleanIngredient,
         quantity: 1,
-        unit: ''
+        unit: '',
+        displayQuantity: '1'
       };
     }
     
     const quantityStr = quantityMatch[1];
     let quantity = 0;
+    let displayQuantity = quantityStr;
     
+    // Handle ranges (e.g., "10-15", "1-2")
+    if (quantityStr.includes('-') && !quantityStr.includes('/')) {
+      const [start, end] = quantityStr.split('-').map(Number);
+      // Use the midpoint for calculations, but preserve original range for display
+      quantity = (start + end) / 2;
+      displayQuantity = quantityStr; // Keep original "10-15" format
+    }
     // Handle mixed numbers (e.g., "1 1/2")
-    const mixedMatch = quantityStr.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-    if (mixedMatch) {
-      const whole = parseInt(mixedMatch[1]);
-      const numerator = parseInt(mixedMatch[2]);
-      const denominator = parseInt(mixedMatch[3]);
-      quantity = whole + (numerator / denominator);
+    else if (quantityStr.includes(' ') && quantityStr.includes('/')) {
+      const mixedMatch = quantityStr.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+      if (mixedMatch) {
+        const whole = parseInt(mixedMatch[1]);
+        const numerator = parseInt(mixedMatch[2]);
+        const denominator = parseInt(mixedMatch[3]);
+        quantity = whole + (numerator / denominator);
+        displayQuantity = quantityStr;
+      }
     }
     // Handle simple fractions (e.g., "1/2")
     else if (quantityStr.includes('/')) {
       const [numerator, denominator] = quantityStr.split('/').map(Number);
       quantity = numerator / denominator;
+      displayQuantity = quantityStr;
     }
     // Handle decimal numbers (e.g., "1.5")
     else {
       quantity = parseFloat(quantityStr);
+      displayQuantity = quantityStr;
     }
     
     // Round to 3 decimal places to avoid floating point issues
@@ -130,7 +145,8 @@ export function parseIngredients(ingredients: string[]) {
     return {
       name: name || 'Unknown ingredient',
       quantity,
-      unit
+      unit,
+      displayQuantity
     };
   });
 } 

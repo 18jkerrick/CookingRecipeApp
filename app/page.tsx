@@ -137,7 +137,8 @@ export default function Home() {
           items: items.map(item => ({
             name: item.name,
             quantity: item.quantity,
-            unit: item.unit
+            unit: item.unit,
+            displayQuantity: item.displayQuantity
           }))
         })
       });
@@ -199,7 +200,8 @@ export default function Home() {
         items: mergedItems.map(item => ({
           name: item.name,
           quantity: item.quantity,
-          unit: item.unit
+          unit: item.unit,
+          displayQuantity: item.displayQuantity
         }))
       };
       

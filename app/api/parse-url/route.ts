@@ -4,6 +4,9 @@ import { getTiktokCaptions } from '@/lib/parser/tiktok';
 import { getInstagramCaptions } from '@/lib/parser/instagram';
 import { cleanCaption } from '@/lib/ai/cleanCaption';
 import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
+import { fetchAudio } from '@/lib/parser/audio';
+import { transcribeAudio } from '@/lib/ai/transcribeAudio';
+import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,14 +83,58 @@ export async function POST(request: NextRequest) {
         source: 'captions'
       });
     } else {
-      console.log('Caption extraction failed to find ingredients, flagging for audio extraction');
-      return NextResponse.json({
-        platform,
-        needAudio: true,
-        url: url,
-        message: 'No recipe found in captions/description. Audio transcription needed.',
-        source: 'captions_failed'
-      });
+      console.log('Caption extraction failed to find ingredients, attempting audio extraction');
+      
+      // TASK 4.1: Audio Extraction Pipeline
+      try {
+        // Step 1: Download audio
+        console.log('Step 1: Downloading audio stream...');
+        const audioBlob = await fetchAudio(url);
+        console.log('Audio download successful:', {
+          size: audioBlob.size,
+          type: audioBlob.type
+        });
+
+        // Step 2: Transcribe audio
+        console.log('Step 2: Transcribing audio...');
+        const transcript = await transcribeAudio(audioBlob);
+        console.log('Audio transcription successful, length:', transcript.length);
+
+        // Step 3: Extract recipe from transcript
+        console.log('Step 3: Extracting recipe from transcript...');
+        const audioRecipe = await extractRecipeFromTranscript(transcript);
+        
+        if (audioRecipe.ingredients.length > 0) {
+          console.log('Audio extraction successful, returning recipe');
+          return NextResponse.json({
+            platform,
+            ingredients: audioRecipe.ingredients,
+            instructions: audioRecipe.instructions,
+            source: 'audio_transcript',
+            transcript: transcript.substring(0, 200) + '...' // Include preview for debugging
+          });
+        } else {
+          console.log('Audio extraction also failed to find ingredients');
+          return NextResponse.json({
+            platform,
+            needAudio: true,
+            url: url,
+            message: 'No recipe found in captions or audio transcription.',
+            source: 'both_failed',
+            transcript: transcript.substring(0, 200) + '...'
+          });
+        }
+
+      } catch (audioError) {
+        console.error('Audio extraction pipeline failed:', audioError);
+        return NextResponse.json({
+          platform,
+          needAudio: true,
+          url: url,
+          message: `Audio transcription failed: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`,
+          source: 'audio_failed'
+        });
+      }
     }
 
   } catch (error) {
