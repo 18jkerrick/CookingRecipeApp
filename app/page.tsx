@@ -39,14 +39,23 @@ export default function Home() {
     setCurrentGroceryItems([]);
 
     try {
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 minute timeout (was 5 minutes)
+
+      // Update loading message for video processing
+      setLoadingMessage('Analyzing video... This may take 5-10 minutes for comprehensive video analysis.');
+
       const response = await fetch('/api/parse-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -67,9 +76,16 @@ export default function Home() {
       } else {
         throw new Error(data.error || 'Unknown error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error parsing URL:', error);
-      setLoadingMessage('Error parsing URL. Please try again.');
+      
+      if (error.name === 'AbortError') {
+        setLoadingMessage('Request timed out. Video analysis may take longer than expected. Please try again.');
+      } else if (error.message?.includes('Failed to fetch')) {
+        setLoadingMessage('Network error. Please check your connection and try again.');
+      } else {
+        setLoadingMessage('Error parsing URL. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

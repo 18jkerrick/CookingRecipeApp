@@ -7,6 +7,8 @@ import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
 import { fetchAudio } from '@/lib/parser/audio';
 import { transcribeAudio } from '@/lib/ai/transcribeAudio';
 import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
+import { extractTextFromVideo } from '@/lib/parser/video';
+import { detectMusicContent } from '@/lib/ai/detectMusicContent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,46 +97,130 @@ export async function POST(request: NextRequest) {
           type: audioBlob.type
         });
 
-        // Step 2: Transcribe audio
-        console.log('Step 2: Transcribing audio...');
-        const transcript = await transcribeAudio(audioBlob);
-        console.log('Audio transcription successful, length:', transcript.length);
+                          // Step 2: Transcribe audio
+         console.log('Step 2: Transcribing audio...');
+         const transcript = await transcribeAudio(audioBlob);
+         console.log('Audio transcription successful, length:', transcript.length);
 
-        // Step 3: Extract recipe from transcript
-        console.log('Step 3: Extracting recipe from transcript...');
-        const audioRecipe = await extractRecipeFromTranscript(transcript);
-        
-        if (audioRecipe.ingredients.length > 0) {
-          console.log('Audio extraction successful, returning recipe');
-          return NextResponse.json({
-            platform,
-            ingredients: audioRecipe.ingredients,
-            instructions: audioRecipe.instructions,
-            source: 'audio_transcript',
-            transcript: transcript.substring(0, 200) + '...' // Include preview for debugging
-          });
-        } else {
-          console.log('Audio extraction also failed to find ingredients');
-          return NextResponse.json({
-            platform,
-            needAudio: true,
-            url: url,
-            message: 'No recipe found in captions or audio transcription.',
-            source: 'both_failed',
-            transcript: transcript.substring(0, 200) + '...'
-          });
-        }
+         // Step 2.5: Check if transcript contains music/non-cooking content
+         console.log('Step 2.5: Checking if transcript contains music or non-cooking content...');
+         const isMusicContent = await detectMusicContent(transcript);
+         
+         if (isMusicContent) {
+           console.log('Detected music/non-cooking content in audio, skipping to video analysis');
+           // Skip recipe extraction and go straight to video analysis
+         } else {
+           // Step 3: Extract recipe from transcript (only if not music)
+           console.log('Step 3: Extracting recipe from transcript...');
+           const audioRecipe = await extractRecipeFromTranscript(transcript);
+         
+           if (audioRecipe.ingredients.length > 0) {
+             console.log('Audio extraction successful, returning recipe');
+             return NextResponse.json({
+               platform,
+               ingredients: audioRecipe.ingredients,
+               instructions: audioRecipe.instructions,
+               source: 'audio_transcript',
+               transcript: transcript.substring(0, 200) + '...' // Include preview for debugging
+             });
+           }
+         }
 
-      } catch (audioError) {
-        console.error('Audio extraction pipeline failed:', audioError);
-        return NextResponse.json({
-          platform,
-          needAudio: true,
-          url: url,
-          message: `Audio transcription failed: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`,
-          source: 'audio_failed'
-        });
-      }
+         // If we reach here, either audio was music or recipe extraction failed
+         console.log('Audio extraction failed or contained music, attempting video analysis');
+         
+         // PHASE 3: Video Computer Vision Analysis Pipeline  
+         try {
+           console.log('Step 4: Starting computer vision video analysis...');
+           const videoAnalysis = await extractTextFromVideo(url);
+           console.log('Video analysis successful, length:', videoAnalysis.length);
+
+           // Extract recipe from video analysis
+           console.log('Step 5: Extracting recipe from video analysis...');
+           const videoRecipe = await extractRecipeFromTranscript(videoAnalysis);
+           
+           if (videoRecipe.ingredients.length > 0) {
+             console.log('Video analysis successful, returning recipe');
+             return NextResponse.json({
+               platform,
+               ingredients: videoRecipe.ingredients,
+               instructions: videoRecipe.instructions,
+               source: 'video_analysis',
+               analysis: videoAnalysis.substring(0, 300) + '...' // Include preview for debugging
+             });
+           } else {
+             console.log('All extraction methods failed - no recipe found');
+             return NextResponse.json({
+               platform,
+               needAudio: true,
+               url: url,
+               message: isMusicContent 
+                 ? 'Audio contained music/non-cooking content. Video analysis found no recipe.'
+                 : 'No recipe found in captions, audio transcription, or video analysis.',
+               source: 'all_failed',
+               transcript: transcript.substring(0, 200) + '...',
+               videoAnalysis: videoAnalysis.substring(0, 200) + '...'
+             });
+           }
+
+         } catch (videoError) {
+           console.error('Video analysis pipeline failed:', videoError);
+           return NextResponse.json({
+             platform,
+             needAudio: true,
+             url: url,
+             message: `All extraction methods failed. Video analysis error: ${videoError instanceof Error ? videoError.message : 'Unknown error'}`,
+             source: 'video_failed',
+             transcript: transcript.substring(0, 200) + '...'
+           });
+         }
+
+             } catch (audioError) {
+         console.error('Audio extraction pipeline failed:', audioError);
+         console.log('Audio extraction completely failed, attempting video analysis as final fallback');
+         
+         // PHASE 3: Video Computer Vision Analysis Pipeline (Final Fallback)
+         try {
+           console.log('Step 4: Starting computer vision video analysis (final fallback)...');
+           const videoAnalysis = await extractTextFromVideo(url);
+           console.log('Video analysis successful, length:', videoAnalysis.length);
+
+           // Extract recipe from video analysis
+           console.log('Step 5: Extracting recipe from video analysis...');
+           const videoRecipe = await extractRecipeFromTranscript(videoAnalysis);
+           
+           if (videoRecipe.ingredients.length > 0) {
+             console.log('Video analysis successful (final fallback), returning recipe');
+             return NextResponse.json({
+               platform,
+               ingredients: videoRecipe.ingredients,
+               instructions: videoRecipe.instructions,
+               source: 'video_analysis_fallback',
+               analysis: videoAnalysis.substring(0, 300) + '...' // Include preview for debugging
+             });
+           } else {
+             console.log('All extraction methods failed - video analysis found no recipe');
+             return NextResponse.json({
+               platform,
+               needAudio: true,
+               url: url,
+               message: `Complete extraction failure. Audio error: ${audioError instanceof Error ? audioError.message : 'Unknown error'}. Video analysis found no recipe content.`,
+               source: 'complete_failure',
+               videoAnalysis: videoAnalysis.substring(0, 200) + '...'
+             });
+           }
+
+         } catch (videoError) {
+           console.error('Video analysis also failed:', videoError);
+           return NextResponse.json({
+             platform,
+             needAudio: true,
+             url: url,
+             message: `Complete extraction failure. Audio error: ${audioError instanceof Error ? audioError.message : 'Unknown error'}. Video error: ${videoError instanceof Error ? videoError.message : 'Unknown error'}`,
+             source: 'complete_failure'
+           });
+         }
+       }
     }
 
   } catch (error) {

@@ -6,8 +6,8 @@ interface RecipeData {
 }
 
 /**
- * Extracts recipe data from audio transcript using OpenAI
- * @param transcript - Transcribed text from audio
+ * Extracts recipe data from audio transcript or video analysis using OpenAI
+ * @param transcript - Transcribed text from audio OR consolidated video analysis
  * @returns Recipe with ingredients and instructions
  */
 export async function extractRecipeFromTranscript(transcript: string): Promise<RecipeData> {
@@ -15,7 +15,54 @@ export async function extractRecipeFromTranscript(transcript: string): Promise<R
   console.log('Transcript length:', transcript.length, 'characters');
   console.log('Transcript preview:', transcript.substring(0, 200) + '...');
 
-  const prompt = `
+  // Detect if this is video analysis (contains frame observations)
+  const isVideoAnalysis = transcript.includes('FRAME ') && transcript.includes('OBSERVATIONS');
+  
+  const prompt = isVideoAnalysis ? 
+    // Specialized prompt for consolidated video analysis
+    `
+    You are analyzing consolidated observations from multiple frames of a cooking video.
+    This analysis contains chronological observations from different moments in the same cooking process.
+
+    IMPORTANT: This data may contain duplicate ingredients shown at different stages of cooking.
+    Your task is to consolidate these observations into ONE coherent recipe.
+
+    CONSOLIDATION RULES:
+    1. Combine duplicate ingredients (e.g., "2 chicken thighs" and "4 chicken thighs" → determine the actual quantity used)
+    2. Create a logical cooking sequence from the chronological observations
+    3. Don't double-count ingredients that appear in multiple frames
+    4. Use standard measurements: cups, tablespoons, teaspoons, pounds, ounces, etc.
+    5. Format ingredients as: "[quantity] [unit] [ingredient name]"
+
+    INGREDIENT-INSTRUCTION CONSISTENCY RULES:
+    6. Instructions must ONLY reference ingredients that are in the ingredients list
+    7. If the video shows "pork" but analysis suggests it's actually chicken, use "chicken" consistently
+    8. Cross-check every instruction step - does it reference an ingredient that exists?
+    9. Consolidate similar ingredients (e.g., "coconut milk" and "coconut cream" → choose one)
+    10. Instructions should follow logical cooking order: prep → cook → assemble → serve
+
+    EXAMPLES OF CONSOLIDATION:
+    - Frame 1: "2 chicken thighs (raw)" + Frame 3: "4 chicken thighs (cooked)" → "4 chicken thighs" (use the complete quantity)
+    - Frame 2: "chopped onions" + Frame 5: "sautéed onions" → "1 onion" (same ingredient, different states)
+    - Multiple frames showing "olive oil being poured" → "2 tablespoons olive oil" (estimate based on visual cues)
+    - If instructions say "cook the pork" but ingredients only have "chicken" → change to "cook the chicken"
+
+    QUALITY CONTROL:
+    - Each instruction should be actionable and specific
+    - Avoid vague steps like "lift a green leaf" - combine with meaningful cooking actions
+    - Ensure proper cooking order: preparation, cooking, plating, serving
+    - Remove redundant or unclear steps
+
+    Return a single, cohesive recipe in this exact JSON format:
+    {
+    "ingredients": ["ingredient 1", "ingredient 2", ...],
+    "instructions": ["step 1", "step 2", ...]
+    }
+
+    Video Analysis: ${transcript}
+    ` : 
+    // Original prompt for audio transcripts
+    `
     Please extract the ingredients and instructions from this recipe transcript.
     This transcript comes from audio, so it may have verbal filler words, pauses, or colloquial language.
 

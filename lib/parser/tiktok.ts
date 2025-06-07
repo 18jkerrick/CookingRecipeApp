@@ -79,8 +79,21 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
 }
 
 function extractTiktokVideoId(url: string): string | null {
-  // TikTok URLs: https://www.tiktok.com/@username/video/1234567890123456789
-  const regex = /tiktok\.com\/@[^\/]+\/video\/(\d+)/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
+  // TikTok URLs: 
+  // Videos: https://www.tiktok.com/@username/video/1234567890123456789
+  // Photos/Slideshows: https://www.tiktok.com/@username/photo/1234567890123456789
+  const videoRegex = /tiktok\.com\/@[^\/]+\/video\/(\d+)/;
+  const photoRegex = /tiktok\.com\/@[^\/]+\/photo\/(\d+)/;
+  
+  const videoMatch = url.match(videoRegex);
+  if (videoMatch) {
+    return videoMatch[1];
+  }
+  
+  const photoMatch = url.match(photoRegex);
+  if (photoMatch) {
+    return photoMatch[1];
+  }
+  
+  return null;
 } 
