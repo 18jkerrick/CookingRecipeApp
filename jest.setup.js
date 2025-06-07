@@ -23,7 +23,8 @@ jest.mock('next/navigation', () => ({
 // Mock OpenAI
 jest.mock('openai', () => {
   return {
-    OpenAI: jest.fn().mockImplementation(() => ({
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => ({
       chat: {
         completions: {
           create: jest.fn().mockResolvedValue({
@@ -35,6 +36,13 @@ jest.mock('openai', () => {
                 })
               }
             }]
+          })
+        }
+      },
+      audio: {
+        transcriptions: {
+          create: jest.fn().mockResolvedValue({
+            text: 'Mocked transcription text'
           })
         }
       }
