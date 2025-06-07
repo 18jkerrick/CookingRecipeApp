@@ -59,25 +59,46 @@ function parseFraction(str: string): number {
 export function parseIngredients(ingredients: string[]) {
   return ingredients.map(ingredient => {
     // Remove extra whitespace and normalize
-    const cleanIngredient = ingredient.trim();
+    let cleanIngredient = ingredient.trim();
     
-    // Updated regex to match ranges, mixed numbers, fractions, and decimals at the start
-    // This will match: "10-15", "1-2", "1 1/2", "1/2", "1.5", "10", etc.
-    const quantityMatch = cleanIngredient.match(/^(\d+(?:-\d+)?(?:\s+\d+\/\d+|\.\d+|\/\d+)?|\d+\/\d+)/);
+    // Handle tilde (~) replacement for "approximately"
+    cleanIngredient = cleanIngredient.replace(/approximately\s+/gi, '~');
+    
+    // Extract quantity from parentheses (like "Shrimp (approximately 1-2 cups)")
+    const parenQuantityMatch = cleanIngredient.match(/^([^(]+)\s*\([^)]*?(~?\d+(?:-\d+)?(?:\s+\d+\/\d+|\.\d+|\/\d+)?|\d+\/\d+)\s*([a-zA-Z]*)[^)]*\)/);
+    
+    if (parenQuantityMatch) {
+      // Extract from parentheses and restructure
+      const name = parenQuantityMatch[1].trim();
+      const quantity = parenQuantityMatch[2];
+      const unit = parenQuantityMatch[3] || '';
+      cleanIngredient = `${quantity} ${unit} ${name}`.trim();
+    }
+    
+    // Updated regex to match ranges, mixed numbers, fractions, decimals, and tilde at the start
+    // This will match: "~1", "10-15", "1-2", "1 1/2", "1/2", "1.5", "10", etc.
+    const quantityMatch = cleanIngredient.match(/^(~?\d+(?:-\d+)?(?:\s+\d+\/\d+|\.\d+|\/\d+)?|\d+\/\d+)/);
     
     if (!quantityMatch) {
-      // No quantity found, treat as 1 unit
+      // No quantity found, leave blank
       return {
         name: cleanIngredient,
-        quantity: 1,
+        quantity: 0, // 0 indicates no quantity specified
         unit: '',
-        displayQuantity: '1'
+        displayQuantity: '' // Empty string instead of '1'
       };
     }
     
-    const quantityStr = quantityMatch[1];
+    let quantityStr = quantityMatch[1];
     let quantity = 0;
     let displayQuantity = quantityStr;
+    
+    // Handle tilde prefix (approximate quantities)
+    const hasApproximate = quantityStr.startsWith('~');
+    if (hasApproximate) {
+      quantityStr = quantityStr.substring(1); // Remove the tilde for parsing
+      // Keep the tilde in display
+    }
     
     // Handle ranges (e.g., "10-15", "1-2")
     if (quantityStr.includes('-') && !quantityStr.includes('/')) {

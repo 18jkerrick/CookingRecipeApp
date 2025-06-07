@@ -3,6 +3,12 @@ import OpenAI from 'openai';
 export async function cleanCaption(raw: string): Promise<string> {
   console.log('Raw caption input:', raw);
   
+  // If input is empty or just whitespace, return empty string
+  if (!raw || !raw.trim()) {
+    console.log('Empty caption input, returning empty string to trigger fallback');
+    return '';
+  }
+  
   try {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,

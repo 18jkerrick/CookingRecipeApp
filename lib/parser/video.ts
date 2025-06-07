@@ -56,7 +56,14 @@ async function extractTextFromTikTokPhotos(url: string): Promise<string> {
     const imageBuffers = await downloadTikTokPhotos(url);
     
     if (imageBuffers.length === 0) {
-      throw new Error('No images extracted from TikTok photo post');
+      throw new Error(`TikTok photo posts are protected by anti-bot measures and cannot be automatically analyzed. 
+
+Alternative options:
+1. Try a regular TikTok video URL (not /photo/) 
+2. Screenshot the images and upload them directly
+3. Copy any text/captions from the post manually
+
+TikTok's photo slideshow format is not supported due to technical restrictions.`);
     }
     
     console.log(`📸 Extracted ${imageBuffers.length} images for analysis`);
@@ -79,50 +86,115 @@ async function extractTextFromTikTokPhotos(url: string): Promise<string> {
 }
 
 /**
- * Download images from TikTok photo post using yt-dlp
+ * Download images from TikTok photo post using yt-dlp (similar to video download)
  */
 async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
-  const outputDir = 'temp_tiktok_photos';
-  const outputPattern = `${outputDir}/%(title)s.%(ext)s`;
+  console.log('📥 Attempting to download TikTok photo post with yt-dlp...');
   
-  return new Promise((resolve, reject) => {
-    // Create temp directory
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir);
+  // Try multiple yt-dlp approaches for photo posts
+  const attempts = [
+    // Attempt 1: Try to extract all available thumbnails/images
+    {
+      name: 'Extract all thumbnails and images',
+      args: [
+        '--write-all-thumbnails',
+        '--write-info-json', 
+        '--skip-download',  // Don't download video, just thumbnails
+        '--output', 'temp_tiktok_photos/%(title)s_%(id)s.%(ext)s',
+        url
+      ]
+    },
+    // Attempt 2: Force TikTok extractor and extract thumbnails
+    {
+      name: 'Force TikTok extractor with thumbnails',
+      args: [
+        '--force-extractor', 'tiktok',
+        '--write-all-thumbnails',
+        '--skip-download',
+        '--output', 'temp_tiktok_photos/%(title)s_%(id)s.%(ext)s',
+        url
+      ]
+    },
+    // Attempt 3: Try to download as playlist (photo posts might be treated as playlists)
+    {
+      name: 'Download as playlist',
+      args: [
+        '--yes-playlist',
+        '--write-thumbnail',
+        '--skip-download',
+        '--output', 'temp_tiktok_photos/%(playlist_index)s_%(title)s.%(ext)s',
+        url
+      ]
+    },
+    // Attempt 4: Extract best quality thumbnails only
+    {
+      name: 'Extract best thumbnails',
+      args: [
+        '--write-thumbnail',
+        '--thumbnail-format', 'jpg/png/webp',
+        '--skip-download',
+        '--output', 'temp_tiktok_photos/%(title)s.%(ext)s',
+        url
+      ]
     }
-    
-    const ytdlp = spawn('yt-dlp', [
-      '--write-thumbnail',
-      '--write-info-json',
-      '--output', outputPattern,
-      url
-    ]);
+  ];
 
-    let errorOutput = '';
+  const outputDir = 'temp_tiktok_photos';
+  
+  // Create temp directory
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir);
+  }
 
-    ytdlp.stdout.on('data', (data) => {
-      process.stdout.write(data);
-    });
+  for (const attempt of attempts) {
+    try {
+      console.log(`🔄 Trying: ${attempt.name}`);
+      
+      const success = await new Promise<boolean>((resolve) => {
+        const ytdlp = spawn('yt-dlp', attempt.args);
+        
+        let hasOutput = false;
+        
+        ytdlp.stdout.on('data', (data) => {
+          hasOutput = true;
+          process.stdout.write(data);
+        });
 
-    ytdlp.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-    });
+        ytdlp.stderr.on('data', (data) => {
+          const output = data.toString();
+          if (output.includes('Downloading') || output.includes('Writing')) {
+            hasOutput = true;
+          }
+          process.stderr.write(data);
+        });
 
-    ytdlp.on('close', async (code) => {
-      try {
-        if (code === 0) {
-          // Read downloaded images
-          const imageBuffers: Buffer[] = [];
-          const files = fs.readdirSync(outputDir);
+        ytdlp.on('close', (code) => {
+          console.log(`yt-dlp exited with code ${code} for: ${attempt.name}`);
+          resolve(code === 0 && hasOutput);
+        });
+
+        ytdlp.on('error', (error) => {
+          console.error(`yt-dlp error for ${attempt.name}:`, error);
+          resolve(false);
+        });
+      });
+
+      if (success) {
+        // Check if we got any image files
+        const files = fs.readdirSync(outputDir);
+        const imageFiles = files.filter(file => file.match(/\.(jpg|jpeg|png|webp)$/i));
+        
+        if (imageFiles.length > 0) {
+          console.log(`✅ Success with: ${attempt.name} - found ${imageFiles.length} images`);
           
-          for (const file of files) {
-            if (file.match(/\.(jpg|jpeg|png|webp)$/i)) {
-              const filePath = `${outputDir}/${file}`;
-              const buffer = fs.readFileSync(filePath);
-              if (buffer.length > 1000) { // Valid image size check
-                imageBuffers.push(buffer);
-                console.log(`✅ Image extracted: ${file} (${Math.round(buffer.length / 1024)}KB)`);
-              }
+          // Read the image files into buffers
+          const imageBuffers: Buffer[] = [];
+          for (const file of imageFiles) {
+            const filePath = `${outputDir}/${file}`;
+            const buffer = fs.readFileSync(filePath);
+            if (buffer.length > 1000) { // Valid image size check
+              imageBuffers.push(buffer);
+              console.log(`✅ Loaded image: ${file} (${Math.round(buffer.length / 1024)}KB)`);
             }
           }
           
@@ -130,28 +202,120 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
           fs.rmSync(outputDir, { recursive: true, force: true });
           console.log('🧹 Cleaned up downloaded images');
           
-          resolve(imageBuffers);
-        } else {
-          // Clean up on error
-          if (fs.existsSync(outputDir)) {
-            fs.rmSync(outputDir, { recursive: true, force: true });
+          if (imageBuffers.length > 0) {
+            return imageBuffers;
           }
-          reject(new Error(`TikTok photo download failed: ${errorOutput}`));
         }
-      } catch (cleanupError) {
-        console.error('Error during cleanup:', cleanupError);
-        reject(new Error(`Failed to process downloaded images: ${cleanupError}`));
       }
+      
+    } catch (error) {
+      console.error(`❌ Failed attempt: ${attempt.name}`, error);
+      continue;
+    }
+  }
+
+  // If yt-dlp failed, try gallery-dl as final attempt
+  console.log('🔄 Trying gallery-dl as fallback...');
+  try {
+    const galleryOutputDir = 'temp_gallery_dl';
+    
+    // Create temp directory for gallery-dl
+    if (!fs.existsSync(galleryOutputDir)) {
+      fs.mkdirSync(galleryOutputDir);
+    }
+
+    const success = await new Promise<boolean>((resolve) => {
+      const galleryProcess = spawn('gallery-dl', [url, '--destination', galleryOutputDir]);
+      
+      let hasOutput = false;
+      
+      galleryProcess.stdout.on('data', (data) => {
+        hasOutput = true;
+        process.stdout.write(data);
+      });
+
+      galleryProcess.stderr.on('data', (data) => {
+        process.stderr.write(data);
+      });
+
+      galleryProcess.on('close', (code) => {
+        console.log(`gallery-dl exited with code ${code}`);
+        resolve(code === 0);
+      });
+
+      galleryProcess.on('error', (error) => {
+        console.error(`gallery-dl error:`, error);
+        resolve(false);
+      });
     });
 
-    ytdlp.on('error', (error) => {
-      // Clean up on error
-      if (fs.existsSync(outputDir)) {
-        fs.rmSync(outputDir, { recursive: true, force: true });
+    if (success) {
+      // Find all image files in the gallery-dl output
+      const findImageFiles = (dir: string): string[] => {
+        let imageFiles: string[] = [];
+        const files = fs.readdirSync(dir);
+        
+        for (const file of files) {
+          const fullPath = `${dir}/${file}`;
+          const stat = fs.statSync(fullPath);
+          
+          if (stat.isDirectory()) {
+            imageFiles = imageFiles.concat(findImageFiles(fullPath));
+          } else if (file.match(/\.(jpg|jpeg|png|webp)$/i)) {
+            imageFiles.push(fullPath);
+          }
+        }
+        
+        return imageFiles;
+      };
+      
+      const imageFiles = findImageFiles(galleryOutputDir);
+      
+      if (imageFiles.length > 0) {
+        console.log(`✅ Gallery-dl success! Found ${imageFiles.length} images`);
+        
+        // Read the image files into buffers
+        const imageBuffers: Buffer[] = [];
+        for (const filePath of imageFiles) {
+          const buffer = fs.readFileSync(filePath);
+          if (buffer.length > 1000) { // Valid image size check
+            imageBuffers.push(buffer);
+            console.log(`✅ Loaded image: ${filePath.split('/').pop()} (${Math.round(buffer.length / 1024)}KB)`);
+          }
+        }
+        
+        // Clean up temp directory
+        fs.rmSync(galleryOutputDir, { recursive: true, force: true });
+        console.log('🧹 Cleaned up gallery-dl downloads');
+        
+        if (imageBuffers.length > 0) {
+          return imageBuffers;
+        }
       }
-      reject(new Error(`Failed to spawn yt-dlp for photos: ${error.message}`));
-    });
-  });
+    }
+
+    // Clean up gallery-dl directory on failure
+    if (fs.existsSync(galleryOutputDir)) {
+      fs.rmSync(galleryOutputDir, { recursive: true, force: true });
+    }
+    
+  } catch (galleryError) {
+    console.error(`❌ Gallery-dl failed:`, galleryError);
+  }
+
+  // Clean up on failure
+  if (fs.existsSync(outputDir)) {
+    fs.rmSync(outputDir, { recursive: true, force: true });
+  }
+
+  throw new Error(`All yt-dlp attempts failed for TikTok photo post. 
+
+Alternative options:
+1. Try a regular TikTok video URL (not /photo/) 
+2. Screenshot the images and upload them directly
+3. Copy any text/captions from the post manually
+
+TikTok's photo slideshow format may have technical restrictions.`);
 }
 
 /**
@@ -304,7 +468,8 @@ async function extractFramesFromLocalFile(videoPath: string, maxFrames: number):
       
     } catch (error) {
       console.error(`❌ Failed to extract frame at ${timestamps[i]}s:`, error);
-      // Continue with other frames
+      // Continue with other frames - this is expected for some videos at end timestamps
+      continue;
     }
   }
   
@@ -359,15 +524,17 @@ async function extractSingleFrame(videoPath: string, timestampSeconds: number): 
       reject(new Error(`FFmpeg process error: ${error.message}`));
     });
 
-    // Timeout for single frame extraction
+    // Timeout for single frame extraction (increased to 15 seconds)
     setTimeout(() => {
       ffmpegProcess.kill('SIGTERM');
       if (frameBuffer.length > 1000) {
+        console.log(`⚠️ Frame extraction completed after timeout (got ${frameBuffer.length} bytes)`);
         resolve(frameBuffer);
       } else {
+        console.log(`❌ Frame extraction timeout at ${timeStr} with only ${frameBuffer.length} bytes`);
         reject(new Error(`Frame extraction timeout at ${timeStr}`));
       }
-    }, 10000);
+    }, 15000); // Increased from 10 to 15 seconds
   });
 }
 
@@ -707,14 +874,22 @@ async function analyzeFrameWithOpenAI(base64Frame: string, frameIndex: number): 
 
 IMPORTANT: Only describe what you SEE in this frame. Do NOT try to create a complete recipe or make assumptions about other frames.
 
+INGREDIENT IDENTIFICATION GUIDELINES:
+- Be precise and accurate - only identify ingredients you can clearly see
+- Look for package labels or text that can help identify specific ingredients
+- If unsure about specific ingredients, describe what you see rather than guessing
+- Pay attention to size, color, and shape to distinguish between similar ingredients
+- Note any visible brands or product names
+- Do NOT assume ingredients that aren't clearly visible
+
 Describe this frame using this format:
 
 OBSERVATIONS:
-- What ingredients are visible? (list with estimated quantities if clear)
+- What ingredients are visible? (list with estimated quantities if clear, be specific and accurate)
 - What cooking action is happening? (chopping, searing, mixing, etc.)
 - What tools/equipment are being used?
 - What's the state of the food? (raw, cooking, cooked, plated)
-- Any text overlays or measurements visible?
+- Any text overlays, package labels, or measurements visible?
 
 Keep your response concise and factual. Focus only on what is clearly visible in THIS specific frame.
 

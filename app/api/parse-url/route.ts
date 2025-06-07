@@ -38,9 +38,18 @@ export async function POST(request: NextRequest) {
       }
     } catch (captionError) {
       console.error('Caption extraction failed:', captionError);
-      return NextResponse.json({ 
-        error: `Failed to get recipe from link: ${captionError instanceof Error ? captionError.message : 'Unknown error'}` 
-      }, { status: 400 });
+      
+      // For TikTok photo posts, caption extraction failure is expected - continue to video analysis
+      if (url.includes('tiktok.com') && url.includes('/photo/')) {
+        console.log('TikTok photo post detected, skipping caption extraction and continuing to photo analysis');
+        platform = 'TikTok'; // Ensure platform is set
+        rawCaptions = ''; // Empty captions will trigger fallback to video analysis
+      } else {
+        // For other platforms, caption extraction failure is a real error
+        return NextResponse.json({ 
+          error: `Failed to get recipe from link: ${captionError instanceof Error ? captionError.message : 'Unknown error'}` 
+        }, { status: 400 });
+      }
     }
 
     console.log(`Detected platform: ${platform} for URL: ${url}`);

@@ -24,7 +24,7 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>(
     items.map(item => ({
       ...item,
-      displayQuantity: item.displayQuantity || item.quantity.toString()
+      displayQuantity: item.displayQuantity || (item.quantity === 0 ? '' : item.quantity.toString())
     }))
   );
 
@@ -34,7 +34,7 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
     setGroceryItems(
       items.map(item => ({
         ...item,
-        displayQuantity: item.displayQuantity || item.quantity.toString()
+        displayQuantity: item.displayQuantity || (item.quantity === 0 ? '' : item.quantity.toString())
       }))
     );
   }, [items]);
@@ -194,9 +194,10 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
                 <td className="py-2 px-3">
                   <input
                     type="text"
-                    value={item.displayQuantity !== undefined ? item.displayQuantity : item.quantity.toString()}
+                    value={item.displayQuantity !== undefined ? item.displayQuantity : (item.quantity === 0 ? '' : item.quantity.toString())}
                     onChange={(e) => updateQuantity(index, e.target.value)}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    placeholder="1, 2, 3..."
                   />
                 </td>
                 <td className="py-2 px-3">
