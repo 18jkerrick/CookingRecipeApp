@@ -13,7 +13,8 @@ export async function GET() {
           id,
           name,
           quantity,
-          unit
+          unit,
+          display_quantity
         )
       `)
       .order('created_at', { ascending: false });
@@ -23,7 +24,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch grocery lists' }, { status: 500 });
     }
 
-    return NextResponse.json({ lists });
+    // Transform the data to match frontend expectations
+    const transformedLists = lists?.map(list => ({
+      ...list,
+      grocery_items: list.grocery_items.map(item => ({
+        ...item,
+        displayQuantity: item.display_quantity
+      }))
+    }));
+
+    return NextResponse.json({ lists: transformedLists });
 
   } catch (error) {
     console.error('Fetch grocery lists error:', error);
@@ -56,7 +66,8 @@ export async function POST(request: NextRequest) {
       list_id: list.id,
       name: item.name,
       quantity: item.quantity,
-      unit: item.unit || ''
+      unit: item.unit || '',
+      display_quantity: item.displayQuantity || item.quantity.toString()
     }));
 
     const { error: itemsError } = await supabase
@@ -115,7 +126,8 @@ export async function PUT(request: NextRequest) {
       list_id: listId,
       name: item.name,
       quantity: item.quantity,
-      unit: item.unit || ''
+      unit: item.unit || '',
+      display_quantity: item.displayQuantity || item.quantity.toString()
     }));
 
     const { error: itemsError } = await supabase

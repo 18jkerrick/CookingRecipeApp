@@ -1,0 +1,30 @@
+const nextJest = require('next/jest')
+
+const createJestConfig = nextJest({
+  // Provide the path to your Next.js app to load next.config.js and .env files
+  dir: './',
+})
+
+// Add any custom config to be passed to Jest
+const customJestConfig = {
+  testEnvironment: 'jest-environment-jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/',
+    '<rootDir>/node_modules/',
+  ],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  // Add timeout configuration for async tests
+  testTimeout: 30000,
+  // Force Jest to exit immediately after tests complete
+  forceExit: true,
+  // Detect open handles to help with debugging
+  detectOpenHandles: false, // Disable by default for speed
+  // Limit workers to reduce complexity
+  maxWorkers: 1,
+}
+
+// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
+module.exports = createJestConfig(customJestConfig) 

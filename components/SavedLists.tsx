@@ -192,7 +192,8 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
           items: editedList.grocery_items.map(item => ({
             name: item.name,
             quantity: item.quantity,
-            unit: item.unit
+            unit: item.unit,
+            displayQuantity: item.displayQuantity
           }))
         })
       });
@@ -310,7 +311,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
     let yPosition = 50;
     
     items.forEach((item) => {
-      const quantity = item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3);
+      const quantity = item.displayQuantity || (item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3));
       const unit = item.unit ? ` ${item.unit}` : '';
       const text = `• ${quantity}${unit} ${item.name}`;
       
@@ -347,7 +348,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
             text: "",
           }),
           ...items.map((item) => {
-            const quantity = item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3);
+            const quantity = item.displayQuantity || (item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3));
             const unit = item.unit ? ` ${item.unit}` : '';
             return new Paragraph({
               children: [
@@ -395,7 +396,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
     `;
     
     items.forEach((item) => {
-      const quantity = item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3);
+      const quantity = item.displayQuantity || (item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3));
       const unit = item.unit ? ` ${item.unit}` : '';
       content += `<div class="item">• ${quantity}${unit} ${item.name}</div>\n`;
     });
@@ -425,7 +426,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
     // Create CSV content (Excel can open CSV files)
     let content = `Item,Quantity,Unit\n`;
     items.forEach(item => {
-      const quantity = item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3);
+      const quantity = item.displayQuantity || (item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3));
       content += `"${item.name}","${quantity}","${item.unit}"\n`;
     });
     
@@ -443,7 +444,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
   const exportToNotes = (items: GroceryItem[], listName: string) => {
     let content = `${listName}\n${'='.repeat(listName.length)}\n\n`;
     items.forEach((item) => {
-      const quantity = item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3);
+      const quantity = item.displayQuantity || (item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3));
       const unit = item.unit ? ` ${item.unit}` : '';
       content += `• ${quantity}${unit} ${item.name}\n`;
     });
@@ -511,7 +512,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
   const copyToClipboard = (items: GroceryItem[], listName: string) => {
     let content = `${listName}\n${'='.repeat(listName.length)}\n\n`;
     items.forEach((item) => {
-      const quantity = item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3);
+      const quantity = item.displayQuantity || (item.quantity % 1 === 0 ? item.quantity.toString() : item.quantity.toFixed(3));
       const unit = item.unit ? ` ${item.unit}` : '';
       content += `• ${quantity}${unit} ${item.name}\n`;
     });
@@ -807,7 +808,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                             {/* Item content - takes up most space */}
                             <div className="flex-1">
                               <span className="text-sm text-gray-700">
-                                {item.quantity} {item.unit} {item.name}
+                                {item.displayQuantity || item.quantity} {item.unit} {item.name}
                               </span>
                             </div>
                           </div>

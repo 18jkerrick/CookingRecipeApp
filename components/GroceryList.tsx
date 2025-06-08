@@ -17,13 +17,28 @@ interface GroceryListProps {
 }
 
 export default function GroceryList({ items, onAddToExisting, onCreateNew }: GroceryListProps) {
+  console.log('GroceryList received items:', items);
+  console.log('Items length:', items?.length);
+  
   // Initialize with display values
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>(
     items.map(item => ({
       ...item,
-      displayQuantity: item.quantity.toString()
+      displayQuantity: item.displayQuantity || (item.quantity === 0 ? '' : item.quantity.toString())
     }))
   );
+
+  // Add this useEffect to sync with incoming props
+  useEffect(() => {
+    console.log('GroceryList useEffect - updating internal state with:', items);
+    setGroceryItems(
+      items.map(item => ({
+        ...item,
+        displayQuantity: item.displayQuantity || (item.quantity === 0 ? '' : item.quantity.toString())
+      }))
+    );
+  }, [items]);
+
   const [listName, setListName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [itemsToDelete, setItemsToDelete] = useState<Set<number>>(new Set());
@@ -179,9 +194,10 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
                 <td className="py-2 px-3">
                   <input
                     type="text"
-                    value={item.displayQuantity !== undefined ? item.displayQuantity : item.quantity.toString()}
+                    value={item.displayQuantity !== undefined ? item.displayQuantity : (item.quantity === 0 ? '' : item.quantity.toString())}
                     onChange={(e) => updateQuantity(index, e.target.value)}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    placeholder="1, 2, 3..."
                   />
                 </td>
                 <td className="py-2 px-3">

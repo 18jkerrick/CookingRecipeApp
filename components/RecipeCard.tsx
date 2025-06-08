@@ -3,7 +3,7 @@ interface RecipeCardProps {
   instructions: string[];
 }
 
-export default function RecipeCard({ ingredients, instructions }: RecipeCardProps) {
+export default function RecipeCard({ ingredients = [], instructions = [] }: RecipeCardProps) {
   return (
     <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Extracted Recipe</h2>
@@ -20,6 +20,9 @@ export default function RecipeCard({ ingredients, instructions }: RecipeCardProp
               </li>
             ))}
           </ul>
+          {ingredients.length === 0 && (
+            <p className="text-gray-400 italic">No ingredients found</p>
+          )}
         </div>
 
         {/* Instructions */}
@@ -33,6 +36,9 @@ export default function RecipeCard({ ingredients, instructions }: RecipeCardProp
               </li>
             ))}
           </ol>
+          {instructions.length === 0 && (
+            <p className="text-gray-400 italic">No instructions found</p>
+          )}
         </div>
       </div>
     </div>
