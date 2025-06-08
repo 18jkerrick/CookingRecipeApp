@@ -198,8 +198,8 @@ export default function Home() {
 
         setRecipe({
           platform: data.platform,
-          ingredients: data.ingredients,
-          instructions: data.instructions,
+          ingredients: data.ingredients || [],
+          instructions: data.instructions || [],
           source: data.source
         });
 
@@ -301,7 +301,7 @@ export default function Home() {
 
   useEffect(() => {
     console.log('Recipe changed:', recipe);
-    if (recipe && recipe.ingredients.length > 0) {
+    if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
       console.log('Recipe ingredients:', recipe.ingredients);
       // Convert recipe ingredients to grocery items when recipe is set
       const groceryItems = parseIngredients(recipe.ingredients);

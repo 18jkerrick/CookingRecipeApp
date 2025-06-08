@@ -213,7 +213,7 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
  * Extract strategic frames showing cooking actions and ingredients
  * Focuses on key moments: beginning (ingredients), middle (cooking), end (plating)
  */
-export async function extractCookingFrames(url: string, maxFrames: number = 8): Promise<Buffer[]> {
+export async function extractCookingFrames(url: string, maxFrames: number = 5): Promise<Buffer[]> {
   try {
     // Download video first (similar to audio approach)
     const videoPath = await downloadVideoForFrames(url);
@@ -395,7 +395,7 @@ async function extractSingleFrame(videoPath: string, timestampSeconds: number): 
       reject(new Error(`FFmpeg process error: ${error.message}`));
     });
 
-    // Timeout for single frame extraction (increased to 15 seconds)
+    // Timeout for single frame extraction (extended for quality)
     setTimeout(() => {
       ffmpegProcess.kill('SIGTERM');
       if (frameBuffer.length > 1000) {
@@ -403,7 +403,7 @@ async function extractSingleFrame(videoPath: string, timestampSeconds: number): 
       } else {
         reject(new Error(`Frame extraction timeout at ${timeStr}`));
       }
-    }, 15000); // Increased from 10 to 15 seconds
+    }, 60000); // 60 seconds - allow plenty of time for quality extraction
   });
 }
 
@@ -483,7 +483,7 @@ export async function extractFramesFromStream(streamUrl: string, maxFrames: numb
       reject(new Error(`Failed to spawn FFmpeg: ${error.message}`));
     });
 
-    // Timeout after 30 seconds
+    // Timeout after 5 minutes - allow plenty of time for quality frame extraction
     setTimeout(() => {
       ffmpegProcess.kill('SIGTERM');
       if (frames.length > 0) {
@@ -491,7 +491,7 @@ export async function extractFramesFromStream(streamUrl: string, maxFrames: numb
       } else {
         reject(new Error('Frame extraction timeout - no frames captured'));
       }
-    }, 30000);
+    }, 300000); // 5 minutes
   });
 }
 
@@ -632,10 +632,10 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
   const results: string[] = [];
   
   // Process frames in batches to avoid rate limiting
-  const BATCH_SIZE = 5; // Analyze 5 frames at a time
-  const BATCH_DELAY = 2000; // 2 second delay between batches
-  const RETRY_DELAY = 2000; // 2 second delay for rate limit retries
-  const MAX_RETRIES = 3; // Maximum retry attempts per frame
+  const BATCH_SIZE = 3; // Analyze 3 frames at a time for better rate limiting
+  const BATCH_DELAY = 1000; // 1 second delay between batches
+  const RETRY_DELAY = 3000; // 3 second delay for rate limit retries (more conservative)
+  const MAX_RETRIES = 5; // More retry attempts for reliability
   
   for (let batchStart = 0; batchStart < frames.length; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE, frames.length);
@@ -683,7 +683,7 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
       
       // Small delay between individual frame analyses (only if not the last frame in batch)
       if (i < batchFrames.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 500)); // Reduced delay
       }
     }
     

@@ -27,7 +27,6 @@ const TIMEOUTS = {
   RECIPE_EXTRACTION: 15000,   // 15 seconds
   AUDIO_DOWNLOAD: 30000,      // 30 seconds
   AUDIO_TRANSCRIPTION: 60000, // 60 seconds
-  VIDEO_ANALYSIS: 45000,      // 45 seconds
   MUSIC_DETECTION: 10000      // 10 seconds
 };
 
@@ -173,11 +172,21 @@ export async function POST(request: NextRequest) {
 
         // Step 2.5: Check if transcript contains music/non-cooking content with timeout
         console.log('Step 2.5: Checking if transcript contains music or non-cooking content...');
-        const isMusicContent = await withTimeout(
-          detectMusicContent(transcript), 
-          TIMEOUTS.MUSIC_DETECTION, 
-          'Music content detection'
-        );
+        let isMusicContent = false;
+        
+        try {
+          isMusicContent = await withTimeout(
+            detectMusicContent(transcript), 
+            TIMEOUTS.MUSIC_DETECTION, 
+            'Music content detection'
+          );
+        } catch (musicDetectionError) {
+          console.error('Error detecting music content:', musicDetectionError);
+          // If music detection fails (e.g., rate limiting), assume it's music to be safe
+          // This prevents extracting recipes from music/non-cooking audio
+          console.log('Music detection failed, assuming music content to skip to video analysis');
+          isMusicContent = true;
+        }
         
         if (isMusicContent) {
           console.log('Detected music/non-cooking content in audio, skipping to video analysis');
@@ -209,11 +218,7 @@ export async function POST(request: NextRequest) {
         // PHASE 3: Video Computer Vision Analysis Pipeline  
         try {
           console.log('Step 4: Starting computer vision video analysis...');
-          const videoAnalysis = await withTimeout(
-            extractTextFromVideo(url), 
-            TIMEOUTS.VIDEO_ANALYSIS, 
-            'Video analysis'
-          );
+          const videoAnalysis = await extractTextFromVideo(url);
           console.log('Video analysis successful, length:', videoAnalysis.length);
 
           // Extract recipe from video analysis with timeout
@@ -267,11 +272,7 @@ export async function POST(request: NextRequest) {
         // PHASE 3: Video Computer Vision Analysis Pipeline (Final Fallback)
         try {
           console.log('Step 4: Starting computer vision video analysis (final fallback)...');
-          const videoAnalysis = await withTimeout(
-            extractTextFromVideo(url), 
-            TIMEOUTS.VIDEO_ANALYSIS, 
-            'Video analysis (final fallback)'
-          );
+          const videoAnalysis = await extractTextFromVideo(url);
           console.log('Video analysis successful, length:', videoAnalysis.length);
 
           // Extract recipe from video analysis with timeout
