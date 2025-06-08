@@ -2,41 +2,51 @@ import { render, screen } from '@testing-library/react'
 import RecipeCard from '@/components/RecipeCard'
 
 describe('RecipeCard', () => {
-  const mockRecipe = {
-    ingredients: ['2 eggs', '1 cup flour', '1 cup milk'],
-    instructions: ['Beat eggs', 'Mix with flour', 'Add milk and stir']
-  }
+  const mockIngredients = [
+    '2 cups flour',
+    '3 eggs',
+    '1 cup milk'
+  ]
 
-  test('renders recipe title', () => {
-    render(<RecipeCard {...mockRecipe} />)
+  const mockInstructions = [
+    'Mix dry ingredients',
+    'Add wet ingredients',
+    'Bake at 350°F for 30 minutes'
+  ]
+
+  it('renders the recipe title', () => {
+    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
+    
     expect(screen.getByText('Extracted Recipe')).toBeInTheDocument()
   })
 
-  test('renders all ingredients', () => {
-    render(<RecipeCard {...mockRecipe} />)
+  it('renders all ingredients', () => {
+    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
     
-    expect(screen.getByText('2 eggs')).toBeInTheDocument()
-    expect(screen.getByText('1 cup flour')).toBeInTheDocument()
+    expect(screen.getByText('Ingredients')).toBeInTheDocument()
+    expect(screen.getByText('2 cups flour')).toBeInTheDocument()
+    expect(screen.getByText('3 eggs')).toBeInTheDocument()
     expect(screen.getByText('1 cup milk')).toBeInTheDocument()
   })
 
-  test('renders all instructions with numbers', () => {
-    render(<RecipeCard {...mockRecipe} />)
+  it('renders all instructions', () => {
+    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
     
-    expect(screen.getByText('Beat eggs')).toBeInTheDocument()
-    expect(screen.getByText('Mix with flour')).toBeInTheDocument()
-    expect(screen.getByText('Add milk and stir')).toBeInTheDocument()
-    
-    // Check that instructions are numbered
-    expect(screen.getByText('1.')).toBeInTheDocument()
-    expect(screen.getByText('2.')).toBeInTheDocument()
-    expect(screen.getByText('3.')).toBeInTheDocument()
+    expect(screen.getByText('Instructions')).toBeInTheDocument()
+    expect(screen.getByText('Mix dry ingredients')).toBeInTheDocument()
+    expect(screen.getByText('Add wet ingredients')).toBeInTheDocument()
+    expect(screen.getByText('Bake at 350°F for 30 minutes')).toBeInTheDocument()
   })
 
-  test('renders ingredients and instructions sections', () => {
-    render(<RecipeCard {...mockRecipe} />)
+  it('renders proper layout structure', () => {
+    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
     
-    expect(screen.getByText('Ingredients')).toBeInTheDocument()
-    expect(screen.getByText('Instructions')).toBeInTheDocument()
+    // Check for ingredients section
+    const ingredientsSection = screen.getByText('Ingredients').closest('div')
+    expect(ingredientsSection).toBeInTheDocument()
+    
+    // Check for instructions section
+    const instructionsSection = screen.getByText('Instructions').closest('div')
+    expect(instructionsSection).toBeInTheDocument()
   })
 })

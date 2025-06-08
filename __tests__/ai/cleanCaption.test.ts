@@ -37,13 +37,26 @@ describe('cleanCaption', () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(mockCreate).toHaveBeenCalledWith({
       model: 'gpt-3.5-turbo',
-      messages: expect.arrayContaining([
-        expect.objectContaining({
-          role: 'user',
-          content: expect.stringContaining(messyCaption)
-        })
-      ]),
-      temperature: 0.3
+      messages: [
+        {
+          role: "system",
+          content: `You are a caption cleaning assistant. Your job is to clean and normalize video captions/transcripts by:
+          1. Removing timestamp markers like [00:15] or (0:30)
+          2. Removing speaker labels like "SPEAKER 1:" or "Host:"
+          3. Fixing common transcription errors and typos
+          4. Normalizing punctuation and spacing
+          5. Keeping all recipe-related content intact
+          6. Making the text flow naturally and be easy to read
+          
+          Return only the cleaned caption text, nothing else.`
+        },
+        {
+          role: "user",
+          content: `Please clean this video caption/transcript:\n\n${messyCaption}`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 1000,
     });
   });
 
@@ -61,10 +74,14 @@ describe('cleanCaption', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('should handle OpenAI API errors', async () => {
+  it('should handle OpenAI API errors with fallback', async () => {
     mockCreate.mockRejectedValue(new Error('API Error'));
 
-    await expect(cleanCaption('test caption')).rejects.toThrow('API Error');
+    const result = await cleanCaption('test caption');
+    
+    // Should fall back to basic cleaning instead of throwing
+    expect(result).toBe('test caption');
+    expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
   it('should preserve recipe-related content while cleaning', async () => {

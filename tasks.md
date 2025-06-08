@@ -140,7 +140,7 @@ End: Achieve >90% coverage on new modules; all tests pass.
 
 5. Frontend & UI Updates
 
-**Task 5.1: Loading & Fallback Indicators
+**Task 5.1: Loading & Fallback Indicators ✅ COMPLETED
 
 Start: RecipeCard handles only success.
 
@@ -148,7 +148,7 @@ Action: In RecipeCard, add UI states for "Parsing captions…", "Transcribing au
 
 End: Simulate each state via props; verify correct label appears.
 
-**Task 5.2: Performance Metrics Logging
+**Task 5.2: Performance Metrics Logging ✅ COMPLETED
 
 Start: No metrics collected.
 
@@ -156,7 +156,7 @@ Action: Instrument timing for each extraction step and send to console or analyt
 
 End: Trigger URL parse; console logs durations for each step.
 
-**Task 5.3: Cost-Optimization Flag
+**Task 5.3: Cost-Optimization Flag ✅ COMPLETED
 
 Start: No option to skip expensive steps.
 

@@ -36,7 +36,7 @@ describe('mergeLists', () => {
     
     expect(result).toHaveLength(3)
     expect(result).toEqual(expect.arrayContaining([
-      { name: 'flour', quantity: 1.5, unit: 'cup' },
+      { name: 'flour', quantity: 1.5, unit: 'cup', displayQuantity: '1.5' },
       { name: 'eggs', quantity: 2, unit: '' },
       { name: 'milk', quantity: 1, unit: 'cup' }
     ]))
@@ -59,5 +59,11 @@ describe('mergeLists', () => {
     
     expect(result).toHaveLength(1)
     expect(result[0].quantity).toBe(1.5)
+    expect(result[0]).toEqual(expect.objectContaining({
+      name: 'Flour',
+      quantity: 1.5,
+      unit: 'cup',
+      displayQuantity: '1.5'
+    }))
   })
 })
