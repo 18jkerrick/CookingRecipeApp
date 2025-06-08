@@ -49,12 +49,64 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
     if (jsonMatch) {
       try {
         const data = JSON.parse(jsonMatch[1]);
+        
+        // Debug: Log the available data structure
+        console.log('🔍 TikTok JSON structure keys:', Object.keys(data?.['__DEFAULT_SCOPE__'] || {}));
+        
+        // Try video data structure first (for regular videos)
         const videoData = data?.['__DEFAULT_SCOPE__']?.['webapp.video-detail']?.['itemInfo']?.['itemStruct'];
-        const description = videoData?.['desc'];
+        let description = videoData?.['desc'];
+        
         if (description) {
+          console.log('✅ Found description in video data structure');
           return description;
         }
+        
+        // Try photo data structure (for photo/carousel posts)
+        const photoData = data?.['__DEFAULT_SCOPE__']?.['webapp.photo-detail']?.['itemInfo']?.['itemStruct'];
+        description = photoData?.['desc'];
+        
+        if (description) {
+          console.log('✅ Found description in photo data structure');
+          return description;
+        }
+        
+        // Debug: Log what we found
+        console.log('⚠️ No description found in standard structures, checking all paths...');
+        
+        // Check if description might be in seo.abtest structure
+        const seoData = data?.['__DEFAULT_SCOPE__']?.['seo.abtest'];
+        if (seoData) {
+          console.log('🔍 Checking seo.abtest structure...');
+          console.log('🔍 seo.abtest keys:', Object.keys(seoData));
+          
+          // Check if there's video/content data in seo structure
+          if (seoData.vidList) {
+            console.log('🔍 vidList length:', seoData.vidList.length);
+            console.log('🔍 vidList content:', JSON.stringify(seoData.vidList, null, 2));
+            
+            if (seoData.vidList.length > 0) {
+              const videoInfo = seoData.vidList[0];
+              console.log('🔍 First video info keys:', Object.keys(videoInfo || {}));
+              
+              description = videoInfo?.desc || videoInfo?.title || videoInfo?.description;
+              if (description) {
+                console.log('✅ Found description in seo.abtest.vidList structure:', description);
+                return description;
+              }
+            }
+          }
+        }
+        
+        // Check webapp.app-context for any content
+        const appContext = data?.['__DEFAULT_SCOPE__']?.['webapp.app-context'];
+        if (appContext) {
+          console.log('🔍 Checking webapp.app-context structure...');
+          console.log('🔍 app-context keys:', Object.keys(appContext));
+        }
+        
       } catch (e) {
+        console.error('❌ Error parsing TikTok JSON:', e);
       }
     }
     

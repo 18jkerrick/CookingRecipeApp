@@ -9,23 +9,32 @@ import path from 'path';
  */
 export async function extractTextFromVideo(url: string): Promise<string> {
   try {
+    console.log('🎬 Starting video analysis pipeline...');
+    
     // Check if this is a TikTok photo/slideshow post
     if (url.includes('tiktok.com') && url.includes('/photo/')) {
-      return await extractTextFromTikTokPhotos(url);
+      console.log('📸 Detected TikTok photo post - skipping video analysis (photo posts are protected by anti-bot measures)');
+      throw new Error('TikTok photo posts cannot be automatically analyzed due to anti-bot protection. Alternative options: 1) Try a regular TikTok video URL (not /photo/), 2) Screenshot the images and upload them directly, 3) Copy any text/captions from the post manually');
     }
     
     // Step 1: Extract strategic frames from video
+    console.log('🎞️ Step 1: Extracting key frames from video...');
     const frames = await extractCookingFrames(url);
     
     if (frames.length === 0) {
       throw new Error('No frames extracted from video');
     }
+    console.log(`✅ Successfully extracted ${frames.length} frames for analysis`);
     
     // Step 2: Analyze frames with computer vision for cooking content
+    console.log('👁️ Step 2: Analyzing frames with computer vision...');
     const analysisResults = await analyzeFramesWithVision(frames);
+    console.log(`✅ Completed vision analysis for ${analysisResults.length} frames`);
     
     // Step 3: Combine analysis into coherent recipe text
+    console.log('📝 Step 3: Combining analysis into recipe format...');
     const recipeText = combineVisionAnalysis(analysisResults);
+    console.log(`✅ Generated recipe text with ${recipeText.length} characters`);
     
     return recipeText;
     
@@ -216,14 +225,20 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
 export async function extractCookingFrames(url: string, maxFrames: number = 5): Promise<Buffer[]> {
   try {
     // Download video first (similar to audio approach)
+    console.log('⬇️ Downloading video file...');
     const videoPath = await downloadVideoForFrames(url);
+    console.log(`✅ Video downloaded to: ${videoPath}`);
     
     // Extract frames at strategic intervals for cooking analysis
+    console.log(`🎞️ Extracting up to ${maxFrames} strategic frames...`);
     const frames = await extractFramesFromLocalFile(videoPath, maxFrames);
+    console.log(`✅ Frame extraction complete: ${frames.length} frames extracted`);
     
     // Clean up downloaded video
+    console.log('🧹 Cleaning up temporary video file...');
     if (fs.existsSync(videoPath)) {
       fs.unlinkSync(videoPath);
+      console.log('✅ Temporary video file removed');
     }
     
     if (frames.length === 0) {
@@ -278,12 +293,23 @@ export async function getVideoStreamUrl(url: string): Promise<string> {
  * Download video for frame extraction using yt-dlp
  */
 async function downloadVideoForFrames(url: string): Promise<string> {
-  const outputPath = 'temp_video_frames.mp4';
+  const outputPath = `temp_video_frames_${Date.now()}.mp4`;
+  
+  // Clean up any existing temp files
+  try {
+    const existingFiles = fs.readdirSync('.').filter(file => file.startsWith('temp_video_frames_'));
+    for (const file of existingFiles) {
+      fs.unlinkSync(file);
+    }
+  } catch (error) {
+    // Ignore cleanup errors
+  }
   
   return new Promise((resolve, reject) => {
     const ytdlp = spawn('yt-dlp', [
       '--format', 'best[ext=mp4]/best',
       '--output', outputPath,
+      '--force-overwrites', // Force overwrite existing files
       url
     ]);
 
@@ -320,31 +346,40 @@ async function extractFramesFromLocalFile(videoPath: string, maxFrames: number):
   const frames: Buffer[] = [];
   
   // Get video duration first
+  console.log('⏱️ Getting video duration...');
   const videoDuration = await getVideoDuration(videoPath);
+  console.log(`✅ Video duration: ${videoDuration.toFixed(1)} seconds`);
   
   // Generate adaptive timestamps based on video length
   const timestamps = generateAdaptiveTimestamps(videoDuration);
+  console.log(`📍 Frame timestamps: [${timestamps.map(t => t.toFixed(1)).join('s, ')}s]`);
   
   // Extract each frame individually for better reliability
+  console.log(`🎥 Starting frame extraction process...`);
   for (let i = 0; i < timestamps.length; i++) {
     try {
       const timestamp = timestamps[i];
+      console.log(`🎞️ Extracting frame ${i + 1}/${timestamps.length} at ${timestamp.toFixed(1)}s...`);
       
       const frame = await extractSingleFrame(videoPath, timestamp);
       if (frame && frame.length > 1000) { // Valid frame size check
         frames.push(frame);
+        console.log(`✅ Frame ${i + 1} extracted successfully (${(frame.length / 1024).toFixed(1)}KB)`);
+      } else {
+        console.log(`⚠️ Frame ${i + 1} too small or invalid (${frame ? frame.length : 0} bytes)`);
       }
       
       // Small delay between extractions
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // await new Promise(resolve => setTimeout(resolve, 200));
       
     } catch (error) {
-      console.error(`❌ Failed to extract frame at ${timestamps[i]}s:`, error);
+      console.error(`❌ Failed to extract frame ${i + 1} at ${timestamps[i]}s:`, error);
       // Continue with other frames - this is expected for some videos at end timestamps
       continue;
     }
   }
   
+  console.log(`🎬 Frame extraction summary: ${frames.length}/${timestamps.length} frames successfully extracted`);
   return frames;
 }
 
@@ -631,16 +666,23 @@ function generateCookingTimestamps(numFrames: number): number[] {
 export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[]> {
   const results: string[] = [];
   
+  console.log(`🧠 Starting AI vision analysis for ${frames.length} frames...`);
+  
   // Process frames in batches to avoid rate limiting
   const BATCH_SIZE = 3; // Analyze 3 frames at a time for better rate limiting
   const BATCH_DELAY = 1000; // 1 second delay between batches
   const RETRY_DELAY = 3000; // 3 second delay for rate limit retries (more conservative)
   const MAX_RETRIES = 5; // More retry attempts for reliability
   
+  console.log(`📊 Processing strategy: ${BATCH_SIZE} frames per batch, ${BATCH_DELAY}ms delay between batches`);
+  
   for (let batchStart = 0; batchStart < frames.length; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE, frames.length);
     const batchFrames = frames.slice(batchStart, batchEnd);
     
+    const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(frames.length / BATCH_SIZE);
+    console.log(`🎯 Starting batch ${batchNumber}/${totalBatches} (frames ${batchStart + 1}-${batchEnd})`);
     
     // Process frames in current batch with small delays
     for (let i = 0; i < batchFrames.length; i++) {
@@ -648,18 +690,24 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
       let retryCount = 0;
       let analysis = '';
       
+      console.log(`🔍 Analyzing frame ${globalIndex + 1}/${frames.length}...`);
+      
       // Retry loop for rate limiting
       while (retryCount <= MAX_RETRIES) {
         try {
           if (retryCount === 0) {
+            console.log(`📤 Sending frame ${globalIndex + 1} to OpenAI Vision API...`);
           } else {
+            console.log(`🔄 Retry attempt ${retryCount} for frame ${globalIndex + 1}...`);
           }
           
           // Convert frame to base64 for Vision API
           const base64Frame = batchFrames[i].toString('base64');
+          console.log(`📏 Frame ${globalIndex + 1} encoded: ${(base64Frame.length / 1024).toFixed(1)}KB base64`);
           
           // Analyze frame with OpenAI Vision (now focused on observations only)
           analysis = await analyzeFrameWithOpenAI(base64Frame, globalIndex);
+          console.log(`✅ Frame ${globalIndex + 1} analysis complete (${analysis.length} characters)`);
           
           // Success - break out of retry loop
           break;
@@ -667,6 +715,7 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
         } catch (error: any) {
           // Check if it's a rate limit error
           if (error?.status === 429 && retryCount < MAX_RETRIES) {
+            console.log(`⏳ Rate limit hit for frame ${globalIndex + 1}, waiting ${RETRY_DELAY}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
             retryCount++;
           } else {
@@ -679,20 +728,26 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
       // Add analysis if we got one
       if (analysis.trim()) {
         results.push(analysis);
+        console.log(`📝 Frame ${globalIndex + 1} analysis added to results`);
+      } else {
+        console.log(`⚠️ Frame ${globalIndex + 1} produced no usable analysis`);
       }
       
       // Small delay between individual frame analyses (only if not the last frame in batch)
       if (i < batchFrames.length - 1) {
+        console.log('⏳ Waiting 500ms before next frame analysis...');
         await new Promise(resolve => setTimeout(resolve, 500)); // Reduced delay
       }
     }
     
     // Longer delay between batches to ensure we don't hit rate limits
     if (batchEnd < frames.length) {
+      console.log(`⏳ Batch ${batchNumber} complete. Waiting ${BATCH_DELAY}ms before next batch...`);
       await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
     }
   }
   
+  console.log(`🎉 AI vision analysis complete! ${results.length}/${frames.length} frames successfully analyzed`);
   return results;
 }
 
@@ -776,7 +831,10 @@ function getFrameStage(frameIndex: number): string {
  * Updated to create a consolidated narrative for final recipe extraction
  */
 function combineVisionAnalysis(analysisResults: string[]): string {
+  console.log(`🔗 Combining vision analysis from ${analysisResults.length} frame analyses...`);
+  
   if (analysisResults.length === 0) {
+    console.log('❌ No analysis results to combine');
     return 'No cooking content detected in video frames.';
   }
 
@@ -788,7 +846,10 @@ function combineVisionAnalysis(analysisResults: string[]): string {
     result.length > 10
   );
 
+  console.log(`📊 Filtering results: ${validAnalyses.length}/${analysisResults.length} frames contain valid cooking content`);
+
   if (validAnalyses.length === 0) {
+    console.log('❌ No valid cooking content found in any frames');
     return 'Video does not appear to contain clear cooking instructions or ingredient information.';
   }
 
@@ -804,6 +865,7 @@ ${analysis}`
 
 CONSOLIDATION NOTE: These are observations from different moments in the same cooking video. Some ingredients or cooking actions may appear multiple times as the cooking progresses. Please consolidate duplicate ingredients and create a coherent recipe flow from these sequential observations.`;
 
+  console.log(`✅ Successfully combined ${validAnalyses.length} frame analyses into narrative (${consolidatedNarrative.length} characters)`);
   return consolidatedNarrative;
 }
 

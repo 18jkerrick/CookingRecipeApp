@@ -1,45 +1,45 @@
 interface RecipeCardProps {
-  ingredients: string[];
-  instructions: string[];
+  title?: string;
+  imageUrl?: string;
+  processing?: boolean;
 }
 
-export default function RecipeCard({ ingredients = [], instructions = [] }: RecipeCardProps) {
-  return (
-    <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Extracted Recipe</h2>
-      
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Ingredients */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 text-gray-700">Ingredients</h3>
-          <ul className="space-y-2">
-            {ingredients.map((ingredient, index) => (
-              <li key={index} className="flex items-start">
-                <span className="text-blue-500 mr-2">•</span>
-                <span className="text-gray-600">{ingredient}</span>
-              </li>
-            ))}
-          </ul>
-          {ingredients.length === 0 && (
-            <p className="text-gray-400 italic">No ingredients found</p>
-          )}
+export default function RecipeCard({ title, imageUrl, processing = false }: RecipeCardProps) {
+  if (processing) {
+    return (
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {/* Shimmer image placeholder */}
+        <div className="aspect-square bg-gray-200 animate-pulse"></div>
+        
+        {/* Shimmer title placeholder */}
+        <div className="p-4 h-20 flex flex-col justify-start">
+          <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4 mx-auto"></div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Instructions */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 text-gray-700">Instructions</h3>
-          <ol className="space-y-2">
-            {instructions.map((instruction, index) => (
-              <li key={index} className="flex items-start">
-                <span className="text-blue-500 mr-2 font-medium">{index + 1}.</span>
-                <span className="text-gray-600">{instruction}</span>
-              </li>
-            ))}
-          </ol>
-          {instructions.length === 0 && (
-            <p className="text-gray-400 italic">No instructions found</p>
-          )}
-        </div>
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+      {/* Recipe image */}
+      <div className="aspect-square bg-gray-100 flex items-center justify-center">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={title || 'Recipe'}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="text-gray-400 text-4xl">🍽️</div>
+        )}
+      </div>
+      
+      {/* Recipe title */}
+      <div className="p-4 h-20 flex items-start justify-center">
+        <h3 className="font-semibold text-gray-900 leading-tight text-center line-clamp-2">
+          {title || 'Untitled Recipe'}
+        </h3>
       </div>
     </div>
   );

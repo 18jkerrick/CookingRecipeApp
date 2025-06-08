@@ -9,6 +9,24 @@ import { transcribeAudio } from '@/lib/ai/transcribeAudio';
 import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
 import { extractTextFromVideo } from '@/lib/parser/video';
 import { detectMusicContent } from '@/lib/ai/detectMusicContent';
+import { generateRecipeTitle } from '@/lib/utils/titleGenerator';
+import { getThumbnailUrl } from '@/lib/utils/thumbnailExtractor';
+import { extractVideoTitle } from '@/lib/utils/titleExtractor';
+
+// Smart title extraction function
+function getSmartTitle(captions: string, platform: string, url: string, ingredients: string[], instructions: string[]): string {
+  // First try to extract from video captions/title
+  const videoTitle = extractVideoTitle(captions, platform, url);
+  if (videoTitle) {
+    console.log(`📺 Using video title: "${videoTitle}"`);
+    return videoTitle;
+  }
+  
+  // Fallback to AI generation from recipe
+  const aiTitle = generateRecipeTitle(ingredients, instructions);
+  console.log(`🤖 Using AI generated title: "${aiTitle}"`);
+  return aiTitle;
+}
 
 // Timeout utility function
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, stepName: string): Promise<T> {
@@ -39,64 +57,85 @@ export async function POST(request: NextRequest) {
     }
 
     const isFastMode = mode === 'fast';
-    console.log(`Processing in ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${url}`);
+    console.log(`\n🚀 STARTING PIPELINE: ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${url}`);
+    console.log(`📅 Timestamp: ${new Date().toISOString()}`);
 
-    // Determine platform and get raw captions
+    // PHASE 1: Caption Extraction
+    console.log(`\n📝 PHASE 1: Caption Extraction`);
     let rawCaptions: string;
     let platform: string;
     
     try {
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
         platform = 'YouTube';
+        console.log(`🎥 Detected platform: ${platform}`);
+        console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
           getYoutubeCaptions(url), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'YouTube caption extraction'
         );
+        console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
       } else if (url.includes('tiktok.com')) {
         platform = 'TikTok';
+        console.log(`🎵 Detected platform: ${platform}`);
+        console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
           getTiktokCaptions(url), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'TikTok caption extraction'
         );
+        console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
       } else if (url.includes('instagram.com')) {
         platform = 'Instagram';
+        console.log(`📸 Detected platform: ${platform}`);
+        console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
           getInstagramCaptions(url), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'Instagram caption extraction'
         );
+        console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
       } else {
         platform = 'Unknown';
+        console.log(`❌ Unsupported platform detected`);
         return NextResponse.json({ error: 'Unsupported platform' }, { status: 400 });
       }
     } catch (captionError) {
-      console.error('Caption extraction failed:', captionError);
+      console.error(`❌ Caption extraction failed:`, captionError);
       
       // For TikTok photo posts, caption extraction failure is expected - continue to video analysis
       if (url.includes('tiktok.com') && url.includes('/photo/')) {
-        console.log('TikTok photo post detected, skipping caption extraction and continuing to photo analysis');
+        console.log(`🔄 TikTok photo post detected, skipping caption extraction and continuing to pipeline`);
         platform = 'TikTok'; // Ensure platform is set
         rawCaptions = ''; // Empty captions will trigger fallback to video analysis
       } else {
         // For other platforms, caption extraction failure is a real error
+        console.log(`🛑 Caption extraction failed for unknown platform, terminating pipeline`);
         return NextResponse.json({ 
           error: `Failed to get recipe from link: ${captionError instanceof Error ? captionError.message : 'Unknown error'}` 
         }, { status: 400 });
       }
     }
 
-    console.log(`Detected platform: ${platform} for URL: ${url}`);
+    console.log(`\n🖼️ EXTRACTING THUMBNAIL`);
+    const thumbnail = await getThumbnailUrl(url, platform);
+    console.log(`📸 Thumbnail extraction: ${thumbnail ? 'success' : 'failed'}`);
+
+    console.log(`\n🍽️ PHASE 2: Recipe Extraction from Captions`);
+    console.log(`📋 Raw captions preview: "${rawCaptions.substring(0, 100)}..."`);
 
     // Clean the captions with timeout
+    console.log(`🧹 Cleaning captions...`);
     const cleanedCaptions = await withTimeout(
       cleanCaption(rawCaptions), 
       TIMEOUTS.CAPTION_CLEANING, 
       'Caption cleaning'
     );
+    console.log(`✅ Caption cleaning successful, length: ${cleanedCaptions.length}`);
     
     // Extract recipe from cleaned captions
+    console.log(`🔍 Extracting recipe from captions...`);
     const prompt = `
     Please extract the ingredients and instructions from this recipe transcript.
 
@@ -128,16 +167,23 @@ export async function POST(request: NextRequest) {
     );
 
     // Check if caption extraction was successful
+    console.log(`📊 Caption recipe extraction results: ${recipe.ingredients.length} ingredients, ${recipe.instructions.length} instructions`);
+    
     if (recipe.ingredients.length > 0) {
-      console.log('Caption extraction successful, returning recipe');
+      console.log(`🎉 SUCCESS: Recipe found in captions! Returning result.`);
+      const title = getSmartTitle(rawCaptions, platform, url, recipe.ingredients, recipe.instructions);
+      console.log(`📝 Final title: "${title}"`);
+      
       return NextResponse.json({
         platform,
+        title,
+        thumbnail,
         ingredients: recipe.ingredients,
         instructions: recipe.instructions,
         source: 'captions'
       });
     } else if (isFastMode) {
-      console.log('Fast mode enabled - skipping audio and video analysis');
+      console.log(`⚡ Fast mode enabled - skipping audio and video analysis`);
       return NextResponse.json({
         platform,
         error: 'No recipe found in captions. Enable full analysis for audio/video processing.',
@@ -145,33 +191,36 @@ export async function POST(request: NextRequest) {
         source: 'captions_only'
       }, { status: 400 });
     } else {
-      console.log('Caption extraction failed to find ingredients, attempting audio extraction');
+      console.log(`🔄 No recipe found in captions, proceeding to audio extraction...`);
       
-      // TASK 4.1: Audio Extraction Pipeline
+      // PHASE 3: Audio Extraction Pipeline
+      console.log(`\n🎵 PHASE 3: Audio Extraction Pipeline`);
       try {
         // Step 1: Download audio with timeout
-        console.log('Step 1: Downloading audio stream...');
+        console.log(`📥 Step 1: Downloading audio stream from URL...`);
         const audioBlob = await withTimeout(
           fetchAudio(url), 
           TIMEOUTS.AUDIO_DOWNLOAD, 
           'Audio download'
         );
-        console.log('Audio download successful:', {
+        console.log(`✅ Audio download successful:`, {
           size: audioBlob.size,
-          type: audioBlob.type
+          type: audioBlob.type,
+          sizeMB: (audioBlob.size / 1024 / 1024).toFixed(2)
         });
 
         // Step 2: Transcribe audio with timeout
-        console.log('Step 2: Transcribing audio...');
+        console.log(`🎤 Step 2: Transcribing audio with Whisper AI...`);
         const transcript = await withTimeout(
           transcribeAudio(audioBlob), 
           TIMEOUTS.AUDIO_TRANSCRIPTION, 
           'Audio transcription'
         );
-        console.log('Audio transcription successful, length:', transcript.length);
+        console.log(`✅ Audio transcription successful, length: ${transcript.length}`);
+        console.log(`📝 Transcript preview: "${transcript.substring(0, 150)}..."`); 
 
         // Step 2.5: Check if transcript contains music/non-cooking content with timeout
-        console.log('Step 2.5: Checking if transcript contains music or non-cooking content...');
+        console.log(`🎶 Step 2.5: Checking if transcript contains music or non-cooking content...`);
         let isMusicContent = false;
         
         try {
@@ -180,30 +229,38 @@ export async function POST(request: NextRequest) {
             TIMEOUTS.MUSIC_DETECTION, 
             'Music content detection'
           );
+          console.log(`🔍 Music detection result: ${isMusicContent ? 'Music/non-cooking content detected' : 'Cooking content detected'}`);
         } catch (musicDetectionError) {
-          console.error('Error detecting music content:', musicDetectionError);
+          console.error(`❌ Error detecting music content:`, musicDetectionError);
           // If music detection fails (e.g., rate limiting), assume it's music to be safe
           // This prevents extracting recipes from music/non-cooking audio
-          console.log('Music detection failed, assuming music content to skip to video analysis');
+          console.log(`⚠️ Music detection failed, assuming music content to skip to video analysis`);
           isMusicContent = true;
         }
         
         if (isMusicContent) {
-          console.log('Detected music/non-cooking content in audio, skipping to video analysis');
+          console.log(`🎵 Detected music/non-cooking content in audio, skipping to video analysis`);
           // Skip recipe extraction and go straight to video analysis
         } else {
           // Step 3: Extract recipe from transcript (only if not music) with timeout
-          console.log('Step 3: Extracting recipe from transcript...');
+          console.log(`🍳 Step 3: Extracting recipe from cooking transcript...`);
           const audioRecipe = await withTimeout(
             extractRecipeFromTranscript(transcript), 
             TIMEOUTS.RECIPE_EXTRACTION, 
             'Audio recipe extraction'
           );
         
+          console.log(`📊 Audio recipe extraction results: ${audioRecipe.ingredients.length} ingredients, ${audioRecipe.instructions.length} instructions`);
+          
           if (audioRecipe.ingredients.length > 0) {
-            console.log('Audio extraction successful, returning recipe');
+            console.log(`🎉 SUCCESS: Recipe found in audio transcript! Returning result.`);
+            const title = getSmartTitle(rawCaptions, platform, url, audioRecipe.ingredients, audioRecipe.instructions);
+            console.log(`📝 Final title: "${title}"`);
+            
             return NextResponse.json({
               platform,
+              title,
+              thumbnail,
               ingredients: audioRecipe.ingredients,
               instructions: audioRecipe.instructions,
               source: 'audio_transcript',
@@ -213,33 +270,47 @@ export async function POST(request: NextRequest) {
         }
 
         // If we reach here, either audio was music or recipe extraction failed
-        console.log('Audio extraction failed or contained music, attempting video analysis');
+        console.log(`🔄 Audio extraction failed or contained music, proceeding to video analysis...`);
         
-        // PHASE 3: Video Computer Vision Analysis Pipeline  
+        // PHASE 4: Video Computer Vision Analysis Pipeline  
+        console.log(`\n🎬 PHASE 4: Video Computer Vision Analysis Pipeline`);
         try {
-          console.log('Step 4: Starting computer vision video analysis...');
+          console.log(`📹 Step 4: Starting computer vision video analysis...`);
           const videoAnalysis = await extractTextFromVideo(url);
-          console.log('Video analysis successful, length:', videoAnalysis.length);
+          console.log(`✅ Video analysis successful, length: ${videoAnalysis.length}`);
+          console.log(`🖼️ Video analysis preview: "${videoAnalysis.substring(0, 150)}..."`);
 
           // Extract recipe from video analysis with timeout
-          console.log('Step 5: Extracting recipe from video analysis...');
+          console.log(`🔍 Step 5: Extracting recipe from video analysis...`);
           const videoRecipe = await withTimeout(
             extractRecipeFromTranscript(videoAnalysis), 
             TIMEOUTS.RECIPE_EXTRACTION, 
             'Video recipe extraction'
           );
           
+          console.log(`📊 Video recipe extraction results: ${videoRecipe.ingredients.length} ingredients, ${videoRecipe.instructions.length} instructions`);
+          
           if (videoRecipe.ingredients.length > 0) {
-            console.log('Video analysis successful, returning recipe');
+            console.log(`🎉 SUCCESS: Recipe found in video analysis! Returning result.`);
+            const title = getSmartTitle(rawCaptions, platform, url, videoRecipe.ingredients, videoRecipe.instructions);
+            console.log(`📝 Final title: "${title}"`);
+            
             return NextResponse.json({
               platform,
+              title,
+              thumbnail,
               ingredients: videoRecipe.ingredients,
               instructions: videoRecipe.instructions,
               source: 'video_analysis',
               analysis: videoAnalysis.substring(0, 300) + '...' // Include preview for debugging
             });
           } else {
-            console.log('All extraction methods failed - no recipe found');
+            console.log(`❌ All extraction methods failed - no recipe found in any phase`);
+            console.log(`📊 Final Results Summary:`);
+            console.log(`   • Captions: No recipe found`);
+            console.log(`   • Audio: ${isMusicContent ? 'Music content detected' : 'No recipe found'}`);
+            console.log(`   • Video: No recipe found`);
+            
             return NextResponse.json({
               platform,
               needAudio: true,
@@ -254,7 +325,7 @@ export async function POST(request: NextRequest) {
           }
 
         } catch (videoError) {
-          console.error('Video analysis pipeline failed:', videoError);
+          console.error(`❌ Video analysis pipeline failed:`, videoError);
           return NextResponse.json({
             platform,
             needAudio: true,
@@ -266,8 +337,8 @@ export async function POST(request: NextRequest) {
         }
 
       } catch (audioError) {
-        console.error('Audio extraction pipeline failed:', audioError);
-        console.log('Audio extraction completely failed, attempting video analysis as final fallback');
+        console.error(`❌ Audio extraction pipeline failed:`, audioError);
+        console.log(`🔄 Audio extraction completely failed, attempting video analysis as final fallback...`);
         
         // PHASE 3: Video Computer Vision Analysis Pipeline (Final Fallback)
         try {
@@ -285,8 +356,13 @@ export async function POST(request: NextRequest) {
           
           if (videoRecipe.ingredients.length > 0) {
             console.log('Video analysis successful (final fallback), returning recipe');
+            const title = getSmartTitle(rawCaptions, platform, url, videoRecipe.ingredients, videoRecipe.instructions);
+            console.log(`📝 Final title: "${title}"`);
+            
             return NextResponse.json({
               platform,
+              title,
+              thumbnail,
               ingredients: videoRecipe.ingredients,
               instructions: videoRecipe.instructions,
               source: 'video_analysis_fallback',

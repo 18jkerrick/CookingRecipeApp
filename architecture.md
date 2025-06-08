@@ -1,163 +1,188 @@
-🍳 Recipe App - Full Stack Architecture
+# 🍳 Cooking Recipe App - Architecture Overview
 
-📁 File & Folder Structure
+## Core Philosophy
+**Smart Content Extraction**: Triple-fallback system that intelligently extracts recipes from social media cooking videos using captions, audio transcription, and computer vision analysis.
 
-recipe-app/
-├── app/                       # Next.js app directory (app router)
-│   ├── api/                   # API route handlers (e.g. for parsing, auth, grocery services)
-│   │   ├── parse-url/         # Endpoint for extracting recipe from media URLs
-│   │   ├── grocery/           # CRUD operations for grocery lists & master lists
-│   │   ├── auth/              # Supabase-based authentication API
-│   ├── dashboard/             # User dashboard for saved recipes & lists
-│   ├── groceries/             # Pages for individual & master grocery lists
-│   ├── shopping/              # Online shopping integration UI
-│   ├── layout.tsx             # Global layout
-│   ├── page.tsx               # Landing page with URL input
-│   └── globals.css            # Tailwind/global styles
-├── components/                # Reusable components (UI and functional)
-│   ├── UrlInput.tsx           # Input field for video URL
-│   ├── RecipeCard.tsx         # UI for displaying extracted recipe
-│   ├── GroceryList.tsx        # UI for displaying/editing grocery lists
-│   ├── MasterListManager.tsx # Add to existing/new master list
-├── lib/                       # Utility functions and external service integrations
-│   ├── ai/                    # AI integration utilities (ChatGPT, Gemini, etc.)
-│   │   ├── extractRecipe.ts   # Unified recipe extraction logic
-│   ├── parser/                # For metadata/audio/video extraction
-│   │   ├── youtube.ts         # Extract captions/transcripts
-│   │   ├── tiktok.ts
-│   │   ├── instagram.ts
-│   ├── shopping/              # Interfaces to grocery delivery APIs
-│   │   ├── amazon.ts
-│   │   ├── instacart.ts
-│   │   ├── doordash.ts
-├── types/                    # TypeScript interfaces/types
-│   ├── recipe.ts
-│   ├── grocery.ts
-├── public/                   # Static assets
-├── .env                      # Environment variables
-├── supabase/                 # Supabase client and schema
-│   ├── client.ts             # Supabase instance setup
-│   ├── schema.sql            # DB schema
-├── middleware.ts             # Auth middleware if needed
-├── next.config.js
-├── tsconfig.json
+## 🔄 Content Processing Pipeline
 
-🧠 What Each Part Does
+### Three-Tier Fallback System
+1. **Caption Extraction** (Primary) - Fast, accurate text extraction
+2. **Audio Transcription** (Secondary) - When captions unavailable/poor quality  
+3. **Computer Vision Analysis** (Tertiary) - Visual analysis of cooking actions
 
-app/
+### Processing Flow
+```
+URL Input → Platform Detection → Content Extraction → AI Processing → Recipe Output
+```
 
-API routes: Handles backend logic like parsing URLs, managing groceries, and authentication.
+## 📁 Current File Structure
 
-Pages: Route-based UI pages for user interaction.
+```
+cooking_recipe_app/
+├── app/                          # Next.js app directory (app router)
+│   ├── api/
+│   │   ├── parse-url/           # Main recipe extraction endpoint
+│   │   └── grocery-lists/       # Grocery list management
+│   ├── dashboard/               # User interface pages
+│   ├── groceries/
+│   ├── layout.tsx
+│   └── page.tsx                 # Main landing page
+├── components/                   # React UI components
+│   ├── UrlInput.tsx
+│   ├── RecipeCard.tsx
+│   └── GroceryList.tsx
+├── lib/                         # Core business logic
+│   ├── parser/                  # Platform-specific content extractors
+│   │   ├── video.ts            # Computer vision analysis (818 lines)
+│   │   ├── audio.ts            # Audio transcription pipeline
+│   │   ├── youtube.ts          # YouTube caption extraction
+│   │   ├── tiktok.ts           # TikTok caption extraction  
+│   │   └── instagram.ts        # Instagram caption extraction
+│   ├── ai/                     # AI processing utilities
+│   │   ├── extractFromCaption.ts    # Recipe extraction from captions
+│   │   ├── extractFromTranscript.ts # Recipe extraction from audio transcripts
+│   │   ├── transcribeAudio.ts       # Audio → text conversion
+│   │   ├── cleanCaption.ts          # Caption preprocessing
+│   │   └── detectMusicContent.ts   # Music detection for content filtering
+│   └── utils/                  # Utility functions
+├── types/                      # TypeScript type definitions
+└── public/                     # Static assets
+```
 
-components/
+## 🧠 Core Systems
 
-Reusable UI/UX components that keep views clean and declarative.
+### Platform Detection & Content Extraction
 
-MasterListManager combines logic to add/merge grocery items smartly.
+**Supported Platforms:**
+- YouTube (captions, audio, video)
+- TikTok (captions, audio, video + photo posts)
+- Instagram (captions, audio, video)
 
-lib/
+**Content Extraction Methods:**
 
-ai/: Wrapper functions for OpenAI, Gemini, Claude APIs to send text/caption/video and return structured recipes.
+1. **Caption-Based** (`lib/parser/{platform}.ts`)
+   - Uses platform APIs and yt-dlp for subtitle extraction
+   - Fastest and most accurate when available
+   - Processed by `extractFromCaption.ts`
 
-parser/: Platform-specific scrapers and extractors to pull metadata, transcripts, or audio.
+2. **Audio Transcription** (`lib/parser/audio.ts`)
+   - Downloads audio using yt-dlp
+   - OpenAI Whisper API transcription
+   - Music content detection and filtering
+   - Processed by `extractFromTranscript.ts`
 
-shopping/: SDK wrappers or REST integrations with shopping APIs. Normalizes formats across platforms.
+3. **Computer Vision Analysis** (`lib/parser/video.ts`)
+   - Downloads video using yt-dlp (bypasses streaming 403 errors)
+   - Strategic frame extraction using FFmpeg
+   - OpenAI Vision API analysis of cooking actions
+   - Identifies ingredients, cooking techniques, and recipe steps visually
 
-types/
+### Video Analysis Deep Dive
 
-Global type definitions to keep TypeScript strict and safe.
+**Frame Extraction Strategy:**
+- Downloads full video locally to avoid streaming restrictions
+- Extracts 3-5 strategic frames (beginning, middle, end of cooking)
+- Uses adaptive timestamps based on video duration
 
-supabase/
+**Computer Vision Analysis:**
+- OpenAI Vision API with cooking-specific prompts
+- Identifies ingredients being used and their preparation state
+- Detects cooking actions (chopping, sautéing, seasoning, etc.)
+- Extracts recipe steps from visual cooking demonstrations
+- Combines analysis from multiple frames into coherent recipe
 
-Central place for auth setup and SQL schema (recipes, groceries, master lists, users).
+**Technical Implementation:**
+```typescript
+extractTextFromVideo(url) →
+  extractCookingFrames(url) →
+    downloadVideoForFrames(url) →
+    extractFramesFromLocalFile(videoPath) →
+  analyzeFramesWithVision(frames) →
+    analyzeFrameWithOpenAI(frame) →
+  combineVisionAnalysis(results)
+```
 
-public/
+### AI Processing
 
-Logos, icons, and static files.
+**OpenAI Integration:**
+- GPT-4 for text-based recipe extraction
+- Whisper for audio transcription
+- Vision API for frame analysis
 
-😌 State Management
+**Processing Strategies:**
+- Content type detection (cooking vs non-cooking)
+- Ingredient standardization and quantity extraction
+- Step-by-step instruction generation
+- Metadata extraction (cook time, servings, etc.)
 
-Local State
+## 🔧 Technical Architecture
 
-Use React Context or Zustand for lightweight shared state (e.g. current recipe, temporary grocery list).
+### Backend Processing
+- All AI API calls handled server-side to protect API keys
+- Asynchronous processing with proper error handling
+- Temporary file management with automatic cleanup
+- Streaming protection bypass using download-first approach
 
-Remote State
+### Content Processing Flow
+```
+1. URL validation and platform detection
+2. Attempt caption extraction (fastest)
+3. If captions unavailable/poor quality → audio transcription
+4. If audio fails/inadequate → computer vision analysis
+5. AI processing to extract structured recipe data
+6. Return formatted recipe with ingredients and instructions
+```
 
-All persistent data (recipes, grocery lists, master lists, user info) stored in Supabase (PostgreSQL + Realtime).
+### Error Handling & Resilience
+- Graceful fallback between extraction methods
+- Platform-specific error handling (403 streaming, geo-blocking)
+- Temporary file cleanup on success/failure
+- Comprehensive logging and debugging
 
-Auth handled via Supabase Auth, optionally paired with JWT middleware on API routes.
+## 🚀 Current Capabilities
 
-Async Services
+**Content Analysis:**
+- ✅ YouTube caption extraction
+- ✅ TikTok caption extraction  
+- ✅ Instagram caption extraction
+- ✅ Audio transcription (all platforms)
+- ✅ Computer vision cooking analysis
+- ✅ TikTok photo post analysis
+- ✅ Music content detection and filtering
 
-AI APIs: Requests sent from backend API routes to avoid exposing keys client-side.
+**Recipe Processing:**
+- ✅ Ingredient extraction and standardization
+- ✅ Step-by-step instruction generation
+- ✅ Cooking technique identification
+- ✅ Metadata extraction (servings, time, etc.)
 
-Shopping APIs: Handled via backend calls for cleaner abstraction & future monetization integration.
+**Technical Features:**
+- ✅ Three-tier fallback system
+- ✅ Anti-streaming protection bypass
+- ✅ Strategic frame extraction
+- ✅ Temporary file management
+- ✅ Comprehensive error handling
 
-🔁 Workflow Overview
+## 🔮 Architecture Strengths
 
-User pastes a URL into the homepage input.
+1. **Resilient Content Extraction**: Multiple fallback methods ensure high success rate
+2. **Platform Agnostic**: Unified interface supports major social media platforms  
+3. **Advanced Computer Vision**: Goes beyond OCR to actual cooking action recognition
+4. **Performance Optimized**: Strategic frame sampling minimizes API costs
+5. **Production Ready**: Proper error handling, cleanup, and logging
 
-Frontend POSTs to /api/parse-url, which:
+## 🛠 Development Considerations
 
-Detects platform (e.g. YouTube, TikTok).
+**Current Focus**: Perfecting the computer vision pipeline for robust cooking content analysis
 
-Extracts captions, audio or metadata.
+**Key Technical Challenges Solved:**
+- Social media streaming restrictions (403 errors)
+- Complex video frame extraction and timing
+- Cooking-specific computer vision prompting
+- Multi-modal content processing pipeline
 
-Sends cleaned content to OpenAI or other AI APIs via /lib/ai/extractRecipe.ts.
-
-Parses and returns: ingredients[], instructions[], metadata.
-
-Recipe is shown on screen.
-
-User clicks "Generate Grocery List" → ingredients are converted to quantity + items.
-
-User can:
-
-Save the grocery list with a name.
-
-Add it to a master grocery list (duplicates merged).
-
-Grocery list can be exported to:
-
-Notes App, Notion, Word (.docx), etc. (via Web Share API or downloads)
-
-Optionally, user can shop online via integrated APIs (Amazon/Instacart).
-
-🛠 Recommended Open Source Additions
-
-Tech
-
-Use Case
-
-Zustand
-
-Lightweight state management
-
-LangChain
-
-Advanced chaining & memory for AI agents
-
-ffmpeg.wasm
-
-For browser-side audio/video parsing if needed
-
-Tesseract.js
-
-OCR from video overlays (if captions are burnt-in)
-
-unified
-
-Parsing/transformation of text for AI prep
-
-🤩 Future Enhancements
-
-Browser extension for 1-click recipe scraping
-
-AI personalization ("remove cilantro from all recipes")
-
-Meal planning/calendar integration
-
-Shared grocery lists for roommates/families
-
-Health filters (vegan, gluten-free, macros, etc.)
+**Next Enhancement Opportunities:**
+- Real-time processing optimization
+- Enhanced ingredient quantity detection
+- Cooking technique classification refinement
+- Multi-language recipe support

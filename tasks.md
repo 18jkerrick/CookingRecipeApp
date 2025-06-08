@@ -1,165 +1,153 @@
-🚀 MVP2 Build Plan
+Component 1: Mobile Testing Environment
 
-A granular, step-by-step checklist for adding intelligent recipe extraction (caption → audio → video). Each task is single-concern, testable, with a clear start and end.
+Task 1.1: Enable LAN Dev Host
 
-1. Caption-Based Extraction
+* Start: Fresh Next.js project with no custom host binding
+* Action:
 
-**Task 1.1: Fetch Raw Captions
+  1. In next.config.js add server: { host: '0.0.0.0' }
+  2. Or run “next dev --hostname 0.0.0.0”
+* End: Dev server is reachable at 0.0.0.0:3000
 
-Start: No caption-fetch function exists.
+Task 1.2: Verify on Phone Over LAN
 
-Action: In lib/parser/youtube.ts, implement async function fetchCaptions(url: string): Promise<string> using youtube-dl (or appropriate API) to return raw caption text.
+* Start: Dev server bound to 0.0.0.0:3000
+* Action:
 
-End: Calling fetchCaptions(youtubeUrl) resolves with caption text (verified via unit test).
+  1. On desktop run ifconfig/ipconfig and note LAN IP (e.g. 192.168.1.42)
+  2. On phone (same Wi-Fi) browse to http\://\<LAN\_IP>:3000
+* End: Home page loads on mobile without errors
 
-**Task 1.2: Normalize Captions
+Task 1.3: Install & Configure localtunnel
 
-Start: Raw caption text returned.
+* Start: No tunneling tool installed
+* Action:
 
-Action: In lib/ai/cleanCaption.ts, write async function cleanCaption(raw: string): Promise<string> that calls OpenAI chat completion with prompt to tidy and unify format.
+  1. npm install --save-dev localtunnel
+  2. Add to package.json scripts: "lt": "lt --port 3000 --subdomain remy-dev"
+* End: Running npm run lt outputs a public HTTPS URL
 
-End: Given messy caption, cleanCaption returns cleaned-up text (assert expected formatted string).
+Task 1.4: Verify Tunnel on Phone
 
-**Task 1.3: Parse Recipe from Caption
+* Start: Tunnel running via npm run lt
+* Action: On any mobile device navigate to the public URL (e.g. [https://remy-dev.loca.lt](https://remy-dev.loca.lt))
+* End: Home page loads and functions identically to localhost
 
-Start: Cleaned caption string.
+Component 2: Authentication & Onboarding
 
-Action: In lib/ai/extractFromCaption.ts, write async function extractRecipeFromCaption(text: string): Promise<{ ingredients: string[]; instructions: string[] }> calling OpenAI with a schema prompt.
+Task 2.1: Install Supabase Client
 
-End: Returns structured recipe object; verified via mock prompt and unit test returning expected arrays.
+* Start: No Supabase package installed
+* Action: npm install @supabase/supabase-js
+* End: @supabase/supabase-js appears in package.json
 
-**Task 1.4: Caption-Fallback Logic Flag
+Task 2.2: Configure Environment Variables
 
-Start: No fallback condition.
+* Start: No .env.local file
+* Action:
 
-Action: In /api/parse-url, after caption extraction, check if ingredients.length > 0; if true, return result; else set needAudio = true.
+  1. Create .env.local at project root
+  2. Add NEXT\_PUBLIC\_SUPABASE\_URL and NEXT\_PUBLIC\_SUPABASE\_ANON\_KEY
+* End: Variables accessible via process.env
 
-End: When caption yields no ingredients, API responds with { needAudio: true }; unit test covers both paths.
+Task 2.3: Initialize Supabase Client Module
 
-2. Audio-Based Extraction
+* Start: No client wrapper created
+* Action:
 
-**Task 2.1: Download Audio Stream
+  1. Create lib/supabaseClient.ts exporting createClient(process.env…)
+* End: Exported supabase client ready for import
 
-Start: No audio-extraction utility.
+Task 2.4: Scaffold AuthContext
 
-Action: In lib/parser/audio.ts, implement async function fetchAudio(url: string): Promise<Blob> using ffmpeg.wasm or server-side extractor to return audio blob.
+* Start: No auth context exists
+* Action:
 
-End: Calling fetchAudio(videoUrl) returns a Blob; test by checking blob MIME type.
+  1. Create context/AuthContext.tsx
+  2. Provide user, signInWithGoogle, signInWithApple, signOut via React Context
+  3. Wrap AuthProvider around \_app.tsx
+* End: useAuth() hook returns auth state and methods
 
-**Task 2.2: Transcribe Audio
+Task 2.5: Build Onboarding Page UI
 
-Start: Raw audio blob available.
+* Start: No /pages/index.tsx content
+* Action:
 
-Action: In lib/ai/transcribeAudio.ts, write async function transcribeAudio(blob: Blob): Promise<string> that sends audio to OpenAI Whisper API and returns transcript text.
+  1. Create pages/index.tsx
+  2. Render logo and two buttons wired to signInWithGoogle and signInWithApple
+* End: Clicking buttons triggers Supabase OAuth popups
 
-End: Given sample audio blob, transcribeAudio returns transcript string; verify via mock Whisper response.
+Task 2.6: Redirect After Login
 
-**Task 2.3: Parse Recipe from Transcript
+* Start: User remains on / after auth
+* Action:
 
-Start: Transcript text returned.
+  1. In AuthContext subscribe to supabase.auth.onAuthStateChange
+  2. On SIGNED\_IN event call router.push('/cookbooks')
+* End: Authenticated users land on /cookbooks
 
-Action: In lib/ai/extractFromTranscript.ts, implement async function extractRecipeFromTranscript(text: string): Promise<{ ingredients: string[]; instructions: string[] }> via OpenAI schema prompt.
+Task 2.7: Prompt for Push Notifications
 
-End: Returns structured recipe object; unit test for expected arrays.
+* Start: No notification prompt shown
+* Action:
 
-**Task 2.4: Audio-Fallback Logic Flag
+  1. On first render of /cookbooks with user present show modal asking Notification.requestPermission()
+  2. Save permission choice in localStorage
+* End: Browser push permission requested once
 
-Start: Fallback flag not implemented.
+Component 3: Cookbooks (Landing) Page
 
-Action: In /api/parse-url, if needAudio and ingredients.length > 0 after transcript extraction, return result; else set needVideo = true.
+Task 3.1: Scaffold pages/cookbooks.tsx
 
-End: When transcript yields no ingredients, API responds with { needVideo: true }; tests cover both cases.
+* Start: No cookbooks page exists
+* Action:
 
-3. Video-Based Extraction
+  1. Create pages/cookbooks.tsx exporting a component that renders “Cookbooks”
+* End: Visiting /cookbooks shows “Cookbooks”
 
-**Task 3.1: Research Video-to-Text Capability
+Task 3.2: Build PasteUrlInput Component
 
-Start: Unknown if OpenAI supports direct video analysis.
+* Start: No URL-input component
+* Action:
 
-Action: Check OpenAI docs for video endpoints; if none, list alternative services (e.g., Google Video AI).
+  1. Create components/PasteUrlInput.tsx
+  2. Render full-width input\[type=url] with placeholder and an Extract button
+  3. Center and style with Tailwind
+* End: PasteUrlInput appears on cookbooks page when imported
 
-End: Document results in docs/video-capabilities.md with service names and sample API calls.
+Task 3.3: Hook Up Input State & Submit Handler
 
-**Task 3.2: Extract Key Frames (if needed)
+* Start: PasteUrlInput is static
+* Action:
 
-Start: Need to sample video.
+  1. Add url state and onChange binding
+  2. Accept onSubmit(url) prop and call it on button click
+  3. Pass onSubmit={u => console.log(u)} from cookbooks.tsx
+* End: Typing a URL and clicking Extract logs it to console
 
-Action: In lib/parser/video.ts, write async function extractFrames(url: string, intervalSec: number): Promise<Buffer[]> using ffmpeg server-side to return array of image buffers.
+Task 3.4: Create RecipeCard Component
 
-End: Calling with sample video URL returns at least one buffer; test by checking buffer length > 0.
+* Start: No card UI exists
+* Action:
 
-**Task 3.3: OCR on Frames (if needed)
+  1. Create components/RecipeCard.tsx with props title, imageUrl, processing
+  2. If processing is true show shimmer, else show image and title
+  3. Style fixed aspect ratio and rounded corners
+* End: RecipeCard renders correctly in both states
 
-Start: Frames array available.
+Task 3.5: Build Responsive Grid Container
 
-Action: In lib/ai/ocrFrames.ts, implement async function ocrFrames(frames: Buffer[]): Promise<string> using Tesseract.js or similar to return concatenated text.
+* Start: Cards stack by default
+* Action:
 
-End: Given test frame (with overlaid text), ocrFrames returns correct string; unit test validates.
+  1. Create components/CardGrid.tsx wrapping children in a div with grid grid-cols-2 md\:grid-cols-4 gap-4
+* End: Grid shows 2 columns on mobile, 4 on desktop
 
-**Task 3.4: Extract Recipe from Video Text
+Task 3.6: Fetch & Render Saved Recipes (Stub)
 
-Start: Text from OCR/video API.
+* Start: No data loading logic
+* Action:
 
-Action: In lib/ai/extractFromVideo.ts, write async function extractRecipeFromVideo(text: string): Promise<{ ingredients: string[]; instructions: string[] }> via OpenAI prompt.
-
-End: Returns structured recipe object; test via mock data.
-
-4. Orchestration & API Integration
-
-**Task 4.1: Sequence Extraction Steps
-
-Start: API route has isolated steps.
-
-Action: In app/api/parse-url/route.ts, implement sequential logic:
-
-Try caption extraction
-
-If needAudio, try audio extraction
-
-If needVideo, try video extraction
-
-Return first successful { ingredients, instructions } or error if all fail.
-
-End: Hitting the API returns recipe from correct source; test all three flows with mocks.
-
-**Task 4.2: Error Handling & Timeouts
-
-Start: No robust error handling.
-
-Action: Wrap each extraction step in try/catch with per-step timeout (e.g., 15s); log errors and proceed to next step.
-
-End: Timeout or error invokes next step; test by forcing timeout in each mock.
-
-**Task 4.3: Unit & Integration Tests
-
-Start: No tests for new features.
-
-Action: Write Jest tests for each lib function and API route with mocked dependencies.
-
-End: Achieve >90% coverage on new modules; all tests pass.
-
-5. Frontend & UI Updates
-
-**Task 5.1: Loading & Fallback Indicators ✅ COMPLETED
-
-Start: RecipeCard handles only success.
-
-Action: In RecipeCard, add UI states for "Parsing captions…", "Transcribing audio…", "Analyzing video…" and for errors.
-
-End: Simulate each state via props; verify correct label appears.
-
-**Task 5.2: Performance Metrics Logging ✅ COMPLETED
-
-Start: No metrics collected.
-
-Action: Instrument timing for each extraction step and send to console or analytics (e.g., timing.start()/end()).
-
-End: Trigger URL parse; console logs durations for each step.
-
-**Task 5.3: Cost-Optimization Flag ✅ COMPLETED
-
-Start: No option to skip expensive steps.
-
-Action: Add toggle in UI for "Fast mode (captions only)"; skip audio/video when enabled.
-
-End: When toggled, the API call includes mode: 'fast'; backend respects and exits after caption.
+  1. In cookbooks.tsx, useState to hold stub recipes array with one real and one processing item
+  2. Render CardGrid mapping over stub recipes into RecipeCard components
+* End: Page shows stub cards in responsive grid on load

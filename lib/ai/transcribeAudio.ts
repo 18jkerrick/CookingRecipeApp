@@ -6,44 +6,61 @@ import OpenAI from 'openai';
  * @returns Transcribed text
  */
 export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+  
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
 
-  try {
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+  // Convert Blob to File (required by OpenAI API)
+  const audioFile = new File([audioBlob], 'audio.mp3', {
+    type: audioBlob.type || 'audio/mpeg'
+  });
 
-    // Convert Blob to File (required by OpenAI API)
-    const audioFile = new File([audioBlob], 'audio.mp3', {
-      type: audioBlob.type || 'audio/mpeg'
-    });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`🎤 Audio transcription attempt ${attempt}/${MAX_RETRIES}...`);
+      
+      const transcription = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: 'whisper-1',
+        response_format: 'text',
+        language: 'en', // Can be removed to auto-detect
+      });
 
-    
-    const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-1',
-      response_format: 'text',
-      language: 'en', // Can be removed to auto-detect
-    });
+      console.log(`✅ Audio transcription successful on attempt ${attempt}`);
+      return transcription;
 
-
-    return transcription;
-
-  } catch (error) {
-    console.error('Whisper transcription failed:', error);
-    
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('quota')) {
-        throw new Error('OpenAI quota exceeded for audio transcription');
-      } else if (error.message.includes('file')) {
-        throw new Error('Audio file format not supported by Whisper API');
-      } else if (error.message.includes('size')) {
-        throw new Error('Audio file too large for Whisper API (max 25MB)');
+    } catch (error: any) {
+      console.error(`❌ Audio transcription attempt ${attempt} failed:`, error);
+      
+      // Check if it's a rate limit error and we have retries left
+      if (error?.status === 429 && attempt < MAX_RETRIES) {
+        console.log(`⏳ Rate limit hit, waiting ${RETRY_DELAY}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        continue;
+      }
+      
+      // If it's the last attempt or not a rate limit error, throw with specific error messages
+      if (attempt === MAX_RETRIES) {
+        if (error instanceof Error) {
+          if (error.message.includes('quota')) {
+            throw new Error('OpenAI quota exceeded for audio transcription');
+          } else if (error.message.includes('file')) {
+            throw new Error('Audio file format not supported by Whisper API');
+          } else if (error.message.includes('size')) {
+            throw new Error('Audio file too large for Whisper API (max 25MB)');
+          }
+        }
+        
+        throw new Error(`Audio transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
-    
-    throw new Error(`Audio transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+  
+  // This should never be reached, but just in case
+  throw new Error('Audio transcription failed after all retry attempts');
 }
 
 /**

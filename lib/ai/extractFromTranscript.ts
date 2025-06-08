@@ -104,68 +104,88 @@ export async function extractRecipeFromTranscript(transcript: string): Promise<R
     Transcript: ${transcript}
     `;
 
-  try {
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.1, // Low temperature for consistent output
-      max_tokens: 2000,
-    });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from OpenAI');
-    }
-
-
-    // Parse JSON response
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+  
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const parsed = JSON.parse(content) as RecipeData;
+      console.log(`🍽️ Transcript extraction attempt ${attempt}/${MAX_RETRIES}...`);
       
-      // Validate the response structure
-      if (!parsed.ingredients || !parsed.instructions) {
-        throw new Error('Invalid response structure from AI');
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.1, // Low temperature for consistent output
+        max_tokens: 2000,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response from OpenAI');
       }
 
-      if (!Array.isArray(parsed.ingredients) || !Array.isArray(parsed.instructions)) {
-        throw new Error('Ingredients and instructions must be arrays');
+      // Parse JSON response
+      try {
+        const parsed = JSON.parse(content) as RecipeData;
+        
+        // Validate the response structure
+        if (!parsed.ingredients || !parsed.instructions) {
+          throw new Error('Invalid response structure from AI');
+        }
+
+        if (!Array.isArray(parsed.ingredients) || !Array.isArray(parsed.instructions)) {
+          throw new Error('Ingredients and instructions must be arrays');
+        }
+
+        // Post-processing validation: ensure ingredient-instruction consistency
+        const validatedRecipe = validateIngredientInstructionConsistency(parsed);
+        
+        if (validatedRecipe.ingredients.length > parsed.ingredients.length) {
+          // Additional ingredients were added during validation
+        }
+
+        console.log(`✅ Transcript extraction successful on attempt ${attempt}`);
+        return validatedRecipe;
+
+      } catch (parseError) {
+        console.error(`❌ JSON parsing failed on attempt ${attempt}:`, parseError);
+        
+        // Fallback parsing attempt
+        return fallbackParseTranscript(content);
       }
-
-      // Post-processing validation: ensure ingredient-instruction consistency
-      const validatedRecipe = validateIngredientInstructionConsistency(parsed);
       
-      if (validatedRecipe.ingredients.length > parsed.ingredients.length) {
-        // Additional ingredients were added during validation
+    } catch (error: any) {
+      console.error(`❌ Transcript extraction attempt ${attempt} failed:`, error);
+      
+      // Check if it's a rate limit error and we have retries left
+      if (error?.status === 429 && attempt < MAX_RETRIES) {
+        console.log(`⏳ Rate limit hit, waiting ${RETRY_DELAY}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        continue;
       }
-
-      return validatedRecipe;
-
-    } catch (parseError) {
-      console.error('Failed to parse JSON from AI response:', parseError);
       
-      // Fallback parsing attempt
-      return fallbackParseTranscript(content);
+      // If it's the last attempt or not a rate limit error, fall back
+      console.log('🔄 Falling back to empty recipe');
+      return {
+        ingredients: [],
+        instructions: []
+      };
     }
-
-  } catch (error) {
-    console.error('OpenAI API error during transcript extraction:', error);
-    
-    // Return empty recipe as fallback
-    return {
-      ingredients: [],
-      instructions: []
-    };
   }
+  
+  // This should never be reached, but just in case
+  return {
+    ingredients: [],
+    instructions: []
+  };
 }
 
 /**
