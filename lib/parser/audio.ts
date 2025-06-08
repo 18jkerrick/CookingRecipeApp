@@ -6,17 +6,14 @@ import { Readable } from 'stream';
  * Supports YouTube, TikTok, Instagram, and other platforms via yt-dlp
  */
 export async function fetchAudio(url: string): Promise<Blob> {
-  console.log('Fetching audio for URL:', url);
   
   try {
     // First try ytdl-core for YouTube (faster and more reliable)
     if (isYouTubeUrl(url)) {
-      console.log('Using ytdl-core for YouTube audio extraction');
       return await fetchYouTubeAudio(url);
     }
     
     // For other platforms, use yt-dlp
-    console.log('Using yt-dlp for audio extraction');
     return await fetchAudioWithYtDlp(url);
     
   } catch (error) {
@@ -47,7 +44,6 @@ async function fetchYouTubeAudio(url: string): Promise<Blob> {
     audioStream.on('end', () => {
       const audioBuffer = Buffer.concat(chunks);
       const blob = new Blob([audioBuffer], { type: 'audio/webm' });
-      console.log('YouTube audio extracted successfully, size:', blob.size);
       resolve(blob);
     });
     
@@ -80,14 +76,12 @@ async function fetchAudioWithYtDlp(url: string): Promise<Blob> {
     });
     
     ytDlp.stderr.on('data', (data: Buffer) => {
-      console.log('yt-dlp stderr:', data.toString());
     });
     
     ytDlp.on('close', (code: number | null) => {
       if (code === 0) {
         const audioBuffer = Buffer.concat(chunks);
         const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-        console.log('yt-dlp audio extracted successfully, size:', blob.size);
         resolve(blob);
       } else {
         reject(new Error(`yt-dlp process exited with code ${code}`));
@@ -119,13 +113,6 @@ export function validateAudioBlob(blob: Blob): boolean {
   
   // Check size (should be > 0)
   const hasContent = blob.size > 0;
-  
-  console.log('Audio blob validation:', {
-    type: blob.type,
-    size: blob.size,
-    isValidType,
-    hasContent
-  });
   
   return isValidType && hasContent;
 } 

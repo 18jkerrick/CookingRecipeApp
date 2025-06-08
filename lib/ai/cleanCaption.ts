@@ -1,11 +1,9 @@
 import OpenAI from 'openai';
 
 export async function cleanCaption(raw: string): Promise<string> {
-  console.log('Raw caption input:', raw);
   
   // If input is empty or just whitespace, return empty string
   if (!raw || !raw.trim()) {
-    console.log('Empty caption input, returning empty string to trigger fallback');
     return '';
   }
   
@@ -39,7 +37,6 @@ export async function cleanCaption(raw: string): Promise<string> {
     });
 
     const cleaned = response.choices[0].message.content?.trim() || raw;
-    console.log('Cleaned caption output:', cleaned);
     return cleaned;
   } catch (error) {
     console.error('Error cleaning caption with AI:', error);
@@ -50,7 +47,6 @@ export async function cleanCaption(raw: string): Promise<string> {
       .replace(/^[A-Z\s]+:/gm, '')
       .replace(/\s+/g, ' ')
       .trim();
-    console.log('Using fallback cleaned caption:', fallback);
     return fallback;
   }
 } 

@@ -2,7 +2,6 @@ import { YoutubeTranscript } from 'youtube-transcript';
 
 export async function getYoutubeCaptions(url: string): Promise<string> {
   try {
-    console.log('Fetching YouTube captions and description for:', url);
     
     // Extract video ID from URL
     const videoId = extractVideoId(url);
@@ -16,11 +15,9 @@ export async function getYoutubeCaptions(url: string): Promise<string> {
     try {
       const description = await getVideoDescription(videoId);
       if (description) {
-        console.log('Successfully extracted YouTube description');
         combinedText += description + '\n\n';
       }
     } catch (descError) {
-      console.log('Could not extract description:', descError instanceof Error ? descError.message : 'Unknown error');
     }
     
     // Try to get transcript/captions
@@ -34,11 +31,9 @@ export async function getYoutubeCaptions(url: string): Promise<string> {
           .replace(/\s+/g, ' ')
           .trim();
         
-        console.log('Successfully extracted YouTube captions');
         combinedText += captions;
       }
     } catch (transcriptError) {
-      console.log('Could not extract transcript:', transcriptError instanceof Error ? transcriptError.message : 'Unknown error');
     }
     
     if (!combinedText.trim()) {
@@ -77,11 +72,9 @@ async function getVideoDescription(videoId: string): Promise<string> {
         const playerResponse = JSON.parse(playerResponseMatch[1]);
         const description = playerResponse?.videoDetails?.shortDescription;
         if (description) {
-          console.log('Found description via ytInitialPlayerResponse');
           return description;
         }
       } catch (e) {
-        console.log('Failed to parse ytInitialPlayerResponse');
       }
     }
     
@@ -96,20 +89,17 @@ async function getVideoDescription(videoId: string): Promise<string> {
           for (const content of contents) {
             const description = content?.videoPrimaryInfoRenderer?.videoActions?.menuRenderer?.topLevelButtons?.[0]?.toggleButtonRenderer?.defaultText?.simpleText;
             if (description) {
-              console.log('Found description via ytInitialData');
               return description;
             }
           }
         }
       } catch (e) {
-        console.log('Failed to parse ytInitialData');
       }
     }
     
     // Pattern 3: Look for meta description (fallback)
     const metaDescMatch = html.match(/<meta name="description" content="([^"]*)">/);
     if (metaDescMatch) {
-      console.log('Found description via meta tag');
       return metaDescMatch[1];
     }
     
@@ -119,11 +109,9 @@ async function getVideoDescription(videoId: string): Promise<string> {
       try {
         const structuredData = JSON.parse(structuredDataMatch[1]);
         if (structuredData.description) {
-          console.log('Found description via structured data');
           return structuredData.description;
         }
       } catch (e) {
-        console.log('Failed to parse structured data');
       }
     }
     

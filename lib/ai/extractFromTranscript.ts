@@ -11,9 +11,6 @@ interface RecipeData {
  * @returns Recipe with ingredients and instructions
  */
 export async function extractRecipeFromTranscript(transcript: string): Promise<RecipeData> {
-  console.log('Extracting recipe from audio transcript');
-  console.log('Transcript length:', transcript.length, 'characters');
-  console.log('Transcript preview:', transcript.substring(0, 200) + '...');
 
   // Detect if this is video analysis (contains frame observations)
   const isVideoAnalysis = transcript.includes('FRAME ') && transcript.includes('OBSERVATIONS');
@@ -108,7 +105,6 @@ export async function extractRecipeFromTranscript(transcript: string): Promise<R
     `;
 
   try {
-    console.log('Sending transcript to OpenAI for recipe extraction...');
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -131,12 +127,10 @@ export async function extractRecipeFromTranscript(transcript: string): Promise<R
       throw new Error('No response from OpenAI');
     }
 
-    console.log('AI response content:', content);
 
     // Parse JSON response
     try {
       const parsed = JSON.parse(content) as RecipeData;
-      console.log('Parsed JSON:', parsed);
       
       // Validate the response structure
       if (!parsed.ingredients || !parsed.instructions) {
@@ -147,27 +141,17 @@ export async function extractRecipeFromTranscript(transcript: string): Promise<R
         throw new Error('Ingredients and instructions must be arrays');
       }
 
-      console.log('Successfully extracted recipe from transcript:', {
-        ingredientCount: parsed.ingredients.length,
-        instructionCount: parsed.instructions.length
-      });
-
       // Post-processing validation: ensure ingredient-instruction consistency
       const validatedRecipe = validateIngredientInstructionConsistency(parsed);
       
       if (validatedRecipe.ingredients.length > parsed.ingredients.length) {
-        console.log('🔧 Added missing ingredients found in instructions:', {
-          original: parsed.ingredients.length,
-          validated: validatedRecipe.ingredients.length,
-          added: validatedRecipe.ingredients.slice(parsed.ingredients.length)
-        });
+        // Additional ingredients were added during validation
       }
 
       return validatedRecipe;
 
     } catch (parseError) {
       console.error('Failed to parse JSON from AI response:', parseError);
-      console.log('Raw AI response:', content);
       
       // Fallback parsing attempt
       return fallbackParseTranscript(content);
@@ -254,7 +238,6 @@ function validateIngredientInstructionConsistency(recipe: RecipeData): RecipeDat
  * Fallback parsing when AI response is not valid JSON
  */
 function fallbackParseTranscript(content: string): RecipeData {
-  console.log('Attempting fallback parsing for transcript extraction');
   
   const ingredients: string[] = [];
   const instructions: string[] = [];
@@ -290,11 +273,6 @@ function fallbackParseTranscript(content: string): RecipeData {
       instructions.push(trimmed.replace(/^-\s*/, '').replace(/^\d+\.\s*/, ''));
     }
   }
-  
-  console.log('Fallback parsing results:', {
-    ingredientCount: ingredients.length,
-    instructionCount: instructions.length
-  });
   
   return { ingredients, instructions };
 } 

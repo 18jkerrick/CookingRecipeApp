@@ -4,7 +4,6 @@ export async function extractRecipeFromCaption(text: string): Promise<{
   ingredients: string[]; 
   instructions: string[] 
 }> {
-  console.log('Input text for recipe extraction:', text);
   
   try {
     const openai = new OpenAI({
@@ -44,23 +43,19 @@ export async function extractRecipeFromCaption(text: string): Promise<{
     });
 
     const content = response.choices[0].message.content?.trim();
-    console.log('AI response content:', content);
     
     if (!content) {
-      console.log('No content returned from AI');
       return { ingredients: [], instructions: [] };
     }
 
     try {
       const parsed = JSON.parse(content);
-      console.log('Parsed JSON:', parsed);
       return {
         ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients : [],
         instructions: Array.isArray(parsed.instructions) ? parsed.instructions : []
       };
     } catch (parseError) {
       console.error('Error parsing AI response as JSON:', parseError);
-      console.log('Raw content that failed to parse:', content);
       return { ingredients: [], instructions: [] };
     }
   } catch (error) {

@@ -8,34 +8,25 @@ import path from 'path';
  * This analyzes cooking actions, ingredients, and techniques visible in video frames
  */
 export async function extractTextFromVideo(url: string): Promise<string> {
-  console.log(`🎬 Starting video analysis: ${url}`);
-  
   try {
     // Check if this is a TikTok photo/slideshow post
     if (url.includes('tiktok.com') && url.includes('/photo/')) {
-      console.log('📸 Detected TikTok photo/slideshow post, using image extraction...');
       return await extractTextFromTikTokPhotos(url);
     }
     
     // Step 1: Extract strategic frames from video
-    console.log('🎬 Step 1: Extracting key cooking frames...');
     const frames = await extractCookingFrames(url);
     
     if (frames.length === 0) {
       throw new Error('No frames extracted from video');
     }
     
-    console.log(`📸 Extracted ${frames.length} frames for analysis`);
-    
     // Step 2: Analyze frames with computer vision for cooking content
-    console.log('🔍 Step 2: Analyzing cooking actions with AI vision...');
     const analysisResults = await analyzeFramesWithVision(frames);
     
     // Step 3: Combine analysis into coherent recipe text
-    console.log('📝 Step 3: Synthesizing recipe from visual analysis...');
     const recipeText = combineVisionAnalysis(analysisResults);
     
-    console.log(`✅ Video analysis complete, extracted ${recipeText.length} characters`);
     return recipeText;
     
   } catch (error) {
@@ -48,11 +39,8 @@ export async function extractTextFromVideo(url: string): Promise<string> {
  * Extract and analyze images from TikTok photo/slideshow posts
  */
 async function extractTextFromTikTokPhotos(url: string): Promise<string> {
-  console.log(`📸 Starting TikTok photo analysis: ${url}`);
-  
   try {
     // Use yt-dlp to download images from TikTok photo post
-    console.log('📥 Downloading images from TikTok photo post...');
     const imageBuffers = await downloadTikTokPhotos(url);
     
     if (imageBuffers.length === 0) {
@@ -66,17 +54,12 @@ Alternative options:
 TikTok's photo slideshow format is not supported due to technical restrictions.`);
     }
     
-    console.log(`📸 Extracted ${imageBuffers.length} images for analysis`);
-    
     // Analyze images with computer vision for cooking content
-    console.log('🔍 Step 2: Analyzing cooking images with AI vision...');
     const analysisResults = await analyzeFramesWithVision(imageBuffers);
     
     // Combine analysis into coherent recipe text
-    console.log('📝 Step 3: Synthesizing recipe from image analysis...');
     const recipeText = combineVisionAnalysis(analysisResults);
     
-    console.log(`✅ TikTok photo analysis complete, extracted ${recipeText.length} characters`);
     return recipeText;
     
   } catch (error) {
@@ -89,8 +72,6 @@ TikTok's photo slideshow format is not supported due to technical restrictions.`
  * Download images from TikTok photo post using yt-dlp (similar to video download)
  */
 async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
-  console.log('📥 Attempting to download TikTok photo post with yt-dlp...');
-  
   // Try multiple yt-dlp approaches for photo posts
   const attempts = [
     // Attempt 1: Try to extract all available thumbnails/images
@@ -148,8 +129,6 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
 
   for (const attempt of attempts) {
     try {
-      console.log(`🔄 Trying: ${attempt.name}`);
-      
       const success = await new Promise<boolean>((resolve) => {
         const ytdlp = spawn('yt-dlp', attempt.args);
         
@@ -157,7 +136,6 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
         
         ytdlp.stdout.on('data', (data) => {
           hasOutput = true;
-          process.stdout.write(data);
         });
 
         ytdlp.stderr.on('data', (data) => {
@@ -165,11 +143,9 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
           if (output.includes('Downloading') || output.includes('Writing')) {
             hasOutput = true;
           }
-          process.stderr.write(data);
         });
 
         ytdlp.on('close', (code) => {
-          console.log(`yt-dlp exited with code ${code} for: ${attempt.name}`);
           resolve(code === 0 && hasOutput);
         });
 
@@ -185,8 +161,6 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
         const imageFiles = files.filter(file => file.match(/\.(jpg|jpeg|png|webp)$/i));
         
         if (imageFiles.length > 0) {
-          console.log(`✅ Success with: ${attempt.name} - found ${imageFiles.length} images`);
-          
           // Read the image files into buffers
           const imageBuffers: Buffer[] = [];
           for (const file of imageFiles) {
@@ -194,128 +168,45 @@ async function downloadTikTokPhotos(url: string): Promise<Buffer[]> {
             const buffer = fs.readFileSync(filePath);
             if (buffer.length > 1000) { // Valid image size check
               imageBuffers.push(buffer);
-              console.log(`✅ Loaded image: ${file} (${Math.round(buffer.length / 1024)}KB)`);
             }
           }
           
-          // Clean up temp directory
-          fs.rmSync(outputDir, { recursive: true, force: true });
-          console.log('🧹 Cleaned up downloaded images');
+          // Cleanup temp files
+          files.forEach(file => {
+            try {
+              fs.unlinkSync(`${outputDir}/${file}`);
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+          });
           
-          if (imageBuffers.length > 0) {
-            return imageBuffers;
+          // Remove temp directory if empty
+          try {
+            fs.rmdirSync(outputDir);
+          } catch (e) {
+            // Ignore if directory not empty or doesn't exist
           }
-        }
-      }
-      
-    } catch (error) {
-      console.error(`❌ Failed attempt: ${attempt.name}`, error);
-      continue;
-    }
-  }
-
-  // If yt-dlp failed, try gallery-dl as final attempt
-  console.log('🔄 Trying gallery-dl as fallback...');
-  try {
-    const galleryOutputDir = 'temp_gallery_dl';
-    
-    // Create temp directory for gallery-dl
-    if (!fs.existsSync(galleryOutputDir)) {
-      fs.mkdirSync(galleryOutputDir);
-    }
-
-    const success = await new Promise<boolean>((resolve) => {
-      const galleryProcess = spawn('gallery-dl', [url, '--destination', galleryOutputDir]);
-      
-      let hasOutput = false;
-      
-      galleryProcess.stdout.on('data', (data) => {
-        hasOutput = true;
-        process.stdout.write(data);
-      });
-
-      galleryProcess.stderr.on('data', (data) => {
-        process.stderr.write(data);
-      });
-
-      galleryProcess.on('close', (code) => {
-        console.log(`gallery-dl exited with code ${code}`);
-        resolve(code === 0);
-      });
-
-      galleryProcess.on('error', (error) => {
-        console.error(`gallery-dl error:`, error);
-        resolve(false);
-      });
-    });
-
-    if (success) {
-      // Find all image files in the gallery-dl output
-      const findImageFiles = (dir: string): string[] => {
-        let imageFiles: string[] = [];
-        const files = fs.readdirSync(dir);
-        
-        for (const file of files) {
-          const fullPath = `${dir}/${file}`;
-          const stat = fs.statSync(fullPath);
           
-          if (stat.isDirectory()) {
-            imageFiles = imageFiles.concat(findImageFiles(fullPath));
-          } else if (file.match(/\.(jpg|jpeg|png|webp)$/i)) {
-            imageFiles.push(fullPath);
-          }
-        }
-        
-        return imageFiles;
-      };
-      
-      const imageFiles = findImageFiles(galleryOutputDir);
-      
-      if (imageFiles.length > 0) {
-        console.log(`✅ Gallery-dl success! Found ${imageFiles.length} images`);
-        
-        // Read the image files into buffers
-        const imageBuffers: Buffer[] = [];
-        for (const filePath of imageFiles) {
-          const buffer = fs.readFileSync(filePath);
-          if (buffer.length > 1000) { // Valid image size check
-            imageBuffers.push(buffer);
-            console.log(`✅ Loaded image: ${filePath.split('/').pop()} (${Math.round(buffer.length / 1024)}KB)`);
-          }
-        }
-        
-        // Clean up temp directory
-        fs.rmSync(galleryOutputDir, { recursive: true, force: true });
-        console.log('🧹 Cleaned up gallery-dl downloads');
-        
-        if (imageBuffers.length > 0) {
           return imageBuffers;
         }
       }
+    } catch (error) {
+      // Continue to next attempt
     }
-
-    // Clean up gallery-dl directory on failure
-    if (fs.existsSync(galleryOutputDir)) {
-      fs.rmSync(galleryOutputDir, { recursive: true, force: true });
-    }
-    
-  } catch (galleryError) {
-    console.error(`❌ Gallery-dl failed:`, galleryError);
   }
 
-  // Clean up on failure
-  if (fs.existsSync(outputDir)) {
-    fs.rmSync(outputDir, { recursive: true, force: true });
+  // Clean up any remaining temp files
+  try {
+    if (fs.existsSync(outputDir)) {
+      const files = fs.readdirSync(outputDir);
+      files.forEach(file => fs.unlinkSync(`${outputDir}/${file}`));
+      fs.rmdirSync(outputDir);
+    }
+  } catch (e) {
+    // Ignore cleanup errors
   }
 
-  throw new Error(`All yt-dlp attempts failed for TikTok photo post. 
-
-Alternative options:
-1. Try a regular TikTok video URL (not /photo/) 
-2. Screenshot the images and upload them directly
-3. Copy any text/captions from the post manually
-
-TikTok's photo slideshow format may have technical restrictions.`);
+  return []; // No images extracted
 }
 
 /**
@@ -323,30 +214,22 @@ TikTok's photo slideshow format may have technical restrictions.`);
  * Focuses on key moments: beginning (ingredients), middle (cooking), end (plating)
  */
 export async function extractCookingFrames(url: string, maxFrames: number = 8): Promise<Buffer[]> {
-  console.log(`🎬 MULTI-FRAME EXTRACTION: Starting with ${maxFrames} frames for: ${url}`);
-  
   try {
     // Download video first (similar to audio approach)
-    console.log('📥 Downloading video for frame extraction...');
     const videoPath = await downloadVideoForFrames(url);
-    console.log('✅ Video downloaded successfully');
     
     // Extract frames at strategic intervals for cooking analysis
-    console.log(`🎬 MULTI-FRAME EXTRACTION: Starting extraction of ${maxFrames} frames from downloaded video...`);
     const frames = await extractFramesFromLocalFile(videoPath, maxFrames);
     
     // Clean up downloaded video
     if (fs.existsSync(videoPath)) {
       fs.unlinkSync(videoPath);
-      console.log('🧹 Cleaned up downloaded video file');
     }
     
     if (frames.length === 0) {
       throw new Error('No frames extracted from video');
     }
     
-    console.log(`✅ MULTI-FRAME EXTRACTION COMPLETE: Successfully extracted ${frames.length} cooking frames`);
-    // Debug frames saving is commented out for production use
     return frames;
     
   } catch (error) {
@@ -438,29 +321,18 @@ async function extractFramesFromLocalFile(videoPath: string, maxFrames: number):
   
   // Get video duration first
   const videoDuration = await getVideoDuration(videoPath);
-  console.log(`🎬 Video duration: ${videoDuration} seconds`);
   
   // Generate adaptive timestamps based on video length
   const timestamps = generateAdaptiveTimestamps(videoDuration);
-  console.log(`🎯 ADAPTIVE TIMESTAMPS: Generated ${timestamps.length} timestamps for ${videoDuration}s video`);
-  console.log(`🎬 Extracting frames at timestamps: ${timestamps.join('s, ')}s`);
   
   // Extract each frame individually for better reliability
   for (let i = 0; i < timestamps.length; i++) {
     try {
       const timestamp = timestamps[i];
-      console.log(`📸 Extracting frame ${i + 1}/${timestamps.length} at ${timestamp}s...`);
       
       const frame = await extractSingleFrame(videoPath, timestamp);
       if (frame && frame.length > 1000) { // Valid frame size check
         frames.push(frame);
-        
-        // Save frame for debugging/inspection (commented out for production)
-        // const frameFilename = `debug_frame_${i + 1}_at_${timestamp}s.png`;
-        // fs.writeFileSync(frameFilename, frame);
-        console.log(`✅ Frame ${i + 1} extracted successfully (${Math.round(frame.length / 1024)}KB)`);
-      } else {
-        console.log(`⚠️ Frame ${i + 1} too small or invalid, skipping`);
       }
       
       // Small delay between extractions
@@ -473,7 +345,6 @@ async function extractFramesFromLocalFile(videoPath: string, maxFrames: number):
     }
   }
   
-  console.log(`🎬 Total frames extracted: ${frames.length}/${timestamps.length}`);
   return frames;
 }
 
@@ -528,10 +399,8 @@ async function extractSingleFrame(videoPath: string, timestampSeconds: number): 
     setTimeout(() => {
       ffmpegProcess.kill('SIGTERM');
       if (frameBuffer.length > 1000) {
-        console.log(`⚠️ Frame extraction completed after timeout (got ${frameBuffer.length} bytes)`);
         resolve(frameBuffer);
       } else {
-        console.log(`❌ Frame extraction timeout at ${timeStr} with only ${frameBuffer.length} bytes`);
         reject(new Error(`Frame extraction timeout at ${timeStr}`));
       }
     }, 15000); // Increased from 10 to 15 seconds
@@ -654,13 +523,11 @@ async function getVideoDuration(videoPath: string): Promise<number> {
         const duration = parseFloat(output.trim());
         resolve(Math.floor(duration)); // Return duration in seconds
       } else {
-        console.warn(`Failed to get video duration: ${errorOutput}`);
         resolve(60); // Default to 60 seconds if we can't get duration
       }
     });
 
     ffprobe.on('error', (error) => {
-      console.warn(`FFprobe error: ${error.message}`);
       resolve(60); // Default to 60 seconds
     });
   });
@@ -677,13 +544,11 @@ function generateAdaptiveTimestamps(durationSeconds: number): number[] {
   
   if (durationSeconds <= 60) {
     // ≤1 minute: Every 2 seconds for comprehensive coverage (up to ~30 frames)
-    console.log(`🎯 Short video (${durationSeconds}s): Using 2-second intervals for comprehensive coverage`);
     for (let t = 1; t < durationSeconds; t += 2) {
       timestamps.push(t);
     }
   } else if (durationSeconds <= 180) {
     // 1-3 minutes: Enhanced timing with 7s start, 5s middle, 7s end
-    console.log(`🎯 Medium video (${durationSeconds}s): Using enhanced intervals (7s start, 5s middle, 7s end)`);
     
     // Start section (first 30s): every 7 seconds
     for (let t = 3; t <= 30 && t < durationSeconds; t += 7) {
@@ -704,7 +569,6 @@ function generateAdaptiveTimestamps(durationSeconds: number): number[] {
     }
   } else if (durationSeconds <= 300) {
     // 3-5 minutes: Every 10 seconds with enhanced start/end coverage
-    console.log(`🎯 Long video (${durationSeconds}s): Using 10-second intervals with enhanced start/end coverage`);
     
     // Early section (first 30s): every 5 seconds
     for (let t = 2; t <= 30 && t < durationSeconds; t += 5) {
@@ -725,7 +589,6 @@ function generateAdaptiveTimestamps(durationSeconds: number): number[] {
     }
   } else {
     // 5+ minutes: Every 15 seconds (up to ~20 frames, max cooking video length)
-    console.log(`🎯 Very long video (${durationSeconds}s): Using 15-second intervals`);
     for (let t = 5; t < Math.min(durationSeconds, 300); t += 15) {
       timestamps.push(t);
     }
@@ -736,7 +599,6 @@ function generateAdaptiveTimestamps(durationSeconds: number): number[] {
     .filter(t => t < durationSeconds - 2) // Leave 2s buffer at end
     .sort((a, b) => a - b);
     
-  console.log(`🎯 Generated ${validTimestamps.length} adaptive timestamps: ${validTimestamps.join('s, ')}s`);
   return validTimestamps;
 }
 
@@ -746,24 +608,19 @@ function generateAdaptiveTimestamps(durationSeconds: number): number[] {
 function generateCookingTimestamps(numFrames: number): number[] {
   const timestamps: number[] = [];
   
-  console.log(`🎯 TIMESTAMP GENERATION: Generating ${numFrames} timestamps`);
   
   if (numFrames <= 3) {
     // For few frames: beginning, middle, end
     timestamps.push(2, 15, 30); // 2s, 15s, 30s
-    console.log(`🎯 Using few frames strategy: ${timestamps.join(', ')}`);
   } else if (numFrames <= 6) {
     // For moderate frames: spread across cooking stages
     timestamps.push(1, 5, 10, 20, 35, 45); // Strategic cooking moments
-    console.log(`🎯 Using moderate frames strategy: ${timestamps.join(', ')}`);
   } else {
     // For comprehensive analysis: cover full cooking journey
     timestamps.push(1, 3, 7, 12, 18, 25, 35, 50); // Detailed coverage
-    console.log(`🎯 Using comprehensive strategy: ${timestamps.join(', ')}`);
   }
   
   const finalTimestamps = timestamps.slice(0, numFrames);
-  console.log(`🎯 FINAL TIMESTAMPS: ${finalTimestamps.join('s, ')}s`);
   return finalTimestamps;
 }
 
@@ -784,7 +641,6 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
     const batchEnd = Math.min(batchStart + BATCH_SIZE, frames.length);
     const batchFrames = frames.slice(batchStart, batchEnd);
     
-    console.log(`🔍 Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(frames.length / BATCH_SIZE)} (frames ${batchStart + 1}-${batchEnd})`);
     
     // Process frames in current batch with small delays
     for (let i = 0; i < batchFrames.length; i++) {
@@ -796,9 +652,7 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
       while (retryCount <= MAX_RETRIES) {
         try {
           if (retryCount === 0) {
-            console.log(`🔍 Analyzing frame ${globalIndex + 1}/${frames.length}...`);
           } else {
-            console.log(`🔄 Retrying frame ${globalIndex + 1}/${frames.length} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
           }
           
           // Convert frame to base64 for Vision API
@@ -813,7 +667,6 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
         } catch (error: any) {
           // Check if it's a rate limit error
           if (error?.status === 429 && retryCount < MAX_RETRIES) {
-            console.log(`⏳ Rate limit hit for frame ${globalIndex + 1}, waiting ${RETRY_DELAY}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
             retryCount++;
           } else {
@@ -826,7 +679,6 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
       // Add analysis if we got one
       if (analysis.trim()) {
         results.push(analysis);
-        console.log(`✅ Frame ${globalIndex + 1} analysis complete${retryCount > 0 ? ` (after ${retryCount + 1} attempts)` : ''}`);
       }
       
       // Small delay between individual frame analyses (only if not the last frame in batch)
@@ -837,12 +689,10 @@ export async function analyzeFramesWithVision(frames: Buffer[]): Promise<string[
     
     // Longer delay between batches to ensure we don't hit rate limits
     if (batchEnd < frames.length) {
-      console.log(`⏳ Waiting ${BATCH_DELAY}ms before next batch...`);
       await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
     }
   }
   
-  console.log(`🎯 Analysis complete: Successfully analyzed ${results.length}/${frames.length} frames`);
   return results;
 }
 

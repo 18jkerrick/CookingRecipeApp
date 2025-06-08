@@ -6,11 +6,6 @@ import OpenAI from 'openai';
  * @returns Transcribed text
  */
 export async function transcribeAudio(audioBlob: Blob): Promise<string> {
-  console.log('Starting audio transcription with Whisper API');
-  console.log('Audio blob info:', {
-    size: audioBlob.size,
-    type: audioBlob.type
-  });
 
   try {
     const openai = new OpenAI({
@@ -22,7 +17,6 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
       type: audioBlob.type || 'audio/mpeg'
     });
 
-    console.log('Sending audio to Whisper API...');
     
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
@@ -31,9 +25,6 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
       language: 'en', // Can be removed to auto-detect
     });
 
-    console.log('Whisper transcription completed');
-    console.log('Transcript length:', transcription.length, 'characters');
-    console.log('Transcript preview:', transcription.substring(0, 200) + '...');
 
     return transcription;
 
@@ -60,7 +51,6 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
  * Returns a helpful error message for development
  */
 export function fallbackTranscription(audioBlob: Blob): string {
-  console.log('Using fallback transcription (no actual transcription performed)');
   
   return `[TRANSCRIPTION UNAVAILABLE - OpenAI Whisper API failed]
   

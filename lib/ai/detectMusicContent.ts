@@ -6,7 +6,6 @@ const openai = new OpenAI({
 
 export async function detectMusicContent(transcript: string): Promise<boolean> {
   try {
-    console.log('Analyzing transcript to detect music/non-cooking content...');
     
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -44,7 +43,6 @@ Respond with only "true" or "false" - no explanation needed.`
     const result = response.choices[0]?.message?.content?.trim().toLowerCase();
     const isMusic = result === 'true';
     
-    console.log(`Music content detection result: ${isMusic ? 'MUSIC/NON-COOKING' : 'COOKING CONTENT'}`);
     return isMusic;
     
   } catch (error) {

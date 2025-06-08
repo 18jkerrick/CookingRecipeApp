@@ -6,7 +6,6 @@ import { supabase } from '@/supabase/client';
  */
 export async function ensureDisplayQuantityColumn(): Promise<boolean> {
   try {
-    console.log('Checking if display_quantity column exists...');
     
     // Try to add the column - this will fail silently if it already exists
     const { error } = await supabase.rpc('exec_sql', {
@@ -14,9 +13,7 @@ export async function ensureDisplayQuantityColumn(): Promise<boolean> {
     });
     
     if (error) {
-      console.log('Column add error (may be expected if column exists):', error);
     } else {
-      console.log('display_quantity column ensured');
     }
     
     // Now populate any existing rows that don't have display_quantity
@@ -25,11 +22,9 @@ export async function ensureDisplayQuantityColumn(): Promise<boolean> {
     });
     
     if (updateError) {
-      console.log('Update error:', updateError);
       return false;
     }
     
-    console.log('Successfully ensured display_quantity column and populated existing data');
     return true;
     
   } catch (error) {

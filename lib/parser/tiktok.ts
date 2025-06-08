@@ -1,6 +1,5 @@
 export async function getTiktokCaptions(url: string): Promise<string> {
   try {
-    console.log('Fetching TikTok captions and description for:', url);
     
     // Extract video ID from URL
     const videoId = extractTiktokVideoId(url);
@@ -14,11 +13,9 @@ export async function getTiktokCaptions(url: string): Promise<string> {
     try {
       const description = await getTiktokDescription(videoId, url);
       if (description) {
-        console.log('Successfully extracted TikTok description');
         combinedText += description;
       }
     } catch (descError) {
-      console.log('Could not extract TikTok description:', descError instanceof Error ? descError.message : 'Unknown error');
     }
     
     if (!combinedText.trim()) {
@@ -55,18 +52,15 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
         const videoData = data?.['__DEFAULT_SCOPE__']?.['webapp.video-detail']?.['itemInfo']?.['itemStruct'];
         const description = videoData?.['desc'];
         if (description) {
-          console.log('Found TikTok description via JSON data');
           return description;
         }
       } catch (e) {
-        console.log('Failed to parse TikTok JSON data');
       }
     }
     
     // Fallback: try meta description
     const metaDescMatch = html.match(/<meta name="description" content="([^"]*)">/);
     if (metaDescMatch) {
-      console.log('Found TikTok description via meta tag');
       return metaDescMatch[1];
     }
     
