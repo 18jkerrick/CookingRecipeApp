@@ -21,6 +21,13 @@ interface RecipeDetailModalProps {
   onDelete?: () => Promise<void>;
 }
 
+interface EditableRecipe {
+  title: string;
+  ingredients: string[];
+  instructions: string[];
+  thumbnail?: string;
+}
+
 export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = false, onSave, onDelete }: RecipeDetailModalProps) {
   const [showGroceryModal, setShowGroceryModal] = useState(false);
   const [showMealPlanModal, setShowMealPlanModal] = useState(false);
@@ -32,6 +39,24 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const [currentWeekStart, setCurrentWeekStart] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [mealPlans, setMealPlans] = useState<{[key: string]: {[key: string]: any}}>({});
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editableRecipe, setEditableRecipe] = useState<EditableRecipe | null>(null);
+  const [draggedIngredientIndex, setDraggedIngredientIndex] = useState<number | null>(null);
+  const [draggedInstructionIndex, setDraggedInstructionIndex] = useState<number | null>(null);
+
+  // Initialize editable recipe when recipe changes or edit mode starts
+  useEffect(() => {
+    if (recipe && isEditMode && !editableRecipe) {
+      setEditableRecipe({
+        title: recipe.title,
+        ingredients: [...recipe.ingredients],
+        instructions: [...recipe.instructions],
+        thumbnail: recipe.thumbnail
+      });
+    }
+  }, [recipe, isEditMode, editableRecipe]);
 
   // Initialize selected ingredients when recipe changes
   useEffect(() => {
@@ -619,6 +644,182 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
     return '❓';
   };
 
+  // Edit mode functions
+  const enterEditMode = () => {
+    setIsEditMode(true);
+    if (recipe) {
+      setEditableRecipe({
+        title: recipe.title,
+        ingredients: [...recipe.ingredients],
+        instructions: [...recipe.instructions],
+        thumbnail: recipe.thumbnail
+      });
+    }
+  };
+
+  const exitEditMode = () => {
+    setIsEditMode(false);
+    setEditableRecipe(null);
+  };
+
+  const saveEditedRecipe = async () => {
+    if (!editableRecipe || !recipe?.saved_id) return;
+    
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        console.error('No auth session available');
+        return;
+      }
+
+      const response = await fetch(`/api/recipes/${recipe.saved_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session.access_token}`
+        },
+        body: JSON.stringify({
+          title: editableRecipe.title,
+          ingredients: editableRecipe.ingredients,
+          instructions: editableRecipe.instructions,
+          thumbnail: editableRecipe.thumbnail
+        }),
+      });
+
+      if (response.ok) {
+        // Update the original recipe object with the edited values
+        Object.assign(recipe, {
+          title: editableRecipe.title,
+          ingredients: editableRecipe.ingredients,
+          instructions: editableRecipe.instructions,
+          thumbnail: editableRecipe.thumbnail
+        });
+        exitEditMode();
+        console.log('Recipe updated successfully');
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to save recipe changes:', response.status, errorData);
+      }
+    } catch (error) {
+      console.error('Error saving recipe changes:', error);
+    }
+  };
+
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && editableRecipe) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setEditableRecipe(prev => prev ? { ...prev, thumbnail: dataUrl } : null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Drag and drop functions for ingredients
+  const handleIngredientDragStart = (event: React.DragEvent, index: number) => {
+    setDraggedIngredientIndex(index);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleIngredientDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleIngredientDrop = (event: React.DragEvent, dropIndex: number) => {
+    event.preventDefault();
+    if (draggedIngredientIndex === null || !editableRecipe || draggedIngredientIndex === dropIndex) {
+      setDraggedIngredientIndex(null);
+      return;
+    }
+
+    const newIngredients = [...editableRecipe.ingredients];
+    const draggedItem = newIngredients[draggedIngredientIndex];
+    newIngredients.splice(draggedIngredientIndex, 1);
+    newIngredients.splice(dropIndex, 0, draggedItem);
+
+    setEditableRecipe(prev => prev ? { ...prev, ingredients: newIngredients } : null);
+    setDraggedIngredientIndex(null);
+  };
+
+  // Drag and drop functions for instructions
+  const handleInstructionDragStart = (event: React.DragEvent, index: number) => {
+    setDraggedInstructionIndex(index);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleInstructionDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleInstructionDrop = (event: React.DragEvent, dropIndex: number) => {
+    event.preventDefault();
+    if (draggedInstructionIndex === null || !editableRecipe || draggedInstructionIndex === dropIndex) {
+      setDraggedInstructionIndex(null);
+      return;
+    }
+
+    const newInstructions = [...editableRecipe.instructions];
+    const draggedItem = newInstructions[draggedInstructionIndex];
+    newInstructions.splice(draggedInstructionIndex, 1);
+    newInstructions.splice(dropIndex, 0, draggedItem);
+
+    setEditableRecipe(prev => prev ? { ...prev, instructions: newInstructions } : null);
+    setDraggedInstructionIndex(null);
+  };
+
+  // Add/Delete functions
+  const addIngredient = () => {
+    if (!editableRecipe) return;
+    setEditableRecipe(prev => prev ? {
+      ...prev,
+      ingredients: [...prev.ingredients, '']
+    } : null);
+  };
+
+  const deleteIngredient = (index: number) => {
+    if (!editableRecipe) return;
+    const newIngredients = editableRecipe.ingredients.filter((_, i) => i !== index);
+    setEditableRecipe(prev => prev ? { ...prev, ingredients: newIngredients } : null);
+  };
+
+  const updateIngredient = (index: number, value: string) => {
+    if (!editableRecipe) return;
+    const newIngredients = [...editableRecipe.ingredients];
+    newIngredients[index] = value;
+    setEditableRecipe(prev => prev ? { ...prev, ingredients: newIngredients } : null);
+  };
+
+  const addInstruction = () => {
+    if (!editableRecipe) return;
+    setEditableRecipe(prev => prev ? {
+      ...prev,
+      instructions: [...prev.instructions, '']
+    } : null);
+  };
+
+  const deleteInstruction = (index: number) => {
+    if (!editableRecipe) return;
+    const newInstructions = editableRecipe.instructions.filter((_, i) => i !== index);
+    setEditableRecipe(prev => prev ? { ...prev, instructions: newInstructions } : null);
+  };
+
+  const updateInstruction = (index: number, value: string) => {
+    if (!editableRecipe) return;
+    const newInstructions = [...editableRecipe.instructions];
+    newInstructions[index] = value;
+    setEditableRecipe(prev => prev ? { ...prev, instructions: newInstructions } : null);
+  };
+
   if (!isOpen || !recipe) return null;
 
   return (
@@ -626,18 +827,56 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 flex-shrink-0">
-          {recipe.thumbnail && (
-            <div className="mb-4 bg-transparent">
-              <img 
-                src={recipe.thumbnail} 
-                alt={recipe.title}
-                className="w-full h-48 object-cover rounded-lg border-0"
-                style={{ backgroundColor: 'transparent' }}
-              />
+          {isEditMode ? (
+            <div className="mb-4">
+              <div className="relative group">
+                <img 
+                  src={editableRecipe?.thumbnail || recipe.thumbnail} 
+                  alt={editableRecipe?.title || recipe.title}
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg flex items-center justify-center transition-all">
+                  <label className="cursor-pointer bg-white bg-opacity-0 group-hover:bg-opacity-90 rounded-lg px-4 py-2 text-sm font-medium text-gray-900 transition-all opacity-0 group-hover:opacity-100">
+                    <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Change Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
+          ) : (
+            recipe.thumbnail && (
+              <div className="mb-4 bg-transparent">
+                <img 
+                  src={recipe.thumbnail} 
+                  alt={recipe.title}
+                  className="w-full h-48 object-cover rounded-lg border-0"
+                  style={{ backgroundColor: 'transparent' }}
+                />
+              </div>
+            )
           )}
+          
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{recipe.title}</h1>
+            {isEditMode ? (
+              <input
+                type="text"
+                value={editableRecipe?.title || ''}
+                onChange={(e) => setEditableRecipe(prev => prev ? { ...prev, title: e.target.value } : null)}
+                className="text-2xl font-bold text-gray-900 w-full border-2 border-orange-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none"
+                placeholder="Recipe title..."
+              />
+            ) : (
+              <h1 className="text-2xl font-bold text-gray-900">{recipe.title}</h1>
+            )}
             <p className="text-sm text-gray-600 mt-1">
               From {recipe.platform} • Extracted via {recipe.source}
             </p>
@@ -687,6 +926,20 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                 </svg>
               </div>
               <span className="text-sm font-medium text-gray-900">Meal Plan</span>
+            </button>
+            
+            <button
+              onClick={isEditMode ? exitEditMode : enterEditMode}
+              className="flex flex-col items-center space-y-2 p-4 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                isEditMode ? 'bg-orange-500' : 'bg-gray-600'
+              }`}>
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-gray-900">Edit</span>
             </button>
             
             <div className="relative share-dropdown">
@@ -773,6 +1026,8 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
               )}
             </div>
           </div>
+          
+
         </div>
 
         {/* Content */}
@@ -780,37 +1035,185 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
           <div className="p-6 pb-12">
             {/* Ingredients Section */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-                Ingredients
-              </h2>
-              <div className="space-y-3">
-                {recipe.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex items-start">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <span className="text-gray-800 leading-relaxed">{ingredient}</span>
-                  </div>
-                ))}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 uppercase tracking-wide">
+                  Ingredients
+                </h2>
               </div>
+              
+              {isEditMode ? (
+                <div className="space-y-3">
+                  {editableRecipe?.ingredients.map((ingredient, index) => (
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={(e) => handleIngredientDragStart(e, index)}
+                      onDragOver={handleIngredientDragOver}
+                      onDrop={(e) => handleIngredientDrop(e, index)}
+                      className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border-2 border-transparent hover:border-orange-200 transition-all cursor-move"
+                    >
+                      {/* Drag handle */}
+                      <div className="flex flex-col space-y-1 text-gray-400 hover:text-gray-600 cursor-grab">
+                        <div className="w-4 h-0.5 bg-current rounded"></div>
+                        <div className="w-4 h-0.5 bg-current rounded"></div>
+                        <div className="w-4 h-0.5 bg-current rounded"></div>
+                      </div>
+                      
+                      {/* Input field */}
+                      <input
+                        type="text"
+                        value={ingredient}
+                        onChange={(e) => updateIngredient(index, e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none text-gray-900"
+                        placeholder="Enter ingredient..."
+                      />
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={() => deleteIngredient(index)}
+                        className="w-8 h-8 rounded-full bg-red-100 text-red-500 flex items-center justify-center hover:bg-red-200 transition-colors flex-shrink-0"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Auto-add new ingredient input */}
+                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <div className="w-6 flex-shrink-0"></div>
+                    <input
+                      type="text"
+                      placeholder="Add new ingredient..."
+                      className="flex-1 border-0 bg-transparent focus:outline-none text-gray-900 placeholder-gray-500"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                          addIngredient();
+                          updateIngredient(editableRecipe?.ingredients.length || 0, e.currentTarget.value.trim());
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (e.currentTarget.value.trim()) {
+                          addIngredient();
+                          updateIngredient(editableRecipe?.ingredients.length || 0, e.currentTarget.value.trim());
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recipe.ingredients.map((ingredient, index) => (
+                    <div key={index} className="flex items-start">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                      <span className="text-gray-900 leading-relaxed">{ingredient}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Instructions Section */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-                Steps
-              </h2>
-              <p className="text-gray-600 text-sm mb-4">How to make it yourself:</p>
-              <div className="space-y-4">
-                {recipe.instructions.map((instruction, index) => (
-                  <div key={index} className="flex items-start">
-                    <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center font-semibold text-sm mr-4 flex-shrink-0">
-                      {index + 1}
-                    </div>
-                    <p className="text-gray-800 leading-relaxed flex-1 pt-1">
-                      {instruction}
-                    </p>
-                  </div>
-                ))}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 uppercase tracking-wide">
+                  Instructions
+                </h2>
               </div>
+              
+              {!isEditMode && (
+                <p className="text-gray-600 text-sm mb-4">How to make it yourself:</p>
+              )}
+              
+              {isEditMode ? (
+                <div className="space-y-4">
+                  {editableRecipe?.instructions.map((instruction, index) => (
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={(e) => handleInstructionDragStart(e, index)}
+                      onDragOver={handleInstructionDragOver}
+                      onDrop={(e) => handleInstructionDrop(e, index)}
+                      className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg border-2 border-transparent hover:border-orange-200 transition-all cursor-move"
+                    >
+                      {/* Drag handle */}
+                      <div className="flex flex-col space-y-1 text-gray-400 hover:text-gray-600 cursor-grab mt-2">
+                        <div className="w-4 h-0.5 bg-current rounded"></div>
+                        <div className="w-4 h-0.5 bg-current rounded"></div>
+                        <div className="w-4 h-0.5 bg-current rounded"></div>
+                      </div>
+                      
+                      {/* Step number */}
+                      <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      
+                      {/* Instruction textarea */}
+                      <textarea
+                        value={instruction}
+                        onChange={(e) => updateInstruction(index, e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none min-h-[80px] resize-none text-gray-900"
+                        placeholder="Enter instruction step..."
+                        rows={3}
+                      />
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={() => deleteInstruction(index)}
+                        className="w-8 h-8 rounded-full bg-red-100 text-red-500 flex items-center justify-center hover:bg-red-200 transition-colors flex-shrink-0 mt-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Auto-add new instruction input */}
+                  <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <div className="w-6 flex-shrink-0"></div>
+                    <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                      {(editableRecipe?.instructions.length || 0) + 1}
+                    </div>
+                    <textarea
+                      placeholder="Add new instruction step..."
+                      className="flex-1 border-0 bg-transparent focus:outline-none min-h-[80px] resize-none text-gray-900 placeholder-gray-500"
+                      rows={3}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.shiftKey === false && e.currentTarget.value.trim()) {
+                          e.preventDefault();
+                          addInstruction();
+                          updateInstruction(editableRecipe?.instructions.length || 0, e.currentTarget.value.trim());
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (e.currentTarget.value.trim()) {
+                          addInstruction();
+                          updateInstruction(editableRecipe?.instructions.length || 0, e.currentTarget.value.trim());
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recipe.instructions.map((instruction, index) => (
+                    <div key={index} className="flex items-start">
+                      <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center font-semibold text-sm mr-4 flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      <p className="text-gray-900 leading-relaxed flex-1 pt-1">
+                        {instruction}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -819,14 +1222,32 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
         <div className="border-t border-gray-200 p-4 bg-gray-50 flex-shrink-0">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-600">
-              Total ingredients: {recipe.ingredients.length} • Total steps: {recipe.instructions.length}
+              Total ingredients: {(isEditMode ? editableRecipe?.ingredients.length : recipe.ingredients.length) || 0} • Total steps: {(isEditMode ? editableRecipe?.instructions.length : recipe.instructions.length) || 0}
             </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-300 ease-in-out hover:shadow-md"
-            >
-              Close
-            </button>
+            
+            {isEditMode ? (
+              <div className="flex space-x-3">
+                <button
+                  onClick={saveEditedRecipe}
+                  className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={exitEditMode}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-300 ease-in-out hover:shadow-md"
+              >
+                Close
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -910,7 +1331,7 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col">
             {/* Meal Plan Header */}
             <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">Add to meal plan</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Add to Meal Plan</h2>
               <button onClick={() => setShowMealPlanModal(false)} className="text-orange-500 font-medium text-lg">
                 Done
               </button>
