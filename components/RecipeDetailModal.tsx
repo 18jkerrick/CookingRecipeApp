@@ -1080,28 +1080,16 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                     </div>
                   ))}
                   
-                  {/* Auto-add new ingredient input */}
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <div className="w-6 flex-shrink-0"></div>
-                    <input
-                      type="text"
-                      placeholder="Add new ingredient..."
-                      className="flex-1 border-0 bg-transparent focus:outline-none text-gray-900 placeholder-gray-500"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                          addIngredient();
-                          updateIngredient(editableRecipe?.ingredients.length || 0, e.currentTarget.value.trim());
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (e.currentTarget.value.trim()) {
-                          addIngredient();
-                          updateIngredient(editableRecipe?.ingredients.length || 0, e.currentTarget.value.trim());
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
+                  {/* Add new ingredient button */}
+                  <div 
+                    onClick={addIngredient}
+                    className="flex items-center justify-center p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center hover:bg-orange-200 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1172,32 +1160,16 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                     </div>
                   ))}
                   
-                  {/* Auto-add new instruction input */}
-                  <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <div className="w-6 flex-shrink-0"></div>
-                    <div className="w-8 h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                      {(editableRecipe?.instructions.length || 0) + 1}
+                  {/* Add new instruction button */}
+                  <div 
+                    onClick={addInstruction}
+                    className="flex items-center justify-center p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-300 hover:bg-orange-50 transition-all cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center hover:bg-orange-200 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
                     </div>
-                    <textarea
-                      placeholder="Add new instruction step..."
-                      className="flex-1 border-0 bg-transparent focus:outline-none min-h-[80px] resize-none text-gray-900 placeholder-gray-500"
-                      rows={3}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.shiftKey === false && e.currentTarget.value.trim()) {
-                          e.preventDefault();
-                          addInstruction();
-                          updateInstruction(editableRecipe?.instructions.length || 0, e.currentTarget.value.trim());
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (e.currentTarget.value.trim()) {
-                          addInstruction();
-                          updateInstruction(editableRecipe?.instructions.length || 0, e.currentTarget.value.trim());
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
                   </div>
                 </div>
               ) : (
