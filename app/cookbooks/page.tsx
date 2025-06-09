@@ -355,6 +355,16 @@ export default function Cookbooks() {
           recipe={selectedRecipe}
           isSaved={selectedRecipe?.saved_id ? savedRecipeIds.has(selectedRecipe.saved_id) : false}
           onSave={() => {/* Already saved automatically */}}
+          onUpdate={(updatedRecipe) => {
+            // Update the recipe in the recipes list
+            setRecipes(prev => prev.map(recipe => 
+              recipe.saved_id === updatedRecipe.saved_id 
+                ? { ...recipe, ...updatedRecipe, imageUrl: updatedRecipe.thumbnail || recipe.imageUrl }
+                : recipe
+            ));
+            // Update the selected recipe for the modal
+            setSelectedRecipe(updatedRecipe);
+          }}
           onDelete={async () => {
             if (selectedRecipe?.saved_id) {
               const success = await deleteRecipe(selectedRecipe.saved_id)
