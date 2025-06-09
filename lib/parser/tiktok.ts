@@ -81,18 +81,19 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
           console.log('🔍 seo.abtest keys:', Object.keys(seoData));
           
           // Check if there's video/content data in seo structure
-          if (seoData.vidList) {
+          if (seoData.vidList && Array.isArray(seoData.vidList)) {
             console.log('🔍 vidList length:', seoData.vidList.length);
             console.log('🔍 vidList content:', JSON.stringify(seoData.vidList, null, 2));
             
-            if (seoData.vidList.length > 0) {
-              const videoInfo = seoData.vidList[0];
-              console.log('🔍 First video info keys:', Object.keys(videoInfo || {}));
-              
-              description = videoInfo?.desc || videoInfo?.title || videoInfo?.description;
-              if (description) {
-                console.log('✅ Found description in seo.abtest.vidList structure:', description);
-                return description;
+            for (const videoInfo of seoData.vidList) {
+              if (videoInfo && typeof videoInfo === 'object') {
+                console.log('🔍 Video info keys:', Object.keys(videoInfo));
+                
+                description = videoInfo?.desc || videoInfo?.title || videoInfo?.description;
+                if (description) {
+                  console.log('✅ Found description in seo.abtest.vidList structure:', description);
+                  return description;
+                }
               }
             }
           }
@@ -105,6 +106,30 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
           console.log('🔍 app-context keys:', Object.keys(appContext));
         }
         
+        // Try alternative data paths for photo posts
+        console.log('🔍 Checking alternative data structures for photo posts...');
+        
+        // Check if there's a different structure for photo posts
+        const webappKeys = Object.keys(data?.['__DEFAULT_SCOPE__'] || {});
+        console.log('🔍 All webapp keys:', webappKeys);
+        
+        // Look for any structure that might contain description
+        for (const key of webappKeys) {
+          if (key.includes('detail') || key.includes('item') || key.includes('photo') || key.includes('video')) {
+            const section = data?.['__DEFAULT_SCOPE__']?.[key];
+            if (section && typeof section === 'object') {
+              console.log(`🔍 Checking ${key} structure...`);
+              
+              // Deep search for description in this section
+              const desc = findDescriptionInObject(section);
+              if (desc) {
+                console.log(`✅ Found description in ${key} structure:`, desc);
+                return desc;
+              }
+            }
+          }
+        }
+        
       } catch (e) {
         console.error('❌ Error parsing TikTok JSON:', e);
       }
@@ -113,7 +138,26 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
     // Fallback: try meta description
     const metaDescMatch = html.match(/<meta name="description" content="([^"]*)">/);
     if (metaDescMatch) {
+      console.log('✅ Found description in meta tag');
       return metaDescMatch[1];
+    }
+    
+    // Fallback: try og:description
+    const ogDescMatch = html.match(/<meta property="og:description" content="([^"]*)">/);
+    if (ogDescMatch) {
+      console.log('✅ Found description in og:description');
+      return ogDescMatch[1];
+    }
+    
+    // Fallback: try to find any text that looks like a description in the HTML
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/);
+    if (titleMatch) {
+      const title = titleMatch[1];
+      // If title contains useful information beyond just "TikTok", use it
+      if (title && title.length > 10 && !title.includes('TikTok') && title.includes('@')) {
+        console.log('✅ Found description in page title');
+        return title;
+      }
     }
     
     throw new Error('Could not find description in TikTok page HTML');
@@ -122,6 +166,43 @@ async function getTiktokDescription(videoId: string, url: string): Promise<strin
     console.error('Error extracting TikTok description:', error);
     throw error;
   }
+}
+
+/**
+ * Recursively search for description-like fields in an object
+ */
+function findDescriptionInObject(obj: any, maxDepth: number = 3): string | null {
+  if (maxDepth <= 0 || !obj || typeof obj !== 'object') {
+    return null;
+  }
+  
+  // Check common description field names
+  const descriptionFields = ['desc', 'description', 'title', 'content', 'text', 'caption'];
+  
+  for (const field of descriptionFields) {
+    if (obj[field] && typeof obj[field] === 'string' && obj[field].trim().length > 0) {
+      return obj[field].trim();
+    }
+  }
+  
+  // Recursively search in nested objects and arrays
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const found = findDescriptionInObject(item, maxDepth - 1);
+          if (found) return found;
+        }
+      } else if (typeof value === 'object') {
+        const found = findDescriptionInObject(value, maxDepth - 1);
+        if (found) return found;
+      }
+    }
+  }
+  
+  return null;
 }
 
 function extractTiktokVideoId(url: string): string | null {

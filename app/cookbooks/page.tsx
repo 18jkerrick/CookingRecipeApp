@@ -64,7 +64,11 @@ export default function Cookbooks() {
           saved_id: recipe.id // Track the database ID
         }))
 
-        setRecipes(formattedRecipes)
+        // Preserve any existing processing cards when loading saved recipes
+        setRecipes(prev => {
+          const processingCards = prev.filter(recipe => recipe.processing)
+          return [...processingCards, ...formattedRecipes]
+        })
         setSavedRecipeIds(new Set(savedRecipes.map((r: any) => r.id)))
       }
     } catch (error) {

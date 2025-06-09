@@ -23,12 +23,13 @@ export default function RecipeCard({ title, imageUrl, processing = false }: Reci
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
       {/* Recipe image */}
-      <div className="aspect-square bg-gray-100 flex items-center justify-center">
+      <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={title || 'Recipe'}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover border-0"
+            style={{ backgroundColor: 'transparent' }}
           />
         ) : (
           <div className="text-gray-400 text-4xl">🍽️</div>

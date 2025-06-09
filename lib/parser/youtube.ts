@@ -48,6 +48,75 @@ export async function getYoutubeCaptions(url: string): Promise<string> {
   }
 }
 
+export async function getYoutubeTitle(url: string): Promise<string | null> {
+  try {
+    const videoId = extractVideoId(url);
+    if (!videoId) {
+      throw new Error('Invalid YouTube URL format');
+    }
+    
+    const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const pageResponse = await fetch(videoPageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!pageResponse.ok) {
+      throw new Error('Could not fetch video page');
+    }
+    
+    const html = await pageResponse.text();
+    
+    // Pattern 1: Look for title in ytInitialPlayerResponse
+    const playerResponseMatch = html.match(/var ytInitialPlayerResponse = ({.+?});/);
+    if (playerResponseMatch) {
+      try {
+        const playerResponse = JSON.parse(playerResponseMatch[1]);
+        const title = playerResponse?.videoDetails?.title;
+        if (title) {
+          console.log(`📺 Found YouTube title in playerResponse: "${title}"`);
+          return title;
+        }
+      } catch (e) {
+        console.log('❌ Error parsing ytInitialPlayerResponse for title:', e);
+      }
+    }
+    
+    // Pattern 2: Look for title in meta tags
+    const metaTitleMatch = html.match(/<meta name="title" content="([^"]*)">/);
+    if (metaTitleMatch) {
+      console.log(`📺 Found YouTube title in meta tag: "${metaTitleMatch[1]}"`);
+      return metaTitleMatch[1];
+    }
+    
+    // Pattern 3: Look for og:title
+    const ogTitleMatch = html.match(/<meta property="og:title" content="([^"]*)">/);
+    if (ogTitleMatch) {
+      console.log(`📺 Found YouTube title in og:title: "${ogTitleMatch[1]}"`);
+      return ogTitleMatch[1];
+    }
+    
+    // Pattern 4: Look for title tag
+    const titleTagMatch = html.match(/<title>([^<]+)<\/title>/);
+    if (titleTagMatch) {
+      // Remove " - YouTube" suffix if present
+      const title = titleTagMatch[1].replace(/ - YouTube$/, '');
+      if (title && title !== titleTagMatch[1]) {
+        console.log(`📺 Found YouTube title in title tag: "${title}"`);
+        return title;
+      }
+    }
+    
+    console.log('❌ Could not find YouTube title in any patterns');
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Error extracting YouTube title:', error);
+    return null;
+  }
+}
+
 async function getVideoDescription(videoId: string): Promise<string> {
   try {
     const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;

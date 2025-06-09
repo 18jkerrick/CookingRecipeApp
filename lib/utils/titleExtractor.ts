@@ -1,29 +1,46 @@
+import { getYoutubeTitle } from '@/lib/parser/youtube';
+
 /**
  * Extract video title from platform data or captions
  */
-export function extractVideoTitle(captions: string, platform: string, url: string): string | null {
+export async function extractVideoTitle(captions: string, platform: string, url: string): Promise<string | null> {
   try {
-      // Clean the captions for title extraction
-  const cleanedCaptions = captions
-    .replace(/🍋‍🟩|🔥|❤️|😍|🤤|👌|💯|✨/g, '') // Remove emojis
-    .replace(/\s+for\s+(a\s+)?(top\s+tier|great|perfect|amazing|delicious).*$/i, '') // Remove promotional endings
-    .replace(/\s+on\s+(a\s+)?(sunny|rainy|cold|hot|warm|beautiful).*$/i, '') // Remove weather/time references
-    .replace(/\s+(makes?\s+)?\d+\s+servings.*$/i, '') // Remove serving info
-    .replace(/\s+ready\s+in.*$/i, '') // Remove time info
-    .replace(/\s+prep\s+time.*$/i, '') // Remove prep time
-    .replace(/full recipe on.*$/i, '') // Remove "full recipe on..." trailing text
-    .replace(/recipe in bio.*$/i, '') // Remove "recipe in bio" trailing text
-    .replace(/link in bio.*$/i, '') // Remove "link in bio" trailing text
-    .replace(/check out.*$/i, '') // Remove "check out..." trailing text
-    .replace(/follow for more.*$/i, '') // Remove "follow for more" trailing text
-    .replace(/#\w+/g, '') // Remove hashtags
-    .trim();
+    // For YouTube, try to get the actual video title from metadata first
+    if (platform === 'YouTube') {
+      try {
+        const youtubeTitle = await getYoutubeTitle(url);
+        if (youtubeTitle) {
+          console.log(`📺 Using YouTube metadata title: "${youtubeTitle}"`);
+          return youtubeTitle;
+        }
+      } catch (error) {
+        console.log(`⚠️ Failed to get YouTube title from metadata, falling back to captions: ${error}`);
+      }
+    }
+
+    // Clean the captions for title extraction (fallback for YouTube, primary for others)
+    const cleanedCaptions = captions
+      .replace(/🍋‍🟩|🔥|❤️|😍|🤤|👌|💯|✨/g, '') // Remove emojis
+      .replace(/\s+for\s+(a\s+)?(top\s+tier|great|perfect|amazing|delicious).*$/i, '') // Remove promotional endings
+      .replace(/\s+on\s+(a\s+)?(sunny|rainy|cold|hot|warm|beautiful).*$/i, '') // Remove weather/time references
+      .replace(/\s+(makes?\s+)?\d+\s+servings.*$/i, '') // Remove serving info
+      .replace(/\s+ready\s+in.*$/i, '') // Remove time info
+      .replace(/\s+prep\s+time.*$/i, '') // Remove prep time
+      .replace(/full recipe on.*$/i, '') // Remove "full recipe on..." trailing text
+      .replace(/recipe in bio.*$/i, '') // Remove "recipe in bio" trailing text
+      .replace(/link in bio.*$/i, '') // Remove "link in bio" trailing text
+      .replace(/check out.*$/i, '') // Remove "check out..." trailing text
+      .replace(/follow for more.*$/i, '') // Remove "follow for more" trailing text
+      .replace(/#\w+/g, '') // Remove hashtags
+      .trim();
 
     // Extract title patterns based on platform
-    if (platform === 'TikTok' || platform === 'Instagram') {
-      return extractFromCaptions(cleanedCaptions);
-    } else if (platform === 'YouTube') {
-      return extractFromCaptions(cleanedCaptions);
+    if (platform === 'TikTok' || platform === 'Instagram' || platform === 'YouTube') {
+      const captionTitle = extractFromCaptions(cleanedCaptions);
+      if (captionTitle) {
+        console.log(`📝 Using caption-extracted title: "${captionTitle}"`);
+        return captionTitle;
+      }
     }
     
     return null;

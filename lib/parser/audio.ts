@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { Readable } from 'stream';
+import { extractTikTokDataWithBrowser } from './tiktok-browser';
 
 /**
  * Downloads audio stream from a video URL and returns it as a Blob
@@ -8,10 +9,10 @@ import { Readable } from 'stream';
 export async function fetchAudio(url: string): Promise<Blob> {
   
   try {
-    // Check if this is a TikTok photo post (not supported for audio extraction)
-    if (isTikTokPhotoUrl(url)) {
-      console.log('📸 TikTok photo post detected - skipping audio extraction (photos have background music, not extractable audio)');
-      throw new Error('TikTok photo posts do not have extractable audio content - only background music over images');
+    // For TikTok photo posts, try to extract background music using browser automation
+    if (url.includes('tiktok.com') && url.includes('/photo/')) {
+      console.log('📸 TikTok photo post detected - attempting background music extraction');
+      return await fetchTikTokPhotoAudio(url);
     }
     
     // First try ytdl-core for YouTube (faster and more reliable)
@@ -25,6 +26,43 @@ export async function fetchAudio(url: string): Promise<Blob> {
   } catch (error) {
     console.error('Audio extraction failed:', error);
     throw new Error(`Failed to extract audio from URL: ${url}`);
+  }
+}
+
+/**
+ * Extract background music from TikTok photo posts using browser automation
+ */
+async function fetchTikTokPhotoAudio(url: string): Promise<Blob> {
+  try {
+    console.log('🚀 Using browser automation to find TikTok photo background music...');
+    const tikTokData = await extractTikTokDataWithBrowser(url);
+    
+    if (tikTokData.audioUrl) {
+      console.log(`🎵 Found audio URL: ${tikTokData.audioUrl.substring(0, 100)}...`);
+      
+      // Download the audio file
+      const response = await fetch(tikTokData.audioUrl, {
+        headers: {
+          'Referer': 'https://www.tiktok.com/',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download audio: ${response.status}`);
+      }
+      
+      const audioBuffer = await response.arrayBuffer();
+      const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+      console.log(`✅ Downloaded TikTok background music: ${blob.size} bytes`);
+      return blob;
+    } else {
+      console.log('❌ No audio URL found in TikTok photo post');
+      throw new Error('No background music found in TikTok photo post');
+    }
+  } catch (error) {
+    console.log(`❌ TikTok photo audio extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 }
 
@@ -157,14 +195,6 @@ async function fetchAudioWithYtDlp(url: string): Promise<Blob> {
 export function isYouTubeUrl(url: string): boolean {
   const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
   return youtubeRegex.test(url);
-}
-
-/**
- * Check if URL is a TikTok photo post URL
- */
-export function isTikTokPhotoUrl(url: string): boolean {
-  const tiktokPhotoRegex = /tiktok\.com\/@[^\/]+\/photo\/\d+/;
-  return tiktokPhotoRegex.test(url);
 }
 
 /**

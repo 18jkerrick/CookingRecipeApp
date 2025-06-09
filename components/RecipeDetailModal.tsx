@@ -627,11 +627,12 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
         {/* Header */}
         <div className="p-6 border-b border-gray-200 flex-shrink-0">
           {recipe.thumbnail && (
-            <div className="mb-4">
+            <div className="mb-4 bg-transparent">
               <img 
                 src={recipe.thumbnail} 
                 alt={recipe.title}
-                className="w-full h-48 object-cover rounded-lg"
+                className="w-full h-48 object-cover rounded-lg border-0"
+                style={{ backgroundColor: 'transparent' }}
               />
             </div>
           )}
@@ -994,8 +995,6 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
           </div>
         </div>
       )}
-
-
 
        {/* Meal Type Selection Modal */}
        {showMealTypeModal && selectedDay !== null && (
