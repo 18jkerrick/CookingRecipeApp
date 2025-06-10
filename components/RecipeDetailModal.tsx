@@ -1096,15 +1096,6 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
             {/* Thumbnail */}
             {isEditMode ? (
               <div className="mb-4">
-                {/* Debug info */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="text-xs text-gray-500 mb-2 p-2 bg-yellow-100 rounded">
-                    Debug: editableRecipe.thumbnail = {editableRecipe?.thumbnail?.substring(0, 50)}...<br/>
-                    Debug: recipe.thumbnail = {recipe?.thumbnail?.substring(0, 50)}...<br/>
-                    Debug: Has thumbnail = {!!(editableRecipe?.thumbnail || recipe?.thumbnail) ? 'YES' : 'NO'}
-                  </div>
-                )}
-                
                 {/* Completely isolated image container */}
                 {(editableRecipe?.thumbnail || recipe?.thumbnail) ? (
                   <div style={{ position: 'relative', marginBottom: '16px', zIndex: 1 }}>

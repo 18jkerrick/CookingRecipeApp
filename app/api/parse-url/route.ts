@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getYoutubeCaptions } from '@/lib/parser/youtube';
 import { getTiktokCaptions } from '@/lib/parser/tiktok';
 import { getInstagramCaptions } from '@/lib/parser/instagram';
+import { getCookingWebsiteContent, getCookingWebsiteData, CookingWebsiteData } from '@/lib/parser/cooking-website';
 import { cleanCaption } from '@/lib/ai/cleanCaption';
 import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
 import { fetchAudio } from '@/lib/parser/audio';
@@ -12,6 +13,11 @@ import { detectMusicContent } from '@/lib/ai/detectMusicContent';
 import { generateRecipeTitle } from '@/lib/utils/titleGenerator';
 import { getThumbnailUrl } from '@/lib/utils/thumbnailExtractor';
 import { extractVideoTitle } from '@/lib/utils/titleExtractor';
+
+interface Recipe {
+  ingredients: string[];
+  instructions: string[];
+}
 
 // Smart title extraction function
 async function getSmartTitle(captions: string, platform: string, url: string, ingredients: string[], instructions: string[]): Promise<string> {
@@ -41,7 +47,7 @@ function isValidRecipeTitle(text: string): boolean {
   // Mostly hashtags, mentions, or emojis
   const hashtagCount = (text.match(/#/g) || []).length;
   const mentionCount = (text.match(/@/g) || []).length;
-  const emojiCount = (text.match(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu) || []).length;
+  const emojiCount = 0; // Simplified - no emoji counting
   
   // If more than 30% is hashtags/mentions/emojis, probably not a recipe title
   const socialMediaElements = hashtagCount + mentionCount + emojiCount;
@@ -241,9 +247,6 @@ export async function POST(request: NextRequest) {
     console.log(`\n🚀 STARTING PIPELINE: ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${url}`);
     console.log(`📅 Timestamp: ${new Date().toISOString()}`);
 
-    // PHASE 1: Caption Extraction
-    console.log(`📝 PHASE 1: Caption Extraction`);
-    
     // Detect platform first (before caption extraction)
     let platform: string;
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -253,16 +256,19 @@ export async function POST(request: NextRequest) {
     } else if (url.includes('instagram.com')) {
       platform = 'Instagram';
     } else {
-      platform = 'Unknown';
-      console.log(`❌ Unsupported platform detected`);
-      return NextResponse.json({ error: 'Unsupported platform' }, { status: 400 });
+      platform = 'Cooking Website';
+      console.log(`🥘 Detected cooking website, will validate content`);
     }
-    
+
+    // PHASE 1: Extract content from platform
+    console.log(`\n📝 PHASE 1: Caption Extraction`);
     let rawCaptions = '';
+    let websiteTitle: string | undefined;
+    let websiteThumbnail: string | undefined;
     
     try {
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        console.log(`🎥 Detected platform: ${platform}`);
+        console.log(`📹 Detected platform: ${platform}`);
         console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
           getYoutubeCaptions(url), 
@@ -288,25 +294,43 @@ export async function POST(request: NextRequest) {
           'Instagram caption extraction'
         );
         console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
+      } else {
+        console.log(`🥘 Detected platform: ${platform}`);
+        console.log(`⏳ Attempting cooking website content extraction...`);
+        const cookingWebsiteData: CookingWebsiteData = await withTimeout(
+          getCookingWebsiteData(url), 
+          TIMEOUTS.CAPTION_EXTRACTION, 
+          'Cooking website content extraction'
+        );
+        rawCaptions = cookingWebsiteData.content;
+        websiteTitle = cookingWebsiteData.title;
+        websiteThumbnail = cookingWebsiteData.thumbnailUrl;
+        console.log(`✅ Cooking website content extraction successful, content length: ${rawCaptions.length}`);
+        if (websiteTitle) {
+          console.log(`📝 Extracted website title: "${websiteTitle}"`);
+        }
+        if (websiteThumbnail) {
+          console.log(`🖼️ Extracted website thumbnail: found`);
+        }
       }
     } catch (captionError) {
-      console.error(`❌ Caption extraction failed:`, captionError);
+      console.error(`❌ Content extraction failed:`, captionError);
       
-      // For TikTok, Instagram, and YouTube, caption extraction failure is common - continue to other methods
+      // For social media platforms, content extraction failure is common - continue to other methods
       if (url.includes('tiktok.com') || url.includes('instagram.com') || url.includes('youtube.com')) {
-        console.log(`🔄 Caption extraction failed for ${platform}, continuing to audio/video analysis pipeline`);
+        console.log(`🔄 Content extraction failed for ${platform}, continuing to audio/video analysis pipeline`);
         rawCaptions = ''; // Empty captions will trigger fallback to audio and video analysis
       } else {
-        // For truly unsupported platforms, caption extraction failure is a real error
-        console.log(`🛑 Caption extraction failed for unsupported platform, terminating pipeline`);
+        // For cooking websites, content extraction failure means not a valid cooking site
+        console.log(`🛑 Content extraction failed for cooking website: ${captionError instanceof Error ? captionError.message : 'Unknown error'}`);
         return NextResponse.json({ 
-          error: `Failed to get recipe from link: ${captionError instanceof Error ? captionError.message : 'Unknown error'}` 
+          error: `Failed to get recipe from cooking website: ${captionError instanceof Error ? captionError.message : 'Unknown error'}` 
         }, { status: 400 });
       }
     }
 
     console.log(`\n🖼️ EXTRACTING THUMBNAIL`);
-    let thumbnail = await getThumbnailUrl(url, platform);
+    let thumbnail = websiteThumbnail || await getThumbnailUrl(url, platform);
     console.log(`📸 Thumbnail extraction: ${thumbnail ? 'success' : 'failed'}`);
 
     console.log(`\n🍽️ PHASE 2: Recipe Extraction from Captions`);
@@ -314,7 +338,7 @@ export async function POST(request: NextRequest) {
 
     // Clean the captions with timeout
     console.log(`🧹 Cleaning captions...`);
-    const cleanedCaptions = await withTimeout(
+    const cleanedCaptions: string = await withTimeout(
       cleanCaption(rawCaptions), 
       TIMEOUTS.CAPTION_CLEANING, 
       'Caption cleaning'
@@ -347,7 +371,7 @@ export async function POST(request: NextRequest) {
 
     Transcript: ${cleanedCaptions}
     `;
-    const recipe = await withTimeout(
+    const recipe: Recipe = await withTimeout(
       extractRecipeFromCaption(prompt), 
       TIMEOUTS.RECIPE_EXTRACTION, 
       'Caption recipe extraction'
@@ -358,8 +382,16 @@ export async function POST(request: NextRequest) {
     
     if (recipe.ingredients.length > 0) {
       console.log(`🎉 SUCCESS: Recipe found in captions! Returning result.`);
-      const title = await getSmartTitle(rawCaptions, platform, url, recipe.ingredients, recipe.instructions);
-      console.log(`📝 Final title: "${title}"`);
+      
+      // For cooking websites, use the extracted title if available, otherwise use smart title generation
+      let title: string;
+      if (platform === 'Cooking Website' && websiteTitle) {
+        title = websiteTitle;
+        console.log(`📝 Using extracted website title: "${title}"`);
+      } else {
+        title = await getSmartTitle(rawCaptions, platform, url, recipe.ingredients, recipe.instructions);
+        console.log(`📝 Using generated title: "${title}"`);
+      }
       
       return NextResponse.json({
         platform,
@@ -385,7 +417,7 @@ export async function POST(request: NextRequest) {
       try {
         // Step 1: Download audio with timeout
         console.log(`📥 Step 1: Downloading audio stream from URL...`);
-        const audioBlob = await withTimeout(
+        const audioBlob: Blob = await withTimeout(
           fetchAudio(url), 
           TIMEOUTS.AUDIO_DOWNLOAD, 
           'Audio download'
@@ -398,7 +430,7 @@ export async function POST(request: NextRequest) {
 
         // Step 2: Transcribe audio with timeout
         console.log(`🎤 Step 2: Transcribing audio with Whisper AI...`);
-        const transcript = await withTimeout(
+        const transcript: string = await withTimeout(
           transcribeAudio(audioBlob), 
           TIMEOUTS.AUDIO_TRANSCRIPTION, 
           'Audio transcription'
@@ -431,7 +463,7 @@ export async function POST(request: NextRequest) {
         } else {
           // Step 3: Extract recipe from transcript (only if not music) with timeout
           console.log(`🍳 Step 3: Extracting recipe from cooking transcript...`);
-          const audioRecipe = await withTimeout(
+          const audioRecipe: Recipe = await withTimeout(
             extractRecipeFromTranscript(transcript), 
             TIMEOUTS.RECIPE_EXTRACTION, 
             'Audio recipe extraction'
@@ -469,7 +501,7 @@ export async function POST(request: NextRequest) {
 
           // Extract recipe from video analysis with timeout
           console.log(`🔍 Step 5: Extracting recipe from video analysis...`);
-          const videoRecipe = await withTimeout(
+          const videoRecipe: Recipe = await withTimeout(
             extractRecipeFromTranscript(videoAnalysis), 
             TIMEOUTS.RECIPE_EXTRACTION, 
             'Video recipe extraction'
@@ -570,36 +602,41 @@ export async function POST(request: NextRequest) {
           );
           
           if (videoRecipe.ingredients.length > 0) {
-            console.log('Video analysis successful (final fallback), returning recipe');
-            
-            // Check if we have TikTok photo data to enhance the result
-            const tikTokPhotoData = getLastTikTokPhotoData();
-            if (tikTokPhotoData.firstImageUrl) {
-              console.log(`🖼️ Using TikTok first image as thumbnail: ${tikTokPhotoData.firstImageUrl.substring(0, 100)}...`);
-              thumbnail = tikTokPhotoData.firstImageUrl;
+                      console.log('Video analysis successful (final fallback), returning recipe');
+          
+          // Check if we have TikTok photo data to enhance the result
+          const tikTokPhotoData = getLastTikTokPhotoData();
+          if (tikTokPhotoData.firstImageUrl) {
+            console.log(`🖼️ Using TikTok first image as thumbnail: ${tikTokPhotoData.firstImageUrl.substring(0, 100)}...`);
+            thumbnail = tikTokPhotoData.firstImageUrl;
+          }
+          
+          // Smart title selection: prefer actual recipe titles over social media captions
+          let title = tikTokPhotoData.title; // Try DOM title first
+          
+          // Check if caption contains a real recipe title (not just social media text)
+          if (!title && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
+            title = tikTokPhotoData.caption;
+          }
+          
+          // If we still don't have a good title, extract it from the video analysis
+          if (!title || !isValidRecipeTitle(title)) {
+            console.log(`🔍 Caption/title not useful ("${title || tikTokPhotoData.caption}"), extracting from video analysis...`);
+            const extractedTitle = await extractRecipeTitleFromAnalysis(videoAnalysis);
+            if (extractedTitle) {
+              title = extractedTitle;
+              console.log(`📝 Extracted title from video analysis: "${title}"`);
+            } else {
+              // Final fallback to AI generation  
+              const videoRecipe: Recipe = await withTimeout(
+                extractRecipeFromTranscript(videoAnalysis), 
+                TIMEOUTS.RECIPE_EXTRACTION, 
+                'Final video recipe extraction'
+              );
+              title = await getSmartTitle(rawCaptions, platform, url, videoRecipe.ingredients, videoRecipe.instructions);
+              console.log(`🤖 Using AI generated title as fallback: "${title}"`);
             }
-            
-            // Smart title selection: prefer actual recipe titles over social media captions
-            let title = tikTokPhotoData.title; // Try DOM title first
-            
-            // Check if caption contains a real recipe title (not just social media text)
-            if (!title && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
-              title = tikTokPhotoData.caption;
-            }
-            
-            // If we still don't have a good title, extract it from the video analysis
-            if (!title || !isValidRecipeTitle(title)) {
-              console.log(`🔍 Caption/title not useful ("${title || tikTokPhotoData.caption}"), extracting from video analysis...`);
-              const extractedTitle = await extractRecipeTitleFromAnalysis(videoAnalysis);
-              if (extractedTitle) {
-                title = extractedTitle;
-                console.log(`📝 Extracted title from video analysis: "${title}"`);
-              } else {
-                // Final fallback to AI generation
-                title = await getSmartTitle(rawCaptions, platform, url, videoRecipe.ingredients, videoRecipe.instructions);
-                console.log(`🤖 Using AI generated title as fallback: "${title}"`);
-              }
-            }
+          }
             console.log(`📝 Final title: "${title}"`);
             
             return NextResponse.json({

@@ -1,3 +1,5 @@
+import { extractThumbnailFromHTML, resolveUrl } from '@/lib/parser/cooking-website';
+
 /**
  * Extract thumbnail URL from video platforms
  */
@@ -9,6 +11,8 @@ export async function getThumbnailUrl(url: string, platform: string): Promise<st
       return await getTikTokThumbnail(url);
     } else if (platform === 'Instagram') {
       return await getInstagramThumbnail(url);
+    } else if (platform === 'Cooking Website') {
+      return await getCookingWebsiteThumbnail(url);
     }
     
     return ''; // No thumbnail available
@@ -226,4 +230,41 @@ function extractYouTubeVideoId(url: string): string | null {
   const regex = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&\n?#]+)/;
   const match = url.match(regex);
   return match ? match[1] : null;
+}
+
+/**
+ * Extract cooking website thumbnail from HTML meta tags and structured data
+ */
+async function getCookingWebsiteThumbnail(url: string): Promise<string> {
+  try {
+    console.log(`📸 Extracting thumbnail from cooking website...`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      console.log(`❌ Failed to fetch cooking website: ${response.status}`);
+      return '';
+    }
+    
+    const html = await response.text();
+    
+    // Extract thumbnail URL from HTML
+    const thumbnailUrl = extractThumbnailFromHTML(html, url);
+    
+    if (thumbnailUrl) {
+      console.log(`✅ Cooking website thumbnail found: ${thumbnailUrl.substring(0, 100)}...`);
+      return thumbnailUrl;
+    } else {
+      console.log(`⚠️ No cooking website thumbnail found`);
+      return '';
+    }
+    
+  } catch (error) {
+    console.log(`❌ Cooking website thumbnail extraction error: ${error}`);
+    return '';
+  }
 } 

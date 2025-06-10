@@ -8,6 +8,7 @@ import { POST } from '../../app/api/parse-url/route';
 // Mock all external dependencies
 jest.mock('../../lib/parser/tiktok');
 jest.mock('../../lib/parser/youtube');
+jest.mock('../../lib/parser/cooking-website');
 jest.mock('../../lib/parser/audio');
 jest.mock('../../lib/parser/video');
 jest.mock('../../lib/ai/cleanCaption');
@@ -18,6 +19,7 @@ jest.mock('../../lib/ai/detectMusicContent');
 
 import { getTiktokCaptions } from '../../lib/parser/tiktok';
 import { getYoutubeCaptions } from '../../lib/parser/youtube';
+import { getCookingWebsiteContent } from '../../lib/parser/cooking-website';
 import { fetchAudio } from '../../lib/parser/audio';
 import { extractTextFromVideo } from '../../lib/parser/video';
 import { cleanCaption } from '../../lib/ai/cleanCaption';
@@ -28,6 +30,7 @@ import { detectMusicContent } from '../../lib/ai/detectMusicContent';
 
 const mockGetTiktokCaptions = getTiktokCaptions as jest.MockedFunction<typeof getTiktokCaptions>;
 const mockGetYoutubeCaptions = getYoutubeCaptions as jest.MockedFunction<typeof getYoutubeCaptions>;
+const mockGetCookingWebsiteContent = getCookingWebsiteContent as jest.MockedFunction<typeof getCookingWebsiteContent>;
 const mockFetchAudio = fetchAudio as jest.MockedFunction<typeof fetchAudio>;
 const mockExtractTextFromVideo = extractTextFromVideo as jest.MockedFunction<typeof extractTextFromVideo>;
 const mockCleanCaption = cleanCaption as jest.MockedFunction<typeof cleanCaption>;
@@ -148,7 +151,10 @@ describe('/api/parse-url', () => {
     expect(mockGetYoutubeCaptions).toHaveBeenCalled();
   });
 
-  it('should return error for invalid URL', async () => {
+  it('should return error for invalid cooking website URL', async () => {
+    // Mock a non-cooking website that will fail validation
+    mockGetCookingWebsiteContent.mockRejectedValue(new Error('Not a valid cooking website URL'));
+
     const request = new NextRequest('http://localhost:3000/api/parse-url', {
       method: 'POST',
       body: JSON.stringify({
@@ -163,7 +169,7 @@ describe('/api/parse-url', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain('Unsupported platform');
+    expect(data.error).toContain('Failed to get recipe from cooking website');
   });
 
   it('should handle missing URL in request', async () => {
@@ -180,6 +186,54 @@ describe('/api/parse-url', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain('URL is required');
+  });
+
+  it('should handle cooking website URLs', async () => {
+    mockGetCookingWebsiteContent.mockResolvedValue('Recipe: Nutella Cookies\n\nIngredients:\n- 2 cups flour\n- 1/2 cup butter\n- 1/2 cup Nutella\n\nInstructions:\n1. Mix ingredients\n2. Bake at 350°F');
+    mockCleanCaption.mockResolvedValue('Recipe: Nutella Cookies. Ingredients: 2 cups flour, 1/2 cup butter, 1/2 cup Nutella. Instructions: Mix ingredients, Bake at 350°F');
+    mockExtractRecipeFromCaption.mockResolvedValue({
+      ingredients: ['2 cups flour', '1/2 cup butter', '1/2 cup Nutella'],
+      instructions: ['Mix ingredients', 'Bake at 350°F for 12 minutes']
+    });
+
+    const request = new NextRequest('http://localhost:3000/api/parse-url', {
+      method: 'POST',
+      body: JSON.stringify({
+        url: 'https://sugarspunrun.com/nutella-cookies/'
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.ingredients).toHaveLength(3);
+    expect(data.platform).toBe('Cooking Website');
+    expect(data.ingredients).toContain('2 cups flour');
+    expect(mockGetCookingWebsiteContent).toHaveBeenCalledWith('https://sugarspunrun.com/nutella-cookies/');
+  });
+
+  it('should reject invalid cooking websites', async () => {
+    mockGetCookingWebsiteContent.mockRejectedValue(new Error('Not a valid cooking website URL'));
+
+    const request = new NextRequest('http://localhost:3000/api/parse-url', {
+      method: 'POST',
+      body: JSON.stringify({
+        url: 'https://example.com/about-us'
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('Failed to get recipe from cooking website');
   });
 
   it('should handle malformed JSON request', async () => {
