@@ -302,15 +302,47 @@ export async function POST(request: NextRequest) {
           TIMEOUTS.CAPTION_EXTRACTION, 
           'Cooking website content extraction'
         );
-        rawCaptions = cookingWebsiteData.content;
+        rawCaptions = cookingWebsiteData.extractedText;
         websiteTitle = cookingWebsiteData.title;
-        websiteThumbnail = cookingWebsiteData.thumbnailUrl;
+        websiteThumbnail = cookingWebsiteData.thumbnail;
         console.log(`✅ Cooking website content extraction successful, content length: ${rawCaptions.length}`);
         if (websiteTitle) {
           console.log(`📝 Extracted website title: "${websiteTitle}"`);
         }
         if (websiteThumbnail) {
           console.log(`🖼️ Extracted website thumbnail: found`);
+        }
+        
+        // Check if we should bypass AI processing
+        if (cookingWebsiteData.bypassAI) {
+          console.log(`🚀 Good website extraction detected - bypassing AI processing`);
+          
+          // Parse the extracted text directly to get ingredients and instructions
+          const ingredientsMatch = rawCaptions.match(/ingredients:\s*([\s\S]*?)(?=instructions:|$)/i);
+          const instructionsMatch = rawCaptions.match(/instructions:\s*([\s\S]*?)$/i);
+          
+          if (ingredientsMatch && instructionsMatch) {
+            const ingredients = ingredientsMatch[1]
+              .split('\n')
+              .map(line => line.replace(/^-\s*/, '').trim())
+              .filter(line => line.length > 3);
+            
+            const instructions = instructionsMatch[1]
+              .split('\n')
+              .map(line => line.replace(/^\d+\.\s*/, '').trim())
+              .filter(line => line.length > 10);
+            
+            console.log(`🎉 BYPASSED AI: Using direct extraction - ${ingredients.length} ingredients, ${instructions.length} instructions`);
+            
+            return NextResponse.json({
+              platform,
+              title: websiteTitle,
+              thumbnail: websiteThumbnail,
+              ingredients,
+              instructions,
+              source: 'website_direct'
+            });
+          }
         }
       }
     } catch (captionError) {

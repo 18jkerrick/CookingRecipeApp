@@ -212,13 +212,55 @@ function extractRecipeSections(content: string): string | null {
   // 3. Fallback: if no clear sections found, look for numbered steps anywhere
   if (instructions.length < 5) {
     console.log('📝 Fallback: looking for numbered steps anywhere in content');
-    const numberedSteps = cleanedContent.match(/\d+\.\s+[A-Z][^]*?(?=\d+\.|$)/g);
     
-    if (numberedSteps && numberedSteps.length > 3) {
-      instructions = numberedSteps
-        .map(step => step.replace(/^\d+\.\s*/, '').trim())
-        .filter(step => step.length > 10);
-      console.log(`📝 Found ${instructions.length} numbered steps as fallback`);
+    // More aggressive approach to find ALL numbered steps
+    const numberedStepsRegex = /(\d+)\.\s+([^]*?)(?=\d+\.|$)/g;
+    const allMatches = [...cleanedContent.matchAll(numberedStepsRegex)];
+    
+    if (allMatches.length > 3) {
+      console.log(`📝 Found ${allMatches.length} potential numbered steps`);
+      
+      instructions = allMatches
+        .map(match => {
+          const stepNumber = parseInt(match[1]);
+          const stepText = match[2].trim();
+          return { number: stepNumber, text: stepText };
+        })
+        .filter(step => {
+          // Filter for cooking-related steps
+          return step.text.length > 10 && 
+                 step.text.length < 1000 &&
+                 /[a-z]/.test(step.text) && // Must contain lowercase letters
+                 !step.text.includes('"@type"') && // Not JSON data
+                 !step.text.includes('{"') && // Not JSON data
+                 !/^[\d\s\.\,\-\+\(\)%]+$/.test(step.text); // Not just numbers/punctuation
+        })
+        .sort((a, b) => a.number - b.number) // Sort by step number
+        .map(step => step.text);
+      
+      console.log(`📝 After filtering: ${instructions.length} valid cooking instructions`);
+    }
+    
+    // If still not enough, try splitting the entire content by numbered patterns
+    if (instructions.length < 5) {
+      console.log('📝 Trying to extract from entire content...');
+      
+      // Look for any numbered lists in the content
+      const allNumberedText = cleanedContent.split(/(?=\d+\.)/);
+      const cookingSteps = allNumberedText
+        .map(text => text.replace(/^\d+\.\s*/, '').trim())
+        .filter(text => {
+          if (text.length < 20 || text.length > 800) return false;
+          
+          // Must contain cooking-related words
+          const cookingWords = /\b(add|mix|heat|cook|fry|bake|grill|roast|stir|pour|place|remove|marinate|blend|sauté|simmer|boil|chicken|sauce|butter|cream|spice|oil|salt|pepper|garlic|onion)\b/i;
+          return cookingWords.test(text);
+        });
+      
+      if (cookingSteps.length > instructions.length) {
+        instructions = cookingSteps;
+        console.log(`📝 Extracted ${instructions.length} cooking steps from entire content`);
+      }
     }
   }
 
@@ -227,7 +269,7 @@ function extractRecipeSections(content: string): string | null {
   ingredients = deduplicateIngredients(ingredients);
 
   // 5. Check if we have good extraction results
-  const hasGoodExtraction = ingredients.length > 5 && instructions.length > 10;
+  const hasGoodExtraction = ingredients.length > 3 && instructions.length > 5;
 
   if (ingredients.length > 0 || instructions.length > 0) {
     let recipeText = '';
@@ -242,6 +284,14 @@ function extractRecipeSections(content: string): string | null {
     
     console.log(`📝 Final result: ${ingredients.length} ingredients, ${instructions.length} instructions`);
     console.log(`📝 Good extraction: ${hasGoodExtraction ? 'YES - will bypass AI processing' : 'NO - will use AI processing'}`);
+    
+    // Debug logging
+    if (ingredients.length > 0) {
+      console.log(`📝 Sample ingredients: ${ingredients.slice(0, 3).join(', ')}...`);
+    }
+    if (instructions.length > 0) {
+      console.log(`📝 Sample instructions: ${instructions.slice(0, 2).map(inst => inst.substring(0, 50)).join(', ')}...`);
+    }
     
     return recipeText.trim();
   }
