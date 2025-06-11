@@ -318,8 +318,8 @@ export async function POST(request: NextRequest) {
           console.log(`🚀 Good website extraction detected - bypassing AI processing`);
           
           // Parse the extracted text directly to get ingredients and instructions
-          const ingredientsMatch = rawCaptions.match(/ingredients:\s*([\s\S]*?)(?=instructions:|$)/i);
-          const instructionsMatch = rawCaptions.match(/instructions:\s*([\s\S]*?)$/i);
+          const ingredientsMatch = rawCaptions.match(/Ingredients:\s*([\s\S]*?)(?=Instructions:|$)/i);
+          const instructionsMatch = rawCaptions.match(/Instructions:\s*([\s\S]*?)$/i);
           
           if (ingredientsMatch && instructionsMatch) {
             const ingredients = ingredientsMatch[1]
@@ -342,6 +342,9 @@ export async function POST(request: NextRequest) {
               instructions,
               source: 'website_direct'
             });
+          } else {
+            console.log(`⚠️ Bypass parsing failed - ingredients match: ${!!ingredientsMatch}, instructions match: ${!!instructionsMatch}`);
+            console.log(`📝 Raw captions format check:`, rawCaptions.substring(0, 200));
           }
         }
       }

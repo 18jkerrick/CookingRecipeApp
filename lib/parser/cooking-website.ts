@@ -367,7 +367,7 @@ async function extractWebsiteData(url: string): Promise<CookingWebsiteData> {
       // Check if we have good extraction (lots of ingredients and instructions)
       const ingredientCount = (htmlExtraction.match(/^- /gm) || []).length;
       const instructionCount = (htmlExtraction.match(/^\d+\. /gm) || []).length;
-      const bypassAI = ingredientCount > 5 && instructionCount > 10;
+      const bypassAI = ingredientCount > 2 && instructionCount > 5;
       
       console.log(`📝 HTML extraction found detailed${bypassAI ? ' (bypassing AI)' : ''} instructions`);
       
