@@ -227,7 +227,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, stepName: string
 
 // Timeout constants (in milliseconds)
 const TIMEOUTS = {
-  CAPTION_EXTRACTION: 15000,  // 15 seconds
+  CAPTION_EXTRACTION: 30000,  // 30 seconds (increased for cooking websites)
   CAPTION_CLEANING: 10000,    // 10 seconds
   RECIPE_EXTRACTION: 15000,   // 15 seconds
   AUDIO_DOWNLOAD: 30000,      // 30 seconds

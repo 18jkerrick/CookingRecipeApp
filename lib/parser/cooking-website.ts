@@ -167,13 +167,17 @@ function extractTextFromHTML(html: string): string {
 }
 
 function extractRecipeSections(content: string): string | null {
-  // Clean HTML but keep structure
+  // Clean HTML but preserve line breaks for structure
   const cleanedContent = content
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&[a-zA-Z0-9#]+;/g, ' ')
-    .replace(/\s+/g, ' ');
+    .replace(/<br\s*\/?>/gi, '\n') // Convert br tags to newlines
+    .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n') // Convert block elements to newlines
+    .replace(/<[^>]+>/g, ' ') // Remove remaining HTML tags
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove HTML entities
+    .replace(/▢/g, '') // Remove unicode checkbox characters
+    .replace(/\s*\n\s*/g, '\n') // Clean up extra whitespace around newlines
+    .replace(/ +/g, ' '); // Collapse multiple spaces
 
   let ingredients: string[] = [];
   let instructions: string[] = [];
@@ -182,85 +186,91 @@ function extractRecipeSections(content: string): string | null {
   const ingredientsMatch = cleanedContent.match(/ingredients\s*:?\s*([\s\S]*?)(?=instructions|method|directions|preparation|steps|notes|tips|nutrition|$)/i);
   if (ingredientsMatch) {
     console.log('📝 Found Ingredients section');
-    ingredients = ingredientsMatch[1]
-      .split(/\n|•|–|-/)
-      .map(item => item.replace(/^\d+\.\s*/, '').trim()) // Remove numbering
-      .filter(item => item.length > 3 && item !== '');
+    const ingredientText = ingredientsMatch[1].trim();
+    
+    // Split by newlines and clean up each ingredient
+    ingredients = ingredientText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => {
+        // Remove empty lines, very short text, and non-ingredient content
+        if (line.length < 5) return false;
+        if (line.toLowerCase().includes('notes:') || line.toLowerCase().includes('tips:')) return false;
+        if (line.toLowerCase().includes('instructions') || line.toLowerCase().includes('method')) return false;
+        return true;
+      })
+      .map(line => {
+        // Clean up each ingredient line
+        return line
+          .replace(/^\d+\.\s*/, '') // Remove numbering like "1. "
+          .replace(/^[-•▪▫◦]\s*/, '') // Remove bullet points
+          .replace(/^\s*\*\s*/, '') // Remove asterisks
+          .trim();
+      })
+      .filter(ingredient => ingredient.length > 3); // Final length check
   }
 
   // 2. Look for clearly marked "Instructions" section (case insensitive)
-  const instructionsMatch = cleanedContent.match(/instructions\s*:?\s*([\s\S]*?)(?=notes|tips|nutrition|comments|storage|$)/i);
+  const instructionsMatch = cleanedContent.match(/instructions\s*:?\s*([\s\S]*?)(?=notes|tips|nutrition|comments|storage|recipe\s+notes|$)/i);
   if (instructionsMatch) {
     console.log('📝 Found Instructions section');
-    const instructionText = instructionsMatch[1];
+    const instructionText = instructionsMatch[1].trim();
     
-    // First try to split by numbered steps
-    const numberedSteps = instructionText.split(/(?=\d+\.)/);
-    if (numberedSteps.length > 3) {
-      instructions = numberedSteps
-        .map(step => step.replace(/^\d+\.\s*/, '').trim())
-        .filter(step => step.length > 10);
-    } else {
-      // Fallback: split by periods for sentence-based instructions
-      instructions = instructionText
-        .split(/\.\s+/)
-        .map(step => step.trim())
-        .filter(step => step.length > 15);
+    // Split by newlines and look for numbered or structured steps
+    const lines = instructionText.split('\n').map(line => line.trim()).filter(line => line.length > 5);
+    
+    instructions = [];
+    for (const line of lines) {
+      // Skip section headers or non-instruction content
+      if (line.toLowerCase().includes('notes:') || 
+          line.toLowerCase().includes('tips:') || 
+          line.toLowerCase().includes('nutrition:')) {
+        break; // Stop processing when we hit these sections
+      }
+      
+      // Clean up instruction line
+      const cleanedLine = line
+        .replace(/^\d+\.\s*/, '') // Remove numbering like "1. "
+        .replace(/^[-•▪▫◦]\s*/, '') // Remove bullet points
+        .replace(/▢/g, '') // Remove unicode checkboxes
+        .trim();
+      
+      // Only keep substantial instruction text
+      if (cleanedLine.length > 15 && cleanedLine.length < 500) {
+        instructions.push(cleanedLine);
+      }
     }
   }
 
   // 3. Fallback: if no clear sections found, look for numbered steps anywhere
-  if (instructions.length < 5) {
+  if (instructions.length < 3) {
     console.log('📝 Fallback: looking for numbered steps anywhere in content');
     
-    // More aggressive approach to find ALL numbered steps
-    const numberedStepsRegex = /(\d+)\.\s+([^]*?)(?=\d+\.|$)/g;
+    // Look for numbered steps pattern
+    const numberedStepsRegex = /(\d+)\.\s+([^\n]*(?:\n(?!\d+\.)[^\n]*)*)/g;
     const allMatches = [...cleanedContent.matchAll(numberedStepsRegex)];
     
-    if (allMatches.length > 3) {
-      console.log(`📝 Found ${allMatches.length} potential numbered steps`);
+    if (allMatches.length > 2) {
+      console.log(`📝 Found ${allMatches.length} numbered steps`);
       
       instructions = allMatches
         .map(match => {
           const stepNumber = parseInt(match[1]);
-          const stepText = match[2].trim();
+          const stepText = match[2].trim().replace(/▢/g, ''); // Remove unicode checkboxes
           return { number: stepNumber, text: stepText };
         })
         .filter(step => {
           // Filter for cooking-related steps
-          return step.text.length > 10 && 
-                 step.text.length < 1000 &&
+          return step.text.length > 15 && 
+                 step.text.length < 500 &&
                  /[a-z]/.test(step.text) && // Must contain lowercase letters
                  !step.text.includes('"@type"') && // Not JSON data
-                 !step.text.includes('{"') && // Not JSON data
-                 !/^[\d\s\.\,\-\+\(\)%]+$/.test(step.text); // Not just numbers/punctuation
+                 !step.text.includes('{"'); // Not JSON data
         })
         .sort((a, b) => a.number - b.number) // Sort by step number
         .map(step => step.text);
       
       console.log(`📝 After filtering: ${instructions.length} valid cooking instructions`);
-    }
-    
-    // If still not enough, try splitting the entire content by numbered patterns
-    if (instructions.length < 5) {
-      console.log('📝 Trying to extract from entire content...');
-      
-      // Look for any numbered lists in the content
-      const allNumberedText = cleanedContent.split(/(?=\d+\.)/);
-      const cookingSteps = allNumberedText
-        .map(text => text.replace(/^\d+\.\s*/, '').trim())
-        .filter(text => {
-          if (text.length < 20 || text.length > 800) return false;
-          
-          // Must contain cooking-related words
-          const cookingWords = /\b(add|mix|heat|cook|fry|bake|grill|roast|stir|pour|place|remove|marinate|blend|sauté|simmer|boil|chicken|sauce|butter|cream|spice|oil|salt|pepper|garlic|onion)\b/i;
-          return cookingWords.test(text);
-        });
-      
-      if (cookingSteps.length > instructions.length) {
-        instructions = cookingSteps;
-        console.log(`📝 Extracted ${instructions.length} cooking steps from entire content`);
-      }
     }
   }
 
@@ -269,7 +279,7 @@ function extractRecipeSections(content: string): string | null {
   ingredients = deduplicateIngredients(ingredients);
 
   // 5. Check if we have good extraction results
-  const hasGoodExtraction = ingredients.length > 3 && instructions.length > 5;
+  const hasGoodExtraction = ingredients.length > 3 && instructions.length > 3;
 
   if (ingredients.length > 0 || instructions.length > 0) {
     let recipeText = '';
@@ -287,7 +297,7 @@ function extractRecipeSections(content: string): string | null {
     
     // Debug logging
     if (ingredients.length > 0) {
-      console.log(`📝 Sample ingredients: ${ingredients.slice(0, 3).join(', ')}...`);
+      console.log(`📝 Sample ingredients: ${ingredients.slice(0, 2).map(ing => ing.substring(0, 50)).join(', ')}...`);
     }
     if (instructions.length > 0) {
       console.log(`📝 Sample instructions: ${instructions.slice(0, 2).map(inst => inst.substring(0, 50)).join(', ')}...`);
@@ -297,6 +307,97 @@ function extractRecipeSections(content: string): string | null {
   }
   
   return null;
+}
+
+function extractIngredientsFromText(text: string): string[] {
+  const ingredientsMatch = text.match(/Ingredients:\s*([\s\S]*?)(?=Instructions:|$)/i);
+  if (!ingredientsMatch) return [];
+  
+  return ingredientsMatch[1]
+    .split('\n')
+    .map(line => line.replace(/^-\s*/, '').trim())
+    .filter(line => line.length > 3);
+}
+
+function extractInstructionsFromText(text: string): string[] {
+  const instructionsMatch = text.match(/Instructions:\s*([\s\S]*?)$/i);
+  if (!instructionsMatch) return [];
+  
+  return instructionsMatch[1]
+    .split('\n')
+    .map(line => line.replace(/^\d+\.\s*/, '').trim())
+    .filter(line => line.length > 10);
+}
+
+async function extractIngredientsFromLists(page: any): Promise<string[] | null> {
+  try {
+    const htmlIngredients = await page.evaluate(() => {
+      // Common selectors for ingredients
+      const selectors = [
+        '.wprm-recipe-ingredients-container li',
+        '.recipe-ingredients li',
+        '.ingredients li',
+        '[class*="ingredient"] li',
+        'ul li'
+      ];
+      
+      for (const selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          return Array.from(elements).map(el => {
+            const text = el.textContent?.trim() || '';
+            // Clean up unicode checkboxes and extra whitespace
+            const cleaned = text.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
+            
+            // Only filter out completely empty lines
+            return cleaned.length > 5 ? cleaned : null;
+          }).filter(text => text !== null);
+        }
+      }
+      return null;
+    });
+    
+    return htmlIngredients;
+  } catch (error) {
+    console.error('Error extracting ingredients from lists:', error);
+    return null;
+  }
+}
+
+async function extractInstructionsFromLists(page: any): Promise<string[] | null> {
+  try {
+    const htmlInstructions = await page.evaluate(() => {
+      // Common selectors for instruction lists
+      const selectors = [
+        '.wprm-recipe-instructions-container li',
+        '.recipe-instructions li',
+        '.instructions li',
+        '[class*="instruction"] li',
+        '.recipe-directions li',
+        '.directions li'
+      ];
+      
+      for (const selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          return Array.from(elements).map(el => {
+            const text = el.textContent?.trim() || '';
+            // Clean up unicode checkboxes and extra whitespace
+            const cleaned = text.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
+            
+            // Only filter out completely empty lines
+            return cleaned.length > 5 ? cleaned : null;
+          }).filter(text => text !== null);
+        }
+      }
+      return null;
+    });
+    
+    return htmlInstructions;
+  } catch (error) {
+    console.error('Error extracting instructions from lists:', error);
+    return null;
+  }
 }
 
 function deduplicateInstructions(instructions: string[]): string[] {
@@ -325,17 +426,32 @@ async function extractWebsiteData(url: string): Promise<CookingWebsiteData> {
   
   const browser = await puppeteer.launch({ 
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
   
   try {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     
-    await page.goto(url, { 
-      waitUntil: 'networkidle0', 
-      timeout: 30000 
-    });
+    // Set a shorter timeout for individual operations
+    page.setDefaultTimeout(20000);
+    
+    // Try to load the page with retries
+    let retries = 2;
+    while (retries > 0) {
+      try {
+        await page.goto(url, { 
+          waitUntil: 'domcontentloaded', // Less strict than networkidle0
+          timeout: 25000 // 25 seconds per attempt
+        });
+        break; // Success, exit retry loop
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        console.log(`🔄 Page load failed, retrying... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      }
+    }
 
     // Get page content and title
     const content = await page.content();
@@ -345,39 +461,80 @@ async function extractWebsiteData(url: string): Promise<CookingWebsiteData> {
     console.log(`📝 Extracted title: "${title}"`);
     console.log(`🖼️ Extracted thumbnail: ${thumbnail ? 'found' : 'not found'}`);
 
-    // Check for structured data first
+    // Try hybrid approach: structured data + HTML extraction
     const structuredData = await extractStructuredData(page);
-    
-    if (structuredData && !hasPlaceholderInstructions(structuredData)) {
-      console.log('📋 Found structured recipe data (JSON-LD)');
-      return {
-        title,
-        thumbnail,
-        extractedText: structuredData,
-        bypassAI: false // Still let AI process structured data
-      };
-    }
-
-    console.log('⚠️ Structured data has placeholder instructions or not found, trying HTML fallback');
-    
-    // Try HTML extraction
     const htmlExtraction = extractRecipeSections(content);
     
-    if (htmlExtraction) {
-      // Check if we have good extraction (lots of ingredients and instructions)
-      const ingredientCount = (htmlExtraction.match(/^- /gm) || []).length;
-      const instructionCount = (htmlExtraction.match(/^\d+\. /gm) || []).length;
-      const bypassAI = ingredientCount > 2 && instructionCount > 5;
+    // Also try to extract from HTML lists as a backup
+    const htmlListIngredients = await extractIngredientsFromLists(page);
+    const htmlListInstructions = await extractInstructionsFromLists(page);
+    
+    let bestIngredients: string[] = [];
+    let bestInstructions: string[] = [];
+    let extractionSource = '';
+    
+    // 1. Try structured data for ingredients (usually the best)
+    if (structuredData) {
+      const structuredIngredients = extractIngredientsFromText(structuredData);
+      const structuredInstructions = extractInstructionsFromText(structuredData);
       
-      console.log(`📝 HTML extraction found detailed${bypassAI ? ' (bypassing AI)' : ''} instructions`);
+      if (structuredIngredients.length > 5) {
+        bestIngredients = structuredIngredients;
+        extractionSource += 'structured_ingredients ';
+        console.log(`📋 Using ${structuredIngredients.length} structured data ingredients`);
+      }
+      
+      if (structuredInstructions.length > 8) {
+        bestInstructions = structuredInstructions;
+        extractionSource += 'structured_instructions ';
+        console.log(`📋 Using ${structuredInstructions.length} structured data instructions`);
+      }
+    }
+    
+    // 2. Fallback to HTML list ingredients if structured data ingredients failed
+    if (bestIngredients.length === 0 && htmlListIngredients && htmlListIngredients.length > 5) {
+      bestIngredients = htmlListIngredients;
+      extractionSource += 'html_list_ingredients ';
+      console.log(`📝 Using ${htmlListIngredients.length} HTML list ingredients`);
+    }
+    
+    // 3. Prefer HTML list instructions over text extraction (they're more accurate)
+    if (htmlListInstructions && htmlListInstructions.length > 5) {
+      bestInstructions = htmlListInstructions;
+      extractionSource += 'html_list_instructions ';
+      console.log(`📝 Using ${htmlListInstructions.length} HTML list instructions (filtered)`);
+    }
+    // 4. Fallback to HTML text extraction for instructions if list extraction failed
+    else if (bestInstructions.length === 0 && htmlExtraction) {
+      const htmlInstructions = extractInstructionsFromText(htmlExtraction);
+      if (htmlInstructions.length > 5) {
+        bestInstructions = htmlInstructions;
+        extractionSource += 'html_text_instructions ';
+        console.log(`📝 Using ${htmlInstructions.length} HTML text extraction instructions`);
+      }
+    }
+    
+    // 4. Create final recipe text if we have good content
+    if (bestIngredients.length > 3 && bestInstructions.length > 3) {
+      let recipeText = '';
+      
+      recipeText += 'Ingredients:\n' + bestIngredients.map(ing => `- ${ing}`).join('\n') + '\n\n';
+      recipeText += 'Instructions:\n' + bestInstructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n');
+      
+      const bypassAI = bestIngredients.length > 5 && bestInstructions.length > 8;
+      
+      console.log(`📝 Hybrid extraction: ${bestIngredients.length} ingredients, ${bestInstructions.length} instructions (${extractionSource.trim()})`);
+      console.log(`📝 ${bypassAI ? 'Will bypass AI' : 'Will use AI processing'}`);
       
       return {
         title,
         thumbnail,
-        extractedText: htmlExtraction,
+        extractedText: recipeText,
         bypassAI
       };
     }
+    
+    console.log('⚠️ Both structured data and HTML extraction failed, trying basic HTML fallback');
 
     throw new Error('No recipe content could be extracted from the website');
     
@@ -423,6 +580,7 @@ async function extractThumbnail(page: any, content: string): Promise<string | un
 }
 
 function hasPlaceholderInstructions(content: string): boolean {
+  // Only reject if multiple placeholder patterns are found, or very short instructions
   const placeholderPatterns = [
     /make the sauce/i,
     /grill or roast/i,
@@ -431,7 +589,14 @@ function hasPlaceholderInstructions(content: string): boolean {
     /cook the/i
   ];
   
-  return placeholderPatterns.some(pattern => pattern.test(content));
+  const matchCount = placeholderPatterns.filter(pattern => pattern.test(content)).length;
+  
+  // Count total instructions to see if they're too short
+  const instructionLines = content.split('\n').filter(line => line.match(/^\d+\./));
+  const avgLength = instructionLines.reduce((sum, line) => sum + line.length, 0) / instructionLines.length;
+  
+  // Reject only if multiple placeholders OR very short average length
+  return matchCount >= 2 || (instructionLines.length > 0 && avgLength < 30);
 }
 
 async function extractStructuredData(page: any): Promise<string | null> {
@@ -463,16 +628,24 @@ async function extractStructuredData(page: any): Promise<string | null> {
         recipe = data['@graph'].find((item: any) => item['@type'] === 'Recipe');
       }
       
-      if (recipe && recipe.recipeIngredient && recipe.recipeInstruction) {
+      if (recipe && recipe.recipeIngredient && (recipe.recipeInstruction || recipe.recipeInstructions)) {
         let text = 'Ingredients:\n';
         recipe.recipeIngredient.forEach((ingredient: string) => {
-          text += `- ${ingredient}\n`;
+          // Clean up ingredient text and remove unicode checkboxes
+          const cleanedIngredient = ingredient.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
+          text += `- ${cleanedIngredient}\n`;
         });
         
         text += '\nInstructions:\n';
-        recipe.recipeInstruction.forEach((instruction: any, index: number) => {
+        const instructions = recipe.recipeInstruction || recipe.recipeInstructions;
+        instructions.forEach((instruction: any, index: number) => {
           const instructionText = typeof instruction === 'string' ? instruction : instruction.text;
-          text += `${index + 1}. ${instructionText}\n`;
+          // Skip undefined or empty instructions
+          if (!instructionText || instructionText.trim() === '') return;
+          
+          // Clean up instruction text and remove unicode checkboxes
+          const cleanedInstruction = instructionText.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
+          text += `${index + 1}. ${cleanedInstruction}\n`;
         });
         
         return text;
