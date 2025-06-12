@@ -588,17 +588,17 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
 
   if (safeListsArray.length === 0) {
     return (
-      <div className="w-full max-w-4xl bg-white border border-gray-200 rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">Saved Grocery Lists</h2>
-        <p className="text-gray-600">No saved grocery lists yet. Create a recipe to get started!</p>
+      <div className="w-full max-w-4xl bg-[#1e1f26] border border-white/10 rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold mb-4 text-white">Saved Grocery Lists</h2>
+        <p className="text-white/70">No saved grocery lists yet. Create a recipe to get started!</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl bg-white border border-gray-200 rounded-lg shadow-md p-6 mt-6">
+    <div className="w-full max-w-4xl bg-[#1e1f26] border border-white/10 rounded-lg shadow-md p-6 mt-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">Saved Grocery Lists</h2>
+        <h2 className="text-xl font-semibold text-white">Saved Grocery Lists</h2>
       </div>
       
       <div className="space-y-4">
@@ -607,7 +607,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
           const displayList = isEditing ? editedList! : list;
           
           return (
-            <div key={list.id} className="border border-gray-200 rounded-lg">
+            <div key={list.id} className="border border-white/10 rounded-lg">
               <div className="px-4 py-3">
                 <div className="flex justify-between items-center">
                   <div className="flex-1">
@@ -616,15 +616,15 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                         type="text"
                         value={displayList.name}
                         onChange={(e) => updateListName(e.target.value)}
-                        className="font-semibold text-gray-800 border border-gray-300 rounded px-2 py-1 mr-2"
+                        className="font-semibold text-white border border-white/20 rounded px-2 py-1 mr-2 bg-[#14151a]"
                       />
                     ) : (
                       <button
                         onClick={() => handleListClick(list.id)}
-                        className="text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded w-full p-2"
+                        className="text-left hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-[#FF3A25] rounded w-full p-2"
                       >
-                        <h3 className="font-semibold text-gray-800">{list.name}</h3>
-                        <p className="text-sm text-gray-600">
+                        <h3 className="font-semibold text-white">{list.name}</h3>
+                        <p className="text-sm text-white/70">
                           {list.grocery_items.length} items • {formatDate(list.created_at)}
                         </p>
                       </button>
@@ -637,19 +637,19 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                         <button
                           onClick={saveChanges}
                           disabled={saving}
-                          className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50"
+                          className="px-3 py-1 bg-[#FF3A25] text-white rounded text-sm hover:bg-[#FF3A25]/90 disabled:opacity-50"
                         >
                           {saving ? 'Saving...' : 'Save'}
                         </button>
                         <button
                           onClick={cancelEditing}
-                          className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+                          className="px-3 py-1 bg-white/10 text-white rounded text-sm hover:bg-white/20"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={() => handleDelete(list.id)}
-                          className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                          className="px-3 py-1 bg-[#FF3A25] text-white rounded text-sm hover:bg-[#FF3A25]/90"
                         >
                           Delete
                         </button>
@@ -658,13 +658,13 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                       <>
                         <button
                           onClick={() => startEditing(list)}
-                          className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                          className="px-3 py-1 bg-[#FF3A25] text-white rounded text-sm hover:bg-[#FF3A25]/90"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => copyToClipboard(list.grocery_items, list.name)}
-                          className="p-2 text-gray-500 hover:bg-gray-50 rounded-full transition-colors"
+                          className="p-2 text-white/70 hover:bg-white/10 rounded-full transition-colors"
                           title="Copy to clipboard"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -683,41 +683,41 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                           </button>
                           
                           {showExportMenu === list.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                            <div className="absolute right-0 mt-2 w-48 bg-[#1e1f26] border border-white/10 rounded-md shadow-lg z-10">
                               <div className="py-1">
                                 <button
                                   onClick={() => handleExport(list, 'txt')}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
                                 >
                                   Export as TXT
                                 </button>
                                 <button
                                   onClick={() => handleExport(list, 'html')}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
                                 >
                                   Export as HTML
                                 </button>
                                 <button
                                   onClick={() => handleExport(list, 'excel')}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
                                 >
                                   Export as Excel (CSV)
                                 </button>
                                 <button
                                   onClick={() => handleExport(list, 'pdf')}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
                                 >
                                   Export as PDF
                                 </button>
                                 <button
                                   onClick={() => handleExport(list, 'docx')}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
                                 >
                                   Export as DOCX
                                 </button>
                                 <button
                                   onClick={() => handleExport(list, 'notes')}
-                                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
                                 >
                                   Send to Notes App
                                 </button>
@@ -739,22 +739,22 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse">
                           <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="text-left py-3 px-2 font-semibold text-gray-800">Item</th>
-                              <th className="text-left py-3 px-2 font-semibold text-gray-800">Quantity</th>
-                              <th className="text-left py-3 px-2 font-semibold text-gray-800">Unit</th>
+                            <tr className="border-b border-white/10">
+                              <th className="text-left py-3 px-2 font-semibold text-white">Item</th>
+                              <th className="text-left py-3 px-2 font-semibold text-white">Quantity</th>
+                              <th className="text-left py-3 px-2 font-semibold text-white">Unit</th>
                               <th className="w-8"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {displayList.grocery_items.map((item, itemIndex) => (
-                              <tr key={item.id} className="border-b border-gray-100">
+                              <tr key={item.id} className="border-b border-white/5">
                                 <td className="py-3 px-2">
                                   <input
                                     type="text"
                                     value={item.name}
                                     onChange={(e) => updateItemName(itemIndex, e.target.value)}
-                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                    className="w-full px-2 py-1 border border-white/20 rounded focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white"
                                   />
                                 </td>
                                 <td className="py-3 px-2">
@@ -762,7 +762,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                                     type="text"
                                     value={item.displayQuantity ?? item.quantity.toString()}
                                     onChange={(e) => updateItem(itemIndex, 'displayQuantity', e.target.value)}
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                    className="w-20 px-2 py-1 border border-white/20 rounded focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white"
                                   />
                                 </td>
                                 <td className="py-3 px-2">
@@ -770,7 +770,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                                     type="text"
                                     value={item.unit}
                                     onChange={(e) => updateItemUnit(itemIndex, e.target.value)}
-                                    className="w-24 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                    className="w-24 px-2 py-1 border border-white/20 rounded focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white"
                                   />
                                 </td>
                                 <td className="py-3 px-2">
@@ -780,7 +780,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                                         e.stopPropagation();
                                         handleDeleteItem(itemIndex);
                                       }}
-                                      className="w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors text-xs font-bold"
+                                      className="w-5 h-5 bg-[#FF3A25] text-white rounded-full flex items-center justify-center hover:bg-[#FF3A25]/90 transition-colors text-xs font-bold"
                                       title="Delete item"
                                     >
                                       ✕
@@ -788,7 +788,7 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                                   ) : (
                                     <button
                                       onClick={(e) => toggleDeleteConfirmation(itemIndex, e)}
-                                      className="w-5 h-5 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-400 transition-colors text-xs font-bold"
+                                      className="w-5 h-5 bg-white/10 text-white/70 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors text-xs font-bold"
                                       title="Delete item"
                                     >
                                       −
@@ -804,10 +804,10 @@ const SavedLists = forwardRef<{ refreshLists: () => void }>((props, ref) => {
                       // Read-only view
                       <div className="grid gap-2">
                         {displayList.grocery_items.map((item, itemIndex) => (
-                          <div key={itemIndex} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div key={itemIndex} className="flex items-center justify-between p-2 bg-white/5 rounded">
                             {/* Item content - takes up most space */}
                             <div className="flex-1">
-                              <span className="text-sm text-gray-700">
+                              <span className="text-sm text-white/80">
                                 {item.displayQuantity || item.quantity} {item.unit} {item.name}
                               </span>
                             </div>

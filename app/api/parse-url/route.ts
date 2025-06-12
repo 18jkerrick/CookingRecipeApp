@@ -4,6 +4,7 @@ import { getTiktokCaptions } from '@/lib/parser/tiktok';
 import { getInstagramCaptions } from '@/lib/parser/instagram';
 import { getCookingWebsiteData, CookingWebsiteData } from '@/lib/parser/cooking-website';
 import { getPinterestSourceUrl, isLikelyCookingWebsite } from '@/lib/parser/pinterest';
+import { getFacebookCaptions } from '@/lib/parser/facebook';
 import { cleanCaption } from '@/lib/ai/cleanCaption';
 import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
 import { fetchAudio } from '@/lib/parser/audio';
@@ -302,6 +303,8 @@ export async function POST(request: NextRequest) {
           error: `Failed to extract source from Pinterest: ${pinterestError instanceof Error ? pinterestError.message : 'Unknown error'}` 
         }, { status: 400 });
       }
+    } else if (normalizedUrl.includes('facebook.com') || normalizedUrl.includes('fb.com') || normalizedUrl.includes('fb.watch')) {
+      platform = 'Facebook';
     } else {
       platform = 'Cooking Website';
       console.log(`🥘 Detected cooking website, will validate content`);
@@ -341,6 +344,15 @@ export async function POST(request: NextRequest) {
           'Instagram caption extraction'
         );
         console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
+      } else if (normalizedUrl.includes('facebook.com') || normalizedUrl.includes('fb.com') || normalizedUrl.includes('fb.watch')) {
+        console.log(`📘 Detected platform: ${platform}`);
+        console.log(`⏳ Attempting caption and comments extraction...`);
+        rawCaptions = await withTimeout(
+          getFacebookCaptions(normalizedUrl), 
+          TIMEOUTS.CAPTION_EXTRACTION, 
+          'Facebook caption and comments extraction'
+        );
+        console.log(`✅ Caption and comments extraction successful, length: ${rawCaptions.length}`);
       } else {
         console.log(`🥘 Detected platform: ${platform}`);
         console.log(`⏳ Attempting cooking website content extraction...`);
@@ -349,6 +361,9 @@ export async function POST(request: NextRequest) {
           TIMEOUTS.CAPTION_EXTRACTION, 
           'Cooking website content extraction'
         );
+        if (!cookingWebsiteData) {
+          throw new Error('No data returned from cooking website extraction');
+        }
         rawCaptions = cookingWebsiteData.extractedText;
         websiteTitle = cookingWebsiteData.title;
         websiteThumbnail = cookingWebsiteData.thumbnail;
@@ -399,7 +414,7 @@ export async function POST(request: NextRequest) {
       console.error(`❌ Content extraction failed:`, captionError);
       
       // For social media platforms, content extraction failure is common - continue to other methods
-      if (normalizedUrl.includes('tiktok.com') || normalizedUrl.includes('instagram.com') || normalizedUrl.includes('youtube.com')) {
+      if (normalizedUrl.includes('tiktok.com') || normalizedUrl.includes('instagram.com') || normalizedUrl.includes('youtube.com') || normalizedUrl.includes('facebook.com') || normalizedUrl.includes('fb.com') || normalizedUrl.includes('fb.watch')) {
         console.log(`🔄 Content extraction failed for ${platform}, continuing to audio/video analysis pipeline`);
         rawCaptions = ''; // Empty captions will trigger fallback to audio and video analysis
       } else {
@@ -596,22 +611,22 @@ export async function POST(request: NextRequest) {
             
             // Check if we have TikTok photo data to enhance the result
             const tikTokPhotoData = getLastTikTokPhotoData();
-            if (tikTokPhotoData.firstImageUrl) {
+            if (tikTokPhotoData && tikTokPhotoData.firstImageUrl) {
               console.log(`🖼️ Using TikTok first image as thumbnail: ${tikTokPhotoData.firstImageUrl.substring(0, 100)}...`);
               thumbnail = tikTokPhotoData.firstImageUrl;
             }
             
             // Smart title selection: prefer actual recipe titles over social media captions
-            let title = tikTokPhotoData.title; // Try DOM title first
+            let title = tikTokPhotoData ? tikTokPhotoData.title : null; // Try DOM title first
             
             // Check if caption contains a real recipe title (not just social media text)
-            if (!title && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
+            if (!title && tikTokPhotoData && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
               title = tikTokPhotoData.caption;
             }
             
             // If we still don't have a good title, extract it from the video analysis
             if (!title || !isValidRecipeTitle(title)) {
-              console.log(`🔍 Caption/title not useful ("${title || tikTokPhotoData.caption}"), extracting from video analysis...`);
+              console.log(`🔍 Caption/title not useful ("${title || (tikTokPhotoData ? tikTokPhotoData.caption : '')}"), extracting from video analysis...`);
               const extractedTitle = await extractRecipeTitleFromAnalysis(videoAnalysis);
               if (extractedTitle) {
                 title = extractedTitle;
@@ -688,22 +703,22 @@ export async function POST(request: NextRequest) {
           
           // Check if we have TikTok photo data to enhance the result
           const tikTokPhotoData = getLastTikTokPhotoData();
-          if (tikTokPhotoData.firstImageUrl) {
+          if (tikTokPhotoData && tikTokPhotoData.firstImageUrl) {
             console.log(`🖼️ Using TikTok first image as thumbnail: ${tikTokPhotoData.firstImageUrl.substring(0, 100)}...`);
             thumbnail = tikTokPhotoData.firstImageUrl;
           }
           
           // Smart title selection: prefer actual recipe titles over social media captions
-          let title = tikTokPhotoData.title; // Try DOM title first
+          let title = tikTokPhotoData ? tikTokPhotoData.title : null; // Try DOM title first
           
           // Check if caption contains a real recipe title (not just social media text)
-          if (!title && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
+          if (!title && tikTokPhotoData && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
             title = tikTokPhotoData.caption;
           }
           
           // If we still don't have a good title, extract it from the video analysis
           if (!title || !isValidRecipeTitle(title)) {
-            console.log(`🔍 Caption/title not useful ("${title || tikTokPhotoData.caption}"), extracting from video analysis...`);
+            console.log(`🔍 Caption/title not useful ("${title || (tikTokPhotoData ? tikTokPhotoData.caption : '')}"), extracting from video analysis...`);
             const extractedTitle = await extractRecipeTitleFromAnalysis(videoAnalysis);
             if (extractedTitle) {
               title = extractedTitle;

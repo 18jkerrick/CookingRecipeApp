@@ -19,7 +19,7 @@ jest.mock('../../lib/ai/detectMusicContent');
 
 import { getTiktokCaptions } from '../../lib/parser/tiktok';
 import { getYoutubeCaptions } from '../../lib/parser/youtube';
-import { getCookingWebsiteContent } from '../../lib/parser/cooking-website';
+import { getCookingWebsiteData } from '../../lib/parser/cooking-website';
 import { fetchAudio } from '../../lib/parser/audio';
 import { extractTextFromVideo } from '../../lib/parser/video';
 import { cleanCaption } from '../../lib/ai/cleanCaption';
@@ -30,7 +30,7 @@ import { detectMusicContent } from '../../lib/ai/detectMusicContent';
 
 const mockGetTiktokCaptions = getTiktokCaptions as jest.MockedFunction<typeof getTiktokCaptions>;
 const mockGetYoutubeCaptions = getYoutubeCaptions as jest.MockedFunction<typeof getYoutubeCaptions>;
-const mockGetCookingWebsiteContent = getCookingWebsiteContent as jest.MockedFunction<typeof getCookingWebsiteContent>;
+const mockGetCookingWebsiteData = getCookingWebsiteData as jest.MockedFunction<typeof getCookingWebsiteData>;
 const mockFetchAudio = fetchAudio as jest.MockedFunction<typeof fetchAudio>;
 const mockExtractTextFromVideo = extractTextFromVideo as jest.MockedFunction<typeof extractTextFromVideo>;
 const mockCleanCaption = cleanCaption as jest.MockedFunction<typeof cleanCaption>;
@@ -153,7 +153,7 @@ describe('/api/parse-url', () => {
 
   it('should return error for invalid cooking website URL', async () => {
     // Mock a non-cooking website that will fail validation
-    mockGetCookingWebsiteContent.mockRejectedValue(new Error('Not a valid cooking website URL'));
+    mockGetCookingWebsiteData.mockRejectedValue(new Error('Not a valid cooking website URL'));
 
     const request = new NextRequest('http://localhost:3000/api/parse-url', {
       method: 'POST',
@@ -189,7 +189,12 @@ describe('/api/parse-url', () => {
   });
 
   it('should handle cooking website URLs', async () => {
-    mockGetCookingWebsiteContent.mockResolvedValue('Recipe: Nutella Cookies\n\nIngredients:\n- 2 cups flour\n- 1/2 cup butter\n- 1/2 cup Nutella\n\nInstructions:\n1. Mix ingredients\n2. Bake at 350°F');
+    mockGetCookingWebsiteData.mockResolvedValue({
+      extractedText: 'Recipe: Nutella Cookies\n\nIngredients:\n- 2 cups flour\n- 1/2 cup butter\n- 1/2 cup Nutella\n\nInstructions:\n1. Mix ingredients\n2. Bake at 350°F',
+      title: 'Nutella Cookies',
+      thumbnail: 'https://example.com/nutella-cookies.jpg',
+      bypassAI: false
+    });
     mockCleanCaption.mockResolvedValue('Recipe: Nutella Cookies. Ingredients: 2 cups flour, 1/2 cup butter, 1/2 cup Nutella. Instructions: Mix ingredients, Bake at 350°F');
     mockExtractRecipeFromCaption.mockResolvedValue({
       ingredients: ['2 cups flour', '1/2 cup butter', '1/2 cup Nutella'],
@@ -213,11 +218,11 @@ describe('/api/parse-url', () => {
     expect(data.ingredients).toHaveLength(3);
     expect(data.platform).toBe('Cooking Website');
     expect(data.ingredients).toContain('2 cups flour');
-    expect(mockGetCookingWebsiteContent).toHaveBeenCalledWith('https://sugarspunrun.com/nutella-cookies/');
+    expect(mockGetCookingWebsiteData).toHaveBeenCalledWith('https://sugarspunrun.com/nutella-cookies/');
   });
 
   it('should reject invalid cooking websites', async () => {
-    mockGetCookingWebsiteContent.mockRejectedValue(new Error('Not a valid cooking website URL'));
+    mockGetCookingWebsiteData.mockRejectedValue(new Error('Not a valid cooking website URL'));
 
     const request = new NextRequest('http://localhost:3000/api/parse-url', {
       method: 'POST',

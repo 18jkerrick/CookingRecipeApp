@@ -167,28 +167,28 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
   };
 
   return (
-    <div className="w-full max-w-4xl bg-white border border-gray-200 rounded-lg shadow-md p-6 grocery-list-container">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Grocery List</h2>
+    <div className="w-full max-w-4xl bg-[#1e1f26] border border-white/10 rounded-lg shadow-md p-6 grocery-list-container">
+      <h2 className="text-xl font-semibold text-white mb-4">Grocery List</h2>
       
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse bg-white">
+        <table className="w-full border-collapse bg-[#1e1f26]">
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 text-gray-700 font-medium">Item</th>
-              <th className="text-left py-2 px-3 text-gray-700 font-medium">Quantity</th>
-              <th className="text-left py-2 px-3 text-gray-700 font-medium">Unit</th>
+            <tr className="border-b border-white/10">
+              <th className="text-left py-2 px-3 text-white/90 font-medium">Item</th>
+              <th className="text-left py-2 px-3 text-white/90 font-medium">Quantity</th>
+              <th className="text-left py-2 px-3 text-white/90 font-medium">Unit</th>
               <th className="w-8"></th>
             </tr>
           </thead>
           <tbody>
             {groceryItems.map((item, index) => (
-              <tr key={index} className="border-b border-gray-100">
+              <tr key={index} className="border-b border-white/5">
                 <td className="py-2 px-3">
                   <input
                     type="text"
                     value={item.name}
                     onChange={(e) => updateName(index, e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-2 py-1 border border-white/20 rounded focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white placeholder-white/50"
                   />
                 </td>
                 <td className="py-2 px-3">
@@ -196,7 +196,7 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
                     type="text"
                     value={item.displayQuantity !== undefined ? item.displayQuantity : (item.quantity === 0 ? '' : item.quantity.toString())}
                     onChange={(e) => updateQuantity(index, e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-2 py-1 border border-white/20 rounded focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white placeholder-white/50"
                     placeholder="1, 2, 3..."
                   />
                 </td>
@@ -205,7 +205,7 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
                     type="text"
                     value={item.unit}
                     onChange={(e) => updateUnit(index, e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-2 py-1 border border-white/20 rounded focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white placeholder-white/50"
                     placeholder="cups, lbs, etc."
                   />
                 </td>
@@ -217,7 +217,7 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
                         console.log('Deleting item at index:', index);
                         handleDeleteItem(index);
                       }}
-                      className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors text-xs font-bold"
+                      className="w-6 h-6 bg-[#FF3A25] text-white rounded-full flex items-center justify-center hover:bg-[#FF3A25]/90 transition-colors text-xs font-bold"
                       title="Delete item"
                     >
                       ✕
@@ -228,7 +228,7 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
                         console.log('Clicked minus button for index:', index);
                         toggleDeleteConfirmation(index, e);
                       }}
-                      className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-400 transition-colors text-sm font-bold"
+                      className="w-6 h-6 bg-white/10 text-white/70 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors text-sm font-bold"
                       title="Delete item"
                     >
                       −
@@ -248,21 +248,21 @@ export default function GroceryList({ items, onAddToExisting, onCreateNew }: Gro
             placeholder="Enter list name..."
             value={listName}
             onChange={(e) => setListName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            className="w-full px-3 py-2 border border-white/20 rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF3A25] bg-[#14151a] text-white placeholder-white/50"
           />
         </div>
         
         <div className="flex gap-4">
           <button
             onClick={handleAddToExisting}
-            className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="flex-1 px-4 py-2 bg-[#FF3A25] text-white rounded-md hover:bg-[#FF3A25]/90 focus:outline-none focus:ring-2 focus:ring-[#FF3A25]"
           >
             Add to Existing List
           </button>
           <button
             onClick={handleCreateNew}
             disabled={isSaving || !listName.trim()}
-            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 bg-[#FF3A25] text-white rounded-md hover:bg-[#FF3A25]/90 focus:outline-none focus:ring-2 focus:ring-[#FF3A25] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Create New List'}
           </button>
