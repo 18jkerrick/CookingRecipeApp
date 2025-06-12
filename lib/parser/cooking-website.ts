@@ -7,22 +7,103 @@ export interface CookingWebsiteData {
   bypassAI?: boolean; // Flag to bypass AI processing when we have good extraction
 }
 
-export async function getCookingWebsiteContent(url: string): Promise<string> {
-  try {
-    // Use the new data extraction approach
-    const websiteData = await getCookingWebsiteData(url);
-    return websiteData.extractedText;
-    
-  } catch (error) {
-    console.error('Error fetching cooking website content:', error);
-    throw new Error(`Failed to extract content from cooking website: ${error instanceof Error ? error.message : 'Unknown error'}`);
+// Comprehensive text cleaning function
+function cleanRecipeText(text: string, isInstruction: boolean = false): string {
+  if (!text) return '';
+  
+  // 1. Decode HTML entities
+  text = text
+    .replace(/&#8211;/g, '-')  // em dash
+    .replace(/&#8212;/g, '--') // en dash
+    .replace(/&#8217;/g, "'")  // right single quotation mark
+    .replace(/&#8220;/g, '"')  // left double quotation mark
+    .replace(/&#8221;/g, '"')  // right double quotation mark
+    .replace(/&#8230;/g, '...') // horizontal ellipsis
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+    .replace(/&([a-z]+);/gi, (match, entity) => {
+      const entities: { [key: string]: string } = {
+        'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', 'apos': "'",
+        'nbsp': ' ', 'ndash': '-', 'mdash': '--', 'lsquo': "'", 
+        'rsquo': "'", 'ldquo': '"', 'rdquo': '"', 'hellip': '...'
+      };
+      return entities[entity.toLowerCase()] || match;
+    });
+
+  // 2. Remove unicode characters and symbols
+  text = text
+    .replace(/▢/g, '')           // checkbox symbols
+    .replace(/□/g, '')           // empty checkbox
+    .replace(/☐/g, '')           // ballot box
+    .replace(/✓/g, '')           // checkmarks
+    .replace(/✔/g, '')
+    .replace(/•/g, '')           // bullet points (we'll add our own)
+    .replace(/◦/g, '')           // white bullet
+    .replace(/‣/g, '')           // triangular bullet
+    .replace(/\u00A0/g, ' ')     // non-breaking space
+    .replace(/\u2022/g, '')      // bullet
+    .replace(/\u2023/g, '')      // triangular bullet
+    .replace(/\u25E6/g, '')      // white bullet
+    .replace(/\u2043/g, '')      // hyphen bullet
+    .replace(/[\u2000-\u206F]/g, ' '); // general punctuation block
+
+  // 3. Clean up whitespace
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // 4. Remove leading/trailing non-alphabetical characters (but keep punctuation and parentheses at end)
+  if (isInstruction) {
+    // For instructions, remove leading symbols but keep ending punctuation and parentheses
+    text = text.replace(/^[^\w\s(]+/, '').trim();
+    // Remove common prefixes that aren't actual instructions
+    text = text.replace(/^(step \d+:?\s*)/i, '').trim();
+  } else {
+    // For ingredients, remove leading/trailing symbols except measurement-related ones, parentheses, and fractions
+    text = text.replace(/^[^\w\s\d\/\-\(\u00BC-\u00BE\u2150-\u215E]+/, '').replace(/[^\w\s\d\/\-\.\(\)\u00BC-\u00BE\u2150-\u215E]+$/, '').trim();
   }
+
+  // 5. Remove leading dots, dashes, or other separators
+  text = text.replace(/^[\.\-\s]+/, '').trim();
+
+  return text;
+}
+
+// Function to check if an instruction is actually instructional content
+function isActualInstruction(text: string): boolean {
+  if (!text || text.length < 10) return false;
+  
+  const trimmedText = text.trim();
+  
+  // Only exclude very specific introductory patterns that are clearly not instructions
+  const introductoryPatterns = [
+    /^(creating|making|preparing).+is\s+(easy|simple|straightforward)/i,
+    /^(this|these).+(steps?|instructions?|directions?)/i,
+    /^(follow|use).+(steps?|instructions?|directions?)/i,
+    /^(here.s how|here are the)/i,
+    /when you follow these/i,
+    /follow these.*steps/i,
+    /is easy when/i,
+    /consider these\s*$/i,  // Incomplete sentences ending with "consider these"
+    /\b(these|the|a|an)\s*$/i  // Incomplete sentences ending with articles/demonstratives
+  ];
+  
+  // If it matches an introductory pattern, it's NOT an instruction
+  if (introductoryPatterns.some(pattern => pattern.test(trimmedText))) {
+    return false;
+  }
+  
+  // For everything else, assume it's a valid instruction
+  // The extraction methods should already be getting content from lists/structured data
+  return true;
+}
+
+export async function getCookingWebsiteContent(url: string): Promise<string> {
+  const data = await getCookingWebsiteData(url);
+  return data.extractedText;
 }
 
 export async function getCookingWebsiteData(url: string): Promise<CookingWebsiteData> {
   try {
-    // First, validate that this is a cooking-related website
     console.log('🥘 Validating cooking website content...');
+    
     const isValidCookingWebsite = await validateCookingWebsite(url);
     
     if (!isValidCookingWebsite) {
@@ -31,12 +112,7 @@ export async function getCookingWebsiteData(url: string): Promise<CookingWebsite
     
     console.log('✅ Cooking website validation passed');
     
-    // Extract the website content and metadata
-    const websiteData = await extractWebsiteData(url);
-    console.log(`✅ Website data extraction successful, content length: ${websiteData.extractedText.length}`);
-    
-    return websiteData;
-    
+    return await extractWebsiteData(url);
   } catch (error) {
     console.error('Error fetching cooking website data:', error);
     throw new Error(`Failed to extract data from cooking website: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -48,85 +124,45 @@ async function validateCookingWebsite(url: string): Promise<boolean> {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+      },
+      signal: AbortSignal.timeout(10000) // 10 second timeout
     });
     
     if (!response.ok) {
-      throw new Error('Could not fetch website');
+      return false;
     }
     
     const html = await response.text();
-    const lowerHtml = html.toLowerCase();
     
-    // Define comprehensive cooking terms to look for
-    const cookingTerms = [
-      // Recipe structure words
+    // Check for cooking-related keywords in the content
+    const cookingKeywords = [
       'ingredients', 'instructions', 'recipe', 'directions', 'method', 'preparation',
-      
-      // Measurements
-      'cups', 'cup', 'tablespoons', 'tablespoon', 'tbsp', 'teaspoons', 'teaspoon', 'tsp',
-      'ounces', 'ounce', 'oz', 'pounds', 'pound', 'lb', 'lbs', 'grams', 'gram', 'kg',
-      'liters', 'liter', 'ml', 'milliliters', 'pint', 'quart', 'gallon',
-      
-      // Common ingredients
-      'flour', 'sugar', 'salt', 'pepper', 'eggs', 'egg', 'butter', 'oil', 'milk',
-      'chicken', 'beef', 'pork', 'fish', 'salmon', 'shrimp', 'tofu', 'cheese',
-      'onion', 'onions', 'garlic', 'ginger', 'tomato', 'tomatoes', 'potato', 'potatoes',
-      'carrot', 'carrots', 'celery', 'mushroom', 'mushrooms', 'broccoli', 'spinach',
-      'basil', 'oregano', 'thyme', 'rosemary', 'parsley', 'cilantro', 'paprika',
-      'vanilla', 'cinnamon', 'nutmeg', 'cumin', 'chili powder', 'black pepper',
-      'olive oil', 'vegetable oil', 'coconut oil', 'soy sauce', 'vinegar',
-      'lemon juice', 'lime juice', 'honey', 'maple syrup', 'brown sugar',
-      
-      // Cooking actions/verbs
-      'bake', 'baking', 'cook', 'cooking', 'fry', 'frying', 'sauté', 'sautéing',
-      'boil', 'boiling', 'simmer', 'simmering', 'roast', 'roasting', 'grill', 'grilling',
-      'chop', 'chopping', 'dice', 'dicing', 'slice', 'slicing', 'mince', 'mincing',
-      'mix', 'mixing', 'stir', 'stirring', 'whisk', 'whisking', 'beat', 'beating',
-      'fold', 'folding', 'knead', 'kneading', 'marinate', 'marinating',
-      'preheat', 'preheating', 'season', 'seasoning', 'garnish', 'garnishing',
-      
-      // Cooking tools/equipment
-      'oven', 'stovetop', 'pan', 'skillet', 'pot', 'saucepan', 'bowl', 'whisk',
-      'spatula', 'ladle', 'cutting board', 'knife', 'blender', 'mixer', 'processor',
-      'baking sheet', 'baking dish', 'casserole', 'dutch oven',
-      
-      // Time/temperature indicators
-      'minutes', 'minute', 'hours', 'hour', 'seconds', 'degrees', 'fahrenheit', 'celsius',
-      'until golden', 'until tender', 'until done', 'until cooked',
-      
-      // Recipe-specific terms
-      'serves', 'serving', 'servings', 'yield', 'yields', 'prep time', 'cook time',
-      'total time', 'difficulty', 'calories', 'nutrition', 'allergens',
-      
-      // Food categories
-      'appetizer', 'main course', 'side dish', 'dessert', 'breakfast', 'lunch', 'dinner',
-      'snack', 'beverage', 'soup', 'salad', 'pasta', 'pizza', 'bread', 'cake',
-      'cookies', 'pie', 'casserole', 'stir fry', 'curry', 'stew', 'sandwich'
+      'cups?', 'cup', 'tablespoons?', 'tablespoon', 'tbsp', 'teaspoons?', 'teaspoon', 'tsp',
+      'ounces?', 'ounce', 'oz', 'pounds?', 'pound', 'lb', 'grams?', 'gram', 'kg', 'ml', 'pint',
+      'cooking', 'baking', 'kitchen', 'chef', 'food', 'dish', 'meal', 'cuisine',
+      'minutes?', 'minute', 'hours?', 'hour', 'degrees?', 'degree', 'temperature',
+      'serve', 'serves', 'servings?', 'serving', 'portions?', 'portion'
     ];
     
-    // Count how many cooking terms are found
-    let foundTerms = 0;
-    const foundTermsList: string[] = [];
+    const lowerHtml = html.toLowerCase();
+    const foundKeywords = cookingKeywords.filter(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      return regex.test(lowerHtml);
+    });
     
-    for (const term of cookingTerms) {
-      if (lowerHtml.includes(term)) {
-        foundTerms++;
-        foundTermsList.push(term);
-      }
-    }
+    console.log(`🔍 Found ${foundKeywords.length} cooking terms: ${foundKeywords.slice(0, 10).join(', ')}${foundKeywords.length > 10 ? '...' : ''}`);
     
-    console.log(`🔍 Found ${foundTerms} cooking terms: ${foundTermsList.slice(0, 10).join(', ')}${foundTermsList.length > 10 ? '...' : ''}`);
+    // Check for strong indicators (structured data, recipe classes)
+    const hasStrongIndicators = /recipe|ingredients|instructions|directions/i.test(html) && 
+                               (/"@type":\s*"Recipe"/i.test(html) || 
+                                /class="[^"]*recipe/i.test(html) ||
+                                /class="[^"]*ingredient/i.test(html) ||
+                                /class="[^"]*instruction/i.test(html));
     
-    // Require at least 2 cooking terms AND check for strong recipe indicators
-    const strongRecipeIndicators = ['ingredients', 'instructions', 'recipe', 'directions', 'method', 'preparation'];
-    const hasStrongIndicator = strongRecipeIndicators.some(indicator => lowerHtml.includes(indicator));
-    
-    const isValid = foundTerms >= 2 && hasStrongIndicator;
-    console.log(`🥘 Cooking website validation: ${isValid ? 'PASSED' : 'FAILED'} (${foundTerms}/2 required terms, strong indicator: ${hasStrongIndicator})`);
+    const isValid = foundKeywords.length >= 2 || hasStrongIndicators;
+    console.log(`🥘 Cooking website validation: ${isValid ? 'PASSED' : 'FAILED'} (${foundKeywords.length}/2 required terms, strong indicator: ${hasStrongIndicators})`);
     
     return isValid;
-    
   } catch (error) {
     console.error('Error validating cooking website:', error);
     return false;
@@ -325,8 +361,14 @@ function extractInstructionsFromText(text: string): string[] {
   
   return instructionsMatch[1]
     .split('\n')
+    .map(line => line.trim())
+    .filter(line => {
+      // Only include lines that start with a number (actual instructions)
+      return /^\d+\.\s*/.test(line) && line.length > 10;
+    })
     .map(line => line.replace(/^\d+\.\s*/, '').trim())
-    .filter(line => line.length > 10);
+    .map(line => cleanRecipeText(line, true))
+    .filter(line => line.length > 10 && isActualInstruction(line));
 }
 
 async function extractIngredientsFromLists(page: any): Promise<string[] | null> {
@@ -346,16 +388,19 @@ async function extractIngredientsFromLists(page: any): Promise<string[] | null> 
         if (elements.length > 0) {
           return Array.from(elements).map(el => {
             const text = el.textContent?.trim() || '';
-            // Clean up unicode checkboxes and extra whitespace
-            const cleaned = text.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
-            
-            // Only filter out completely empty lines
-            return cleaned.length > 5 ? cleaned : null;
+            return text.length > 5 ? text : null;
           }).filter(text => text !== null);
         }
       }
       return null;
     });
+    
+    // Clean each ingredient
+    if (htmlIngredients) {
+      return htmlIngredients
+        .map((ingredient: string) => cleanRecipeText(ingredient, false))
+        .filter((ingredient: string) => ingredient.length > 3);
+    }
     
     return htmlIngredients;
   } catch (error) {
@@ -382,16 +427,19 @@ async function extractInstructionsFromLists(page: any): Promise<string[] | null>
         if (elements.length > 0) {
           return Array.from(elements).map(el => {
             const text = el.textContent?.trim() || '';
-            // Clean up unicode checkboxes and extra whitespace
-            const cleaned = text.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
-            
-            // Only filter out completely empty lines
-            return cleaned.length > 5 ? cleaned : null;
+            return text.length > 5 ? text : null;
           }).filter(text => text !== null);
         }
       }
       return null;
     });
+    
+    // Clean and filter each instruction
+    if (htmlInstructions) {
+      return htmlInstructions
+        .map((instruction: string) => cleanRecipeText(instruction, true))
+        .filter((instruction: string) => instruction.length > 10 && isActualInstruction(instruction));
+    }
     
     return htmlInstructions;
   } catch (error) {
@@ -631,21 +679,24 @@ async function extractStructuredData(page: any): Promise<string | null> {
       if (recipe && recipe.recipeIngredient && (recipe.recipeInstruction || recipe.recipeInstructions)) {
         let text = 'Ingredients:\n';
         recipe.recipeIngredient.forEach((ingredient: string) => {
-          // Clean up ingredient text and remove unicode checkboxes
-          const cleanedIngredient = ingredient.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
-          text += `- ${cleanedIngredient}\n`;
+          const cleanedIngredient = cleanRecipeText(ingredient, false);
+          if (cleanedIngredient.length > 3) {
+            text += `- ${cleanedIngredient}\n`;
+          }
         });
         
         text += '\nInstructions:\n';
         const instructions = recipe.recipeInstruction || recipe.recipeInstructions;
-        instructions.forEach((instruction: any, index: number) => {
+        let instructionIndex = 1;
+        instructions.forEach((instruction: any) => {
           const instructionText = typeof instruction === 'string' ? instruction : instruction.text;
-          // Skip undefined or empty instructions
           if (!instructionText || instructionText.trim() === '') return;
           
-          // Clean up instruction text and remove unicode checkboxes
-          const cleanedInstruction = instructionText.replace(/▢/g, '').replace(/\s+/g, ' ').trim();
-          text += `${index + 1}. ${cleanedInstruction}\n`;
+          const cleanedInstruction = cleanRecipeText(instructionText, true);
+          if (cleanedInstruction.length > 10 && isActualInstruction(cleanedInstruction)) {
+            text += `${instructionIndex}. ${cleanedInstruction}\n`;
+            instructionIndex++;
+          }
         });
         
         return text;

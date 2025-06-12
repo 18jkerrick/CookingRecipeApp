@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getYoutubeCaptions } from '@/lib/parser/youtube';
 import { getTiktokCaptions } from '@/lib/parser/tiktok';
 import { getInstagramCaptions } from '@/lib/parser/instagram';
-import { getCookingWebsiteContent, getCookingWebsiteData, CookingWebsiteData } from '@/lib/parser/cooking-website';
+import { getCookingWebsiteData, CookingWebsiteData } from '@/lib/parser/cooking-website';
+import { getPinterestSourceUrl, isLikelyCookingWebsite } from '@/lib/parser/pinterest';
 import { cleanCaption } from '@/lib/ai/cleanCaption';
 import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
 import { fetchAudio } from '@/lib/parser/audio';
@@ -225,6 +226,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, stepName: string
   ]);
 }
 
+// Normalize URL to ensure it has proper protocol
+function normalizeUrl(url: string): string {
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return `https://${url}`;
+  }
+  return url;
+}
+
 // Timeout constants (in milliseconds)
 const TIMEOUTS = {
   CAPTION_EXTRACTION: 30000,  // 30 seconds (increased for cooking websites)
@@ -243,18 +252,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
+    // Normalize URL to ensure it has proper protocol
+    const normalizedUrl = normalizeUrl(url);
+
     const isFastMode = mode === 'fast';
-    console.log(`\n🚀 STARTING PIPELINE: ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${url}`);
+    console.log(`\n🚀 STARTING PIPELINE: ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${normalizedUrl}`);
     console.log(`📅 Timestamp: ${new Date().toISOString()}`);
 
     // Detect platform first (before caption extraction)
     let platform: string;
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    let actualUrl = normalizedUrl; // This might change for Pinterest redirects
+    
+    if (normalizedUrl.includes('youtube.com') || normalizedUrl.includes('youtu.be')) {
       platform = 'YouTube';
-    } else if (url.includes('tiktok.com')) {
+    } else if (normalizedUrl.includes('tiktok.com')) {
       platform = 'TikTok';
-    } else if (url.includes('instagram.com')) {
+    } else if (normalizedUrl.includes('instagram.com')) {
       platform = 'Instagram';
+    } else if (normalizedUrl.includes('pinterest.com')) {
+      platform = 'Pinterest';
+      console.log(`📌 Detected Pinterest, will extract source URL`);
+      
+      // Extract the source URL from Pinterest
+      try {
+        const pinterestData = await withTimeout(
+          getPinterestSourceUrl(normalizedUrl),
+          TIMEOUTS.CAPTION_EXTRACTION,
+          'Pinterest source URL extraction'
+        );
+        
+        if (pinterestData.sourceUrl && isLikelyCookingWebsite(pinterestData.sourceUrl)) {
+          console.log(`📌 Found cooking website source: ${pinterestData.sourceUrl}`);
+          actualUrl = pinterestData.sourceUrl;
+          platform = 'Cooking Website'; // Switch to cooking website processing
+        } else if (pinterestData.sourceUrl) {
+          console.log(`📌 Found non-cooking source: ${pinterestData.sourceUrl}`);
+          return NextResponse.json({ 
+            error: `Pinterest pin links to non-cooking website: ${pinterestData.sourceUrl}` 
+          }, { status: 400 });
+        } else {
+          console.log(`📌 No source URL found in Pinterest pin`);
+          return NextResponse.json({ 
+            error: 'Could not find source URL in Pinterest pin' 
+          }, { status: 400 });
+        }
+      } catch (pinterestError) {
+        console.error(`❌ Pinterest source extraction failed:`, pinterestError);
+        return NextResponse.json({ 
+          error: `Failed to extract source from Pinterest: ${pinterestError instanceof Error ? pinterestError.message : 'Unknown error'}` 
+        }, { status: 400 });
+      }
     } else {
       platform = 'Cooking Website';
       console.log(`🥘 Detected cooking website, will validate content`);
@@ -267,29 +314,29 @@ export async function POST(request: NextRequest) {
     let websiteThumbnail: string | undefined;
     
     try {
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      if (normalizedUrl.includes('youtube.com') || normalizedUrl.includes('youtu.be')) {
         console.log(`📹 Detected platform: ${platform}`);
         console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
-          getYoutubeCaptions(url), 
+          getYoutubeCaptions(normalizedUrl), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'YouTube caption extraction'
         );
         console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
-      } else if (url.includes('tiktok.com')) {
+      } else if (normalizedUrl.includes('tiktok.com')) {
         console.log(`🎵 Detected platform: ${platform}`);
         console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
-          getTiktokCaptions(url), 
+          getTiktokCaptions(normalizedUrl), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'TikTok caption extraction'
         );
         console.log(`✅ Caption extraction successful, length: ${rawCaptions.length}`);
-      } else if (url.includes('instagram.com')) {
+      } else if (normalizedUrl.includes('instagram.com')) {
         console.log(`📸 Detected platform: ${platform}`);
         console.log(`⏳ Attempting caption extraction...`);
         rawCaptions = await withTimeout(
-          getInstagramCaptions(url), 
+          getInstagramCaptions(normalizedUrl), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'Instagram caption extraction'
         );
@@ -298,7 +345,7 @@ export async function POST(request: NextRequest) {
         console.log(`🥘 Detected platform: ${platform}`);
         console.log(`⏳ Attempting cooking website content extraction...`);
         const cookingWebsiteData: CookingWebsiteData = await withTimeout(
-          getCookingWebsiteData(url), 
+          getCookingWebsiteData(actualUrl), 
           TIMEOUTS.CAPTION_EXTRACTION, 
           'Cooking website content extraction'
         );
@@ -352,7 +399,7 @@ export async function POST(request: NextRequest) {
       console.error(`❌ Content extraction failed:`, captionError);
       
       // For social media platforms, content extraction failure is common - continue to other methods
-      if (url.includes('tiktok.com') || url.includes('instagram.com') || url.includes('youtube.com')) {
+      if (normalizedUrl.includes('tiktok.com') || normalizedUrl.includes('instagram.com') || normalizedUrl.includes('youtube.com')) {
         console.log(`🔄 Content extraction failed for ${platform}, continuing to audio/video analysis pipeline`);
         rawCaptions = ''; // Empty captions will trigger fallback to audio and video analysis
       } else {
@@ -365,7 +412,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`\n🖼️ EXTRACTING THUMBNAIL`);
-    let thumbnail = websiteThumbnail || await getThumbnailUrl(url, platform);
+    let thumbnail = websiteThumbnail || await getThumbnailUrl(actualUrl, platform);
     console.log(`📸 Thumbnail extraction: ${thumbnail ? 'success' : 'failed'}`);
 
     console.log(`\n🍽️ PHASE 2: Recipe Extraction from Captions`);
@@ -424,7 +471,7 @@ export async function POST(request: NextRequest) {
         title = websiteTitle;
         console.log(`📝 Using extracted website title: "${title}"`);
       } else {
-        title = await getSmartTitle(rawCaptions, platform, url, recipe.ingredients, recipe.instructions);
+        title = await getSmartTitle(rawCaptions, platform, actualUrl, recipe.ingredients, recipe.instructions);
         console.log(`📝 Using generated title: "${title}"`);
       }
       
