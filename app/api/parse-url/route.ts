@@ -15,10 +15,13 @@ import { detectMusicContent } from '@/lib/ai/detectMusicContent';
 import { generateRecipeTitle } from '@/lib/utils/titleGenerator';
 import { getThumbnailUrl } from '@/lib/utils/thumbnailExtractor';
 import { extractVideoTitle } from '@/lib/utils/titleExtractor';
+import { parseIngredients, NormalizedIngredient, formatIngredient } from '@/lib/ingredientParser';
+import { normalizeIngredientsWithAIBatch, AINormalizedIngredient } from '@/lib/aiIngredientNormalizer';
 
 interface Recipe {
   ingredients: string[];
   instructions: string[];
+  normalizedIngredients?: NormalizedIngredient[];
 }
 
 // Smart title extraction function
@@ -227,6 +230,140 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, stepName: string
   ]);
 }
 
+// Process and normalize recipe ingredients with AI
+async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
+  console.log(`🔧 Processing ${recipe.ingredients.length} ingredients with AI normalization...`);
+  
+  try {
+    // Use AI to normalize ingredients for better quality
+    const aiNormalizedIngredients = await normalizeIngredientsWithAIBatch(recipe.ingredients);
+    
+    console.log(`📊 AI returned ${aiNormalizedIngredients.length} ingredients from ${recipe.ingredients.length} input ingredients`);
+    
+    // Filter out invalid ingredients but be less aggressive
+    const validNormalized = aiNormalizedIngredients.filter(ingredient => {
+      // Allow ingredients even if quantity is 0 - some ingredients might not have quantities
+      if (!ingredient.ingredient || ingredient.ingredient.length < 2 || ingredient.ingredient === 'unknown ingredient') {
+        console.log(`⚠️ Skipping invalid ingredient: ${ingredient.original} → "${ingredient.ingredient}"`);
+        return false;
+      }
+      return true;
+    });
+    
+    console.log(`📊 After filtering: ${validNormalized.length} valid ingredients`);
+    
+    // Create clean display strings from normalized data
+    const cleanIngredients = validNormalized.map(normalized => {
+      const parts: string[] = [];
+      
+      // Handle ranges vs single quantities
+      if ((normalized as any).range) {
+        const range = (normalized as any).range;
+        // Format range nicely with fractions
+        const formatQty = (qty: number): string => {
+          if (qty === 0.125) return '⅛';
+          else if (qty === 0.25) return '¼';
+          else if (qty === 0.33) return '⅓';
+          else if (qty === 0.5) return '½';
+          else if (qty === 0.67) return '⅔';
+          else if (qty === 0.75) return '¾';
+          else if (qty === 1.5) return '1½';
+          else if (qty === 2.5) return '2½';
+          else if (qty === 3.5) return '3½';
+          else if (qty % 1 === 0) return qty.toString();
+          else return qty.toString();
+        };
+        
+        parts.push(`${formatQty(range.min)} to ${formatQty(range.max)}`);
+      } else if (normalized.quantity && normalized.quantity > 0) {
+        // Format single quantity nicely - include ALL positive quantities
+        const qty = normalized.quantity;
+        if (Math.abs(qty - 0.125) < 0.001) parts.push('⅛'); // Handle floating point precision
+        else if (qty === 0.25) parts.push('¼');
+        else if (qty === 0.33 || qty === 0.3) parts.push('⅓');
+        else if (qty === 0.5) parts.push('½');
+        else if (qty === 0.67) parts.push('⅔');
+        else if (qty === 0.75) parts.push('¾');
+        else if (qty === 1) parts.push('1');
+        else if (qty === 1.5) parts.push('1½');
+        else if (qty === 2.5) parts.push('2½');
+        else if (qty === 3.5) parts.push('3½');
+        else if (qty % 1 === 0) parts.push(qty.toString());
+        else parts.push(qty.toString());
+      }
+      
+      if (normalized.unit) {
+        parts.push(normalized.unit);
+      }
+      
+      // Ingredient name (keep lowercase as requested)
+      parts.push(normalized.ingredient);
+      
+      // Special debugging for turmeric
+      if (normalized.ingredient.includes('turmeric')) {
+        console.log(`🌟 TURMERIC DISPLAY: quantity=${normalized.quantity}, unit="${normalized.unit}", parts so far=[${parts.join(', ')}]`);
+      }
+      
+      // Add preparation if exists (no parentheses to avoid extra ones)
+      if (normalized.preparation && normalized.preparation.trim().length > 0) {
+        const prep = normalized.preparation.trim().replace(/^\(+|\)+$/g, ''); // Remove any existing parentheses
+        if (prep) {
+          parts.push(`(${prep})`);
+        }
+      }
+      
+      // Add essential notes only - very short and useful (no parentheses to avoid extra ones)
+      if (normalized.notes && normalized.notes.trim().length > 0 && normalized.notes.trim().length < 30) {
+        const cleanNotes = normalized.notes.trim().replace(/^\(+|\)+$/g, ''); // Remove surrounding parentheses
+        if (cleanNotes && !cleanNotes.includes('*') && !cleanNotes.includes('updated') && !cleanNotes.includes('adjust')) {
+          parts.push(`(${cleanNotes})`);
+        }
+      }
+      
+      let result = parts.join(' ');
+      
+      // Final cleanup: remove stray closing parentheses (closing parens without opening parens)
+      result = result.replace(/([^(]*)\)/g, '$1'); // Remove closing paren if no opening paren before it
+      
+      return result;
+    });
+    
+    console.log(`✅ AI normalized ${validNormalized.length} valid ingredients`);
+    console.log(`📝 Sample AI normalized:`, validNormalized.slice(0, 2));
+    console.log(`📝 Sample display strings:`, cleanIngredients.slice(0, 2));
+    
+    // Debug range detection
+    validNormalized.forEach((ingredient, index) => {
+      if ((ingredient as any).range) {
+        console.log(`🔍 RANGE DETECTED: "${ingredient.original}" → range: ${JSON.stringify((ingredient as any).range)}, display: "${cleanIngredients[index]}"`);
+      }
+    });
+    
+    return {
+      ...recipe,
+      ingredients: cleanIngredients,
+      normalizedIngredients: validNormalized
+    };
+    
+  } catch (error) {
+    console.error('❌ AI normalization failed, falling back to basic parsing:', error);
+    
+    // Fallback to basic parsing
+    const normalizedIngredients = parseIngredients(recipe.ingredients);
+    const validNormalized = normalizedIngredients.filter(ingredient => {
+      return ingredient.quantity > 0 && ingredient.ingredient && ingredient.ingredient.length >= 2;
+    });
+    
+    const cleanIngredients = validNormalized.map(normalized => formatIngredient(normalized));
+    
+    return {
+      ...recipe,
+      ingredients: cleanIngredients,
+      normalizedIngredients: validNormalized
+    };
+  }
+}
+
 // Normalize URL to ensure it has proper protocol
 function normalizeUrl(url: string): string {
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -396,12 +533,16 @@ export async function POST(request: NextRequest) {
             
             console.log(`🎉 BYPASSED AI: Using direct extraction - ${ingredients.length} ingredients, ${instructions.length} instructions`);
             
+            // Process and normalize ingredients
+            const processedRecipe = await processRecipeIngredients({ ingredients, instructions });
+            
             return NextResponse.json({
               platform,
               title: websiteTitle,
               thumbnail: websiteThumbnail,
-              ingredients,
-              instructions,
+              ingredients: processedRecipe.ingredients,
+              instructions: processedRecipe.instructions,
+              normalizedIngredients: processedRecipe.normalizedIngredients,
               source: 'website_direct'
             });
           } else {
@@ -480,13 +621,16 @@ export async function POST(request: NextRequest) {
     if (recipe.ingredients.length > 0) {
       console.log(`🎉 SUCCESS: Recipe found in captions! Returning result.`);
       
+      // Process and normalize ingredients
+      const processedRecipe = await processRecipeIngredients(recipe);
+      
       // For cooking websites, use the extracted title if available, otherwise use smart title generation
       let title: string;
       if (platform === 'Cooking Website' && websiteTitle) {
         title = websiteTitle;
         console.log(`📝 Using extracted website title: "${title}"`);
       } else {
-        title = await getSmartTitle(rawCaptions, platform, actualUrl, recipe.ingredients, recipe.instructions);
+        title = await getSmartTitle(rawCaptions, platform, actualUrl, processedRecipe.ingredients, processedRecipe.instructions);
         console.log(`📝 Using generated title: "${title}"`);
       }
       
@@ -494,8 +638,9 @@ export async function POST(request: NextRequest) {
         platform,
         title,
         thumbnail,
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
+        ingredients: processedRecipe.ingredients,
+        instructions: processedRecipe.instructions,
+        normalizedIngredients: processedRecipe.normalizedIngredients,
         source: 'captions'
       });
     } else if (isFastMode) {
@@ -570,15 +715,20 @@ export async function POST(request: NextRequest) {
           
           if (audioRecipe.ingredients.length > 0) {
             console.log(`🎉 SUCCESS: Recipe found in audio transcript! Returning result.`);
-            const title = await getSmartTitle(rawCaptions, platform, url, audioRecipe.ingredients, audioRecipe.instructions);
+            
+            // Process and normalize ingredients
+            const processedRecipe = await processRecipeIngredients(audioRecipe);
+            
+            const title = await getSmartTitle(rawCaptions, platform, url, processedRecipe.ingredients, processedRecipe.instructions);
             console.log(`📝 Final title: "${title}"`);
             
             return NextResponse.json({
               platform,
               title,
               thumbnail,
-              ingredients: audioRecipe.ingredients,
-              instructions: audioRecipe.instructions,
+              ingredients: processedRecipe.ingredients,
+              instructions: processedRecipe.instructions,
+              normalizedIngredients: processedRecipe.normalizedIngredients,
               source: 'audio_transcript',
               transcript: transcript.substring(0, 200) + '...' // Include preview for debugging
             });
@@ -609,6 +759,9 @@ export async function POST(request: NextRequest) {
           if (videoRecipe.ingredients.length > 0) {
             console.log(`🎉 SUCCESS: Recipe found in video analysis! Returning result.`);
             
+            // Process and normalize ingredients
+            const processedRecipe = await processRecipeIngredients(videoRecipe);
+            
             // Check if we have TikTok photo data to enhance the result
             const tikTokPhotoData = getLastTikTokPhotoData();
             if (tikTokPhotoData && tikTokPhotoData.firstImageUrl) {
@@ -633,7 +786,7 @@ export async function POST(request: NextRequest) {
                 console.log(`📝 Extracted title from video analysis: "${title}"`);
               } else {
                 // Final fallback to AI generation
-                title = await getSmartTitle(rawCaptions, platform, url, videoRecipe.ingredients, videoRecipe.instructions);
+                title = await getSmartTitle(rawCaptions, platform, url, processedRecipe.ingredients, processedRecipe.instructions);
                 console.log(`🤖 Using AI generated title as fallback: "${title}"`);
               }
             }
@@ -643,8 +796,9 @@ export async function POST(request: NextRequest) {
               platform,
               title,
               thumbnail,
-              ingredients: videoRecipe.ingredients,
-              instructions: videoRecipe.instructions,
+              ingredients: processedRecipe.ingredients,
+              instructions: processedRecipe.instructions,
+              normalizedIngredients: processedRecipe.normalizedIngredients,
               source: 'video_analysis',
               analysis: videoAnalysis.substring(0, 300) + '...' // Include preview for debugging
             });
@@ -699,49 +853,48 @@ export async function POST(request: NextRequest) {
           );
           
           if (videoRecipe.ingredients.length > 0) {
-                      console.log('Video analysis successful (final fallback), returning recipe');
+            console.log('Video analysis successful (final fallback), returning recipe');
+            
+            // Process and normalize ingredients
+            const processedRecipe = await processRecipeIngredients(videoRecipe);
           
-          // Check if we have TikTok photo data to enhance the result
-          const tikTokPhotoData = getLastTikTokPhotoData();
-          if (tikTokPhotoData && tikTokPhotoData.firstImageUrl) {
-            console.log(`🖼️ Using TikTok first image as thumbnail: ${tikTokPhotoData.firstImageUrl.substring(0, 100)}...`);
-            thumbnail = tikTokPhotoData.firstImageUrl;
-          }
-          
-          // Smart title selection: prefer actual recipe titles over social media captions
-          let title = tikTokPhotoData ? tikTokPhotoData.title : null; // Try DOM title first
-          
-          // Check if caption contains a real recipe title (not just social media text)
-          if (!title && tikTokPhotoData && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
-            title = tikTokPhotoData.caption;
-          }
-          
-          // If we still don't have a good title, extract it from the video analysis
-          if (!title || !isValidRecipeTitle(title)) {
-            console.log(`🔍 Caption/title not useful ("${title || (tikTokPhotoData ? tikTokPhotoData.caption : '')}"), extracting from video analysis...`);
-            const extractedTitle = await extractRecipeTitleFromAnalysis(videoAnalysis);
-            if (extractedTitle) {
-              title = extractedTitle;
-              console.log(`📝 Extracted title from video analysis: "${title}"`);
-            } else {
-              // Final fallback to AI generation  
-              const videoRecipe: Recipe = await withTimeout(
-                extractRecipeFromTranscript(videoAnalysis), 
-                TIMEOUTS.RECIPE_EXTRACTION, 
-                'Final video recipe extraction'
-              );
-              title = await getSmartTitle(rawCaptions, platform, url, videoRecipe.ingredients, videoRecipe.instructions);
-              console.log(`🤖 Using AI generated title as fallback: "${title}"`);
+            // Check if we have TikTok photo data to enhance the result
+            const tikTokPhotoData = getLastTikTokPhotoData();
+            if (tikTokPhotoData && tikTokPhotoData.firstImageUrl) {
+              console.log(`🖼️ Using TikTok first image as thumbnail: ${tikTokPhotoData.firstImageUrl.substring(0, 100)}...`);
+              thumbnail = tikTokPhotoData.firstImageUrl;
             }
-          }
+            
+            // Smart title selection: prefer actual recipe titles over social media captions
+            let title = tikTokPhotoData ? tikTokPhotoData.title : null; // Try DOM title first
+            
+            // Check if caption contains a real recipe title (not just social media text)
+            if (!title && tikTokPhotoData && tikTokPhotoData.caption && isValidRecipeTitle(tikTokPhotoData.caption)) {
+              title = tikTokPhotoData.caption;
+            }
+            
+            // If we still don't have a good title, extract it from the video analysis
+            if (!title || !isValidRecipeTitle(title)) {
+              console.log(`🔍 Caption/title not useful ("${title || (tikTokPhotoData ? tikTokPhotoData.caption : '')}"), extracting from video analysis...`);
+              const extractedTitle = await extractRecipeTitleFromAnalysis(videoAnalysis);
+              if (extractedTitle) {
+                title = extractedTitle;
+                console.log(`📝 Extracted title from video analysis: "${title}"`);
+              } else {
+                // Final fallback to AI generation  
+                title = await getSmartTitle(rawCaptions, platform, url, processedRecipe.ingredients, processedRecipe.instructions);
+                console.log(`🤖 Using AI generated title as fallback: "${title}"`);
+              }
+            }
             console.log(`📝 Final title: "${title}"`);
             
             return NextResponse.json({
               platform,
               title,
               thumbnail,
-              ingredients: videoRecipe.ingredients,
-              instructions: videoRecipe.instructions,
+              ingredients: processedRecipe.ingredients,
+              instructions: processedRecipe.instructions,
+              normalizedIngredients: processedRecipe.normalizedIngredients,
               source: 'video_analysis_fallback',
               analysis: videoAnalysis.substring(0, 300) + '...' // Include preview for debugging
             });

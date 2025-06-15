@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useUnitPreference, formatMeasurement } from '../hooks/useUnitPreference';
 import {
   DndContext,
   closestCenter,
@@ -26,7 +27,7 @@ import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 import { getMealPlans, saveMealPlans, addRecipeToMealPlan, getWeekDates, getStartOfWeek, formatDateRange, formatDayName, isToday, MEAL_TYPES } from '../lib/mealPlanStorage';
-import { getIngredientEmoji, getGroceryLists, createGroceryList, updateGroceryList, addRecipeToGroceryList, parseIngredient } from '../lib/groceryStorageDB';
+import { getGroceryLists, createGroceryList, addRecipeToGroceryList } from '../lib/groceryStorageDB';
 
 interface RecipeDetailModalProps {
   isOpen: boolean;
@@ -273,6 +274,18 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const [draggedInstructionIndex, setDraggedInstructionIndex] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
   
+  // Unit preference
+  const unitPreference = useUnitPreference();
+  
+  // Helper function to format numbers nicely
+  const formatNumber = (num?: number): string => {
+    if (num === undefined) return '';
+    
+    // Round to 2 decimal places and remove trailing zeros
+    const rounded = Math.round(num * 100) / 100;
+    return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/\.?0+$/, '');
+  };
+  
   // Modal states
   const [showGroceryModal, setShowGroceryModal] = useState(false);
   const [showListSelectionModal, setShowListSelectionModal] = useState(false);
@@ -284,11 +297,11 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMealTypeModal, setShowMealTypeModal] = useState(false);
-  const [showConvertModal, setShowConvertModal] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState<boolean[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getStartOfWeek(new Date()));
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [mealPlans, setMealPlans] = useState<{[key: string]: {[key: string]: any}}>({});
+  const [activeTab, setActiveTab] = useState<'ingredients' | 'instructions'>('ingredients');
 
   // Load meal plans from localStorage on component mount
   useEffect(() => {
@@ -1158,12 +1171,6 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
               <h1 className="text-xl sm:text-2xl font-bold text-white">{recipe.title}</h1>
             )}
             
-            <div className="flex justify-between items-center mt-4">
-              <p className="text-xs sm:text-sm text-white/70">
-                From {recipe.platform} • Extracted via {recipe.source}
-              </p>
-            </div>
-            
             {/* Action Buttons - Only show when not in edit mode */}
             {!isEditMode && (
               <div className="flex justify-center space-x-4 sm:space-x-6 mt-6">
@@ -1178,7 +1185,7 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                   className="flex flex-col items-center space-y-2 p-3 sm:p-4 rounded-lg hover:bg-white/5 transition-colors"
                 >
                   <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center ${
-                    isSaved ? 'bg-orange-500' : 'bg-gray-400'
+                    isSaved ? 'bg-[#FF3A25]' : 'bg-gray-400'
                   }`}>
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M6 2h12a2 2 0 0 1 2 2v16l-8-4-8 4V4a2 2 0 0 1 2-2z"/>
@@ -1311,91 +1318,153 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-            {/* Ingredients Section */}
-            <div className="mb-6 sm:mb-8">
-              <h2 className="text-lg sm:text-xl font-semibold text-white uppercase tracking-wide mb-4">
-                Ingredients
-              </h2>
-              
-              {isEditMode ? (
-                <>
-                  <SortableContext items={ingredientIds} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-2">
-                      {editableRecipe?.ingredients.map((ingredient, index) => (
-                        <SortableIngredientItem
-                          key={ingredientIds[index]}
-                          id={ingredientIds[index]}
-                          ingredient={ingredient}
-                          index={index}
-                          onUpdate={updateIngredient}
-                          onDelete={deleteIngredient}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                  <button
-                    onClick={addIngredient}
-                    className="w-full mt-3 p-3 border-2 border-dashed border-white/20 rounded-lg hover:border-[#FF3A25] hover:bg-[#FF3A25]/10 transition-colors text-white/70 hover:text-[#FF3A25] font-medium"
-                  >
-                    + Add
-                  </button>
-                </>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {recipe.ingredients.map((ingredient, index) => (
-                    <div key={index} className="flex items-start">
-                      <span className="text-2xl mr-3 flex-shrink-0">{getIngredientEmoji(ingredient)}</span>
-                      <span className="text-white/90 leading-relaxed">{ingredient}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="flex-1 overflow-y-auto">
+            {/* Tabs */}
+            {!isEditMode && (
+              <div className="flex border-b border-white/10">
+                <button
+                  onClick={() => setActiveTab('ingredients')}
+                  className={`flex-1 px-4 py-3 text-lg font-semibold transition-colors ${
+                    activeTab === 'ingredients' 
+                      ? 'text-white border-b-2 border-[#a5a6ff] bg-[#a5a6ff]/10' 
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Ingredients
+                </button>
+                <button
+                  onClick={() => setActiveTab('instructions')}
+                  className={`flex-1 px-4 py-3 text-lg font-semibold transition-colors ${
+                    activeTab === 'instructions' 
+                      ? 'text-white border-b-2 border-[#a5a6ff] bg-[#a5a6ff]/10' 
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Instructions
+                </button>
+              </div>
+            )}
 
-            {/* Instructions Section */}
-            <div className="mb-6 sm:mb-8">
-              <h2 className="text-lg sm:text-xl font-semibold text-white uppercase tracking-wide mb-4">
-                Instructions
-              </h2>
-              
+            <div className="p-4 sm:p-6">
+              {/* Edit Mode - Show both sections */}
               {isEditMode ? (
                 <>
-                  <SortableContext items={instructionIds} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-3">
-                      {editableRecipe?.instructions.map((instruction, index) => (
-                        <SortableInstructionItem
-                          key={instructionIds[index]}
-                          id={instructionIds[index]}
-                          instruction={instruction}
-                          index={index}
-                          displayIndex={getInstructionDisplayIndex(index, instructionIds[index])}
-                          onUpdate={updateInstruction}
-                          onDelete={deleteInstruction}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                  <button
-                    onClick={addInstruction}
-                    className="w-full mt-3 p-3 border-2 border-dashed border-white/20 rounded-lg hover:border-[#FF3A25] hover:bg-[#FF3A25]/10 transition-colors text-white/70 hover:text-[#FF3A25] font-medium"
-                  >
-                    + Add
-                  </button>
+                  {/* Ingredients Section */}
+                  <div className="mb-6 sm:mb-8">
+                    <h2 className="text-lg sm:text-xl font-semibold text-white uppercase tracking-wide mb-4">
+                      Ingredients
+                    </h2>
+                    
+                    <SortableContext items={ingredientIds} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {editableRecipe?.ingredients.map((ingredient, index) => (
+                          <SortableIngredientItem
+                            key={ingredientIds[index]}
+                            id={ingredientIds[index]}
+                            ingredient={ingredient}
+                            index={index}
+                            onUpdate={updateIngredient}
+                            onDelete={deleteIngredient}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                    <button
+                      onClick={addIngredient}
+                      className="w-full mt-3 p-3 border-2 border-dashed border-white/20 rounded-lg hover:border-[#FF3A25] hover:bg-[#FF3A25]/10 transition-colors text-white/70 hover:text-[#FF3A25] font-medium"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {/* Instructions Section */}
+                  <div className="mb-6 sm:mb-8">
+                    <h2 className="text-lg sm:text-xl font-semibold text-white uppercase tracking-wide mb-4">
+                      Instructions
+                    </h2>
+                    
+                    <SortableContext items={instructionIds} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-3">
+                        {editableRecipe?.instructions.map((instruction, index) => (
+                          <SortableInstructionItem
+                            key={instructionIds[index]}
+                            id={instructionIds[index]}
+                            instruction={instruction}
+                            index={index}
+                            displayIndex={getInstructionDisplayIndex(index, instructionIds[index])}
+                            onUpdate={updateInstruction}
+                            onDelete={deleteInstruction}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                    <button
+                      onClick={addInstruction}
+                      className="w-full mt-3 p-3 border-2 border-dashed border-white/20 rounded-lg hover:border-[#FF3A25] hover:bg-[#FF3A25]/10 transition-colors text-white/70 hover:text-[#FF3A25] font-medium"
+                    >
+                      + Add
+                    </button>
+                  </div>
                 </>
               ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {recipe.instructions.map((instruction, index) => (
-                    <div key={index} className="flex items-start">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-[#FF3A25] text-white rounded-lg flex items-center justify-center font-semibold text-xs sm:text-sm mr-3 sm:mr-4 flex-shrink-0">
-                        {index + 1}
-                      </div>
-                      <p className="text-white/90 leading-relaxed flex-1 pt-1 text-sm sm:text-base">
-                        {instruction}
-                      </p>
+                <>
+                  {/* Ingredients Tab Content */}
+                  {activeTab === 'ingredients' && (
+                    <div className="space-y-3 sm:space-y-4">
+                      {recipe.ingredients.map((ingredient, index) => {
+                        // Try to use normalized ingredients if available for unit conversion
+                        const normalized = (recipe as any).normalized_ingredients?.[index];
+                        
+                        if (normalized && unitPreference !== 'original') {
+                          // Use normalized data for unit conversion
+                          const isRange = !!(normalized as any).range;
+                          const range = (normalized as any).range;
+                          
+                          const minQty = isRange ? range.min : normalized.quantity;
+                          const maxQty = isRange ? range.max : normalized.quantity;
+                          const unit = normalized.unit;
+                          
+                          // For recipes, we don't have pre-computed metric/imperial conversions
+                          // So we'll need to compute them on the fly or fallback to original
+                          const displayText = unit && unitPreference !== 'original' 
+                            ? `${formatNumber(minQty)}${minQty !== maxQty ? ` to ${formatNumber(maxQty)}` : ''} ${unit} ${normalized.ingredient}`
+                            : ingredient;
+                          
+                          return (
+                            <div key={index} className="flex items-start">
+                              <div className="w-1 h-6 bg-[#a5a6ff] rounded-full mr-4 flex-shrink-0 mt-1"></div>
+                              <span className="text-white/90 leading-relaxed">{displayText}</span>
+                            </div>
+                          );
+                        }
+                        
+                        // Fallback to original formatting
+                        return (
+                          <div key={index} className="flex items-start">
+                            <div className="w-1 h-6 bg-[#a5a6ff] rounded-full mr-4 flex-shrink-0 mt-1"></div>
+                            <span className="text-white/90 leading-relaxed">{ingredient}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {/* Instructions Tab Content */}
+                  {activeTab === 'instructions' && (
+                    <div className="space-y-3 sm:space-y-4">
+                      {recipe.instructions.map((instruction, index) => (
+                        <div key={index} className="flex items-start">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-[#FF3A25] text-white rounded-lg flex items-center justify-center font-semibold text-xs sm:text-sm mr-3 sm:mr-4 flex-shrink-0">
+                            {index + 1}
+                          </div>
+                          <p className="text-white/90 leading-relaxed flex-1 pt-1 text-sm sm:text-base">
+                            {instruction}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1488,15 +1557,6 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                 <h3 className="text-xl font-semibold text-white">Ingredients</h3>
                 <div className="flex items-center space-x-3">
                   <button 
-                    onClick={() => setShowConvertModal(true)}
-                    className="flex items-center space-x-2 px-3 py-1.5 border border-white/20 rounded-lg text-sm text-white/80 hover:bg-white/10"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-                    </svg>
-                    <span>Convert</span>
-                  </button>
-                  <button 
                     onClick={toggleSelectAll}
                     className="text-[#FF3A25] text-sm font-medium"
                   >
@@ -1505,18 +1565,40 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                 </div>
               </div>
               <div className="space-y-4">
-                {recipe.ingredients.map((ingredient, index) => (
-                  <label key={index} className="flex items-center cursor-pointer p-3 rounded-lg hover:bg-white/5 transition-colors">
-                    <span className="text-2xl mr-4">{getIngredientEmoji(ingredient)}</span>
-                    <span className="flex-1 text-lg text-white/90">{ingredient}</span>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedIngredients[index] || false}
-                      onChange={() => toggleIngredient(index)}
-                      className="w-5 h-5 text-[#FF3A25] rounded border-white/20 focus:ring-[#FF3A25] ml-3 bg-[#14151a]" 
-                    />
-                  </label>
-                ))}
+                {recipe.ingredients.map((ingredient, index) => {
+                  // Try to use normalized ingredients if available for unit conversion
+                  const normalized = (recipe as any).normalized_ingredients?.[index];
+                  
+                  let displayText = ingredient;
+                  if (normalized && unitPreference !== 'original') {
+                    // Use normalized data for unit conversion
+                    const isRange = !!(normalized as any).range;
+                    const range = (normalized as any).range;
+                    
+                    const minQty = isRange ? range.min : normalized.quantity;
+                    const maxQty = isRange ? range.max : normalized.quantity;
+                    const unit = normalized.unit;
+                    
+                    // For recipes, we don't have pre-computed metric/imperial conversions
+                    // So we'll need to compute them on the fly or fallback to original
+                    displayText = unit && unitPreference !== 'original' 
+                      ? `${formatNumber(minQty)}${minQty !== maxQty ? ` to ${formatNumber(maxQty)}` : ''} ${unit} ${normalized.ingredient}`
+                      : ingredient;
+                  }
+                  
+                  return (
+                    <label key={index} className="flex items-center cursor-pointer p-3 rounded-lg hover:bg-white/5 transition-colors">
+                      <div className="w-1 h-6 bg-[#a5a6ff] rounded-full mr-4 flex-shrink-0"></div>
+                      <span className="flex-1 text-lg text-white/90">{displayText}</span>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIngredients[index] || false}
+                        onChange={() => toggleIngredient(index)}
+                        className="w-5 h-5 text-[#FF3A25] rounded border-white/20 focus:ring-[#FF3A25] ml-3 bg-[#14151a]" 
+                      />
+                    </label>
+                  );
+                })}
               </div>
             </div>
             
@@ -1911,38 +1993,6 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
          </div>
        )}
 
-       {/* Convert Units Modal */}
-       {showConvertModal && (
-         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-70">
-           <div className="bg-white rounded-xl w-full max-w-sm mx-4 p-6">
-             <h3 className="text-lg font-semibold text-white mb-6">Convert Units</h3>
-             
-             <div className="space-y-4">
-               <label className="flex items-center justify-between cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                 <span className="font-medium text-white">Original</span>
-                 <input type="radio" name="unitType" defaultChecked className="w-5 h-5 text-[#FF3A25]" />
-               </label>
-               
-               <label className="flex items-center justify-between cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                 <span className="font-medium text-white">Metric (grams, liters)</span>
-                 <input type="radio" name="unitType" className="w-5 h-5 text-[#FF3A25]" />
-               </label>
-               
-               <label className="flex items-center justify-between cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                 <span className="font-medium text-white">Imperial (pounds, ounces)</span>
-                 <input type="radio" name="unitType" className="w-5 h-5 text-[#FF3A25]" />
-               </label>
-             </div>
-             
-             <button
-               onClick={() => setShowConvertModal(false)}
-               className="w-full mt-6 bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition-colors"
-             >
-               Apply
-             </button>
-           </div>
-         </div>
-       )}
     </DndContext>
   );
 } 

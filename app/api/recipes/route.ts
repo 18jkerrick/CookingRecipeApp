@@ -55,7 +55,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, thumbnail, ingredients, instructions, platform, source, original_url } = body;
+    const { title, thumbnail, ingredients, instructions, platform, source, original_url, normalizedIngredients } = body;
+    
+    console.log('📝 Saving recipe with normalized ingredients:', {
+      title,
+      ingredientCount: ingredients?.length,
+      normalizedCount: normalizedIngredients?.length,
+      sampleNormalized: normalizedIngredients?.[0]
+    });
 
     if (!title || !ingredients || !instructions || !platform || !source) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -71,7 +78,8 @@ export async function POST(request: NextRequest) {
         instructions,
         platform,
         source,
-        original_url: original_url || null
+        original_url: original_url || null,
+        normalized_ingredients: normalizedIngredients || []
       })
       .select()
       .single();

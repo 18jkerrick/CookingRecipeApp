@@ -3,6 +3,7 @@
 import { useAuth } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getLastVisitedPage } from '../hooks/useNavigationPersistence'
 
 export default function Home() {
   const { signInWithGoogle, signInWithApple, user, loading } = useAuth()
@@ -14,9 +15,11 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    // Redirect authenticated users to cookbooks page
+    // Redirect authenticated users to their last visited page
     if (user && !loading) {
-      router.push('/cookbooks')
+      const lastPage = getLastVisitedPage()
+      console.log('🏠 Redirecting to last visited page:', lastPage)
+      router.push(lastPage)
     }
   }, [user, loading, router])
 

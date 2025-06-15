@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { Search, Filter, Plus, Settings } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '../../lib/mealPlanStorage'
+import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 // Types for meal planning (Recipe interface for local use)
 interface Recipe {
@@ -25,6 +26,9 @@ export default function MealPlanner() {
   const { user, signOut, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const router = useRouter()
+  
+  // Save this page as the last visited
+  useNavigationPersistence()
 
   // Recipe state management
   const [recipes, setRecipes] = useState<Recipe[]>([])
@@ -265,18 +269,18 @@ export default function MealPlanner() {
         </div>
 
         <nav className="hidden md:flex items-center gap-8">
-          <a href="/cookbooks" className="text-white/80 hover:text-white transition-colors">
+          <button onClick={() => router.push('/cookbooks')} className="text-white/80 hover:text-white transition-colors">
             Cookbooks
-          </a>
-          <a href="/meal-planner" className="text-white hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/meal-planner')} className="text-white hover:text-white transition-colors">
             Meal Planner
-          </a>
-          <a href="/grocery-list" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/grocery-list')} className="text-white/80 hover:text-white transition-colors">
             Grocery Lists
-          </a>
-          <a href="/discover" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/discover')} className="text-white/80 hover:text-white transition-colors">
             Discover
-          </a>
+          </button>
         </nav>
 
         <div className="flex items-center gap-4">

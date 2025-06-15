@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabaseClient'
+import { getLastVisitedPage } from '../hooks/useNavigationPersistence'
 
 interface AuthContextType {
   user: User | null
@@ -39,9 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
       
-      // Redirect to /cookbooks on successful sign in
+      // Redirect to last visited page on successful sign in
       if (event === 'SIGNED_IN' && session?.user) {
-        router.push('/cookbooks')
+        const lastPage = getLastVisitedPage()
+        console.log('🔐 Auth: Redirecting to last visited page:', lastPage)
+        router.push(lastPage)
       }
     })
 

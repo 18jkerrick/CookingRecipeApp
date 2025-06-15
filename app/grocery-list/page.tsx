@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
+import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
 import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { 
@@ -18,7 +19,10 @@ import {
   getCategoryDisplayName,
   updateGroceryItem,
   deleteGroceryItem,
+  addRecipeToGroceryList,
+  removeRecipeFromGroceryList,
 } from '../../lib/groceryStorageDB'
+import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 // Recipe interface for local use
 interface Recipe {
@@ -33,12 +37,17 @@ interface Recipe {
   original_url?: string;
   created_at: string;
   saved_id?: string;
+  normalized_ingredients?: any[]; // AI-normalized ingredient data
 }
 
 export default function GroceryLists() {
   const { user, signOut, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const router = useRouter()
+  const unitPreference = useUnitPreference()
+  
+  // Save this page as the last visited
+  useNavigationPersistence()
 
   // Data state
   const [recipes, setRecipes] = useState<Recipe[]>([])
@@ -56,11 +65,38 @@ export default function GroceryLists() {
   const [newVisualType, setNewVisualType] = useState<'gradient' | 'emoji' | 'image'>('gradient')
   const [newEmoji, setNewEmoji] = useState('')
   const [newImageUrl, setNewImageUrl] = useState('')
+  const [gradientFrom, setGradientFrom] = useState('#667eea')
+  const [gradientTo, setGradientTo] = useState('#764ba2')
   const [editListName, setEditListName] = useState('')
+
+  const foodEmojis = [
+    '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝',
+    '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠',
+    '🥐', '🥖', '🍞', '🥨', '🥯', '🧇', '🥞', '🧈', '🍳', '🥚', '🧀', '🥓', '🥩', '🍗', '🍖',
+    '🌭', '🍔', '🍟', '🍕', '🥪', '🌮', '🌯', '🫔', '🥙', '🧆', '🥘', '🍝', '🍜', '🍲', '🍛',
+    '🍣', '🍱', '🥟', '🦪', '🍤', '🦞', '🦀', '🐙', '🦑', '🍘', '🍙', '🍚', '🍥', '🥮', '🍢',
+    '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🧊', '🥤',
+    '☕', '🍵', '🧃', '🥛', '🍼', '🫖', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃',
+    '🫗', '🥄', '🍴', '🥢', '🔪', '🏺', '🍽️', '🥗', '🥣', '🥡'
+  ]
   const [editingItem, setEditingItem] = useState<string | null>(null)
   const [editQuantity, setEditQuantity] = useState('')
   const [editUnit, setEditUnit] = useState('')
   const [editName, setEditName] = useState('')
+  const [showAddRecipeModal, setShowAddRecipeModal] = useState(false)
+  const [recipesCollapsed, setRecipesCollapsed] = useState(false)
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        setNewImageUrl(result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   useEffect(() => {
     setIsClient(true)
@@ -113,7 +149,8 @@ export default function GroceryLists() {
           source: recipe.source || '',
           original_url: recipe.original_url,
           created_at: recipe.created_at,
-          saved_id: recipe.id
+          saved_id: recipe.id,
+          normalized_ingredients: recipe.normalized_ingredients || []
         }))
         setRecipes(formattedRecipes)
       }
@@ -181,7 +218,7 @@ export default function GroceryLists() {
 
   const handleStartEdit = (item: GroceryItem) => {
     setEditingItem(item.id)
-    setEditQuantity(item.original_quantity.toString())
+    setEditQuantity((item.original_quantity_min || 1).toString())
     setEditUnit(item.original_unit || '')
     setEditName(item.name)
   }
@@ -189,7 +226,8 @@ export default function GroceryLists() {
   const handleSaveEdit = async () => {
     if (selectedList && editingItem) {
       const success = await updateGroceryItem(selectedList.id, editingItem, {
-        original_quantity: parseFloat(editQuantity) || 1,
+        original_quantity_min: parseFloat(editQuantity) || 1,
+        original_quantity_max: parseFloat(editQuantity) || 1,
         original_unit: editUnit || undefined,
         name: editName
       })
@@ -201,7 +239,7 @@ export default function GroceryLists() {
             ...prev,
             items: prev.items.map(item => 
               item.id === editingItem 
-                ? { ...item, original_quantity: parseFloat(editQuantity) || 1, original_unit: editUnit || undefined, name: editName }
+                ? { ...item, original_quantity_min: parseFloat(editQuantity) || 1, original_quantity_max: parseFloat(editQuantity) || 1, original_unit: editUnit || undefined, name: editName }
                 : item
             )
           }
@@ -242,6 +280,8 @@ export default function GroceryLists() {
     setNewVisualType(list.visual?.type || 'gradient')
     setNewEmoji(list.visual?.emoji || '🛒')
     setNewImageUrl(list.visual?.imageUrl || '')
+    setGradientFrom(list.visual?.gradient?.from || '#667eea')
+    setGradientTo(list.visual?.gradient?.to || '#764ba2')
     setEditListName(list.name)
     setShowEditVisualModal(true)
   }
@@ -251,21 +291,18 @@ export default function GroceryLists() {
       let newVisual: GroceryList['visual']
       
       if (newVisualType === 'gradient') {
-        // Generate a new random gradient
-        const gradients = [
-          { from: '#667eea', to: '#764ba2' }, { from: '#f093fb', to: '#f5576c' }, { from: '#4facfe', to: '#00f2fe' },
-          { from: '#43e97b', to: '#38f9d7' }, { from: '#fa709a', to: '#fee140' }, { from: '#30cfd0', to: '#330867' }
-        ]
-        const randomGradient = gradients[Math.floor(Math.random() * gradients.length)]
-        newVisual = { type: 'gradient', gradient: randomGradient }
+        // Use the selected gradient colors
+        newVisual = { type: 'gradient', gradient: { from: gradientFrom, to: gradientTo } }
       } else if (newVisualType === 'emoji') {
-        newVisual = { type: 'emoji', emoji: newEmoji }
+        newVisual = { type: 'emoji', emoji: newEmoji || '📝' }
       } else {
         newVisual = { type: 'image', imageUrl: newImageUrl }
       }
       
       const updatedList = { ...editingVisualList, visual: newVisual, name: editListName }
+      console.log('Updating grocery list with:', updatedList)
       const success = await updateGroceryList(updatedList)
+      console.log('Update result:', success)
       
       if (success) {
         setGroceryLists(prev => prev.map(list => 
@@ -282,6 +319,8 @@ export default function GroceryLists() {
     }
   }
 
+
+
   const getFilteredRecipes = () => {
     if (!selectedList) return []
     return recipes.filter(recipe => selectedList.recipeIds.includes(recipe.id))
@@ -292,10 +331,61 @@ export default function GroceryLists() {
     return recipe?.title || `Recipe ${recipeId.slice(0, 8)}`
   }
 
-  const getDisplayMeasurement = (item: GroceryItem) => {
-    // For database version, return the original quantity and unit
-    return `${item.original_quantity} ${item.original_unit || ''}`
+  const handleAddRecipeToList = async (recipe: Recipe) => {
+    if (!selectedList) return
+    
+    console.log('Adding recipe to list:', recipe.title, 'to list:', selectedList.name)
+    const success = await addRecipeToGroceryList(selectedList.id, recipe)
+    console.log('Add recipe result:', success)
+    if (success) {
+      // Update the local state immediately
+      setSelectedList(prev => prev ? {
+        ...prev,
+        recipeIds: [...prev.recipeIds, recipe.id]
+      } : null)
+      
+      // Update the grocery lists state
+      setGroceryLists(prev => prev.map(list => 
+        list.id === selectedList.id 
+          ? { ...list, recipeIds: [...list.recipeIds, recipe.id] }
+          : list
+      ))
+      
+      // Reload to get updated items from database
+      await loadGroceryLists()
+      setShowAddRecipeModal(false)
+    } else {
+      console.error('Failed to add recipe to list')
+    }
   }
+
+  const handleRemoveRecipeFromList = async (recipeId: string) => {
+    if (!selectedList) return
+    
+    console.log('Removing recipe from list:', recipeId, 'from list:', selectedList.name)
+    const success = await removeRecipeFromGroceryList(selectedList.id, recipeId)
+    console.log('Remove recipe result:', success)
+    if (success) {
+      // Update the local state immediately
+      setSelectedList(prev => prev ? {
+        ...prev,
+        recipeIds: prev.recipeIds.filter(id => id !== recipeId)
+      } : null)
+      
+      // Update the grocery lists state
+      setGroceryLists(prev => prev.map(list => 
+        list.id === selectedList.id 
+          ? { ...list, recipeIds: list.recipeIds.filter(id => id !== recipeId) }
+          : list
+      ))
+      
+      // Reload to get updated items from database
+      await loadGroceryLists()
+    } else {
+      console.error('Failed to remove recipe from list')
+    }
+  }
+
 
   const getSortedItems = () => {
     if (!selectedList) return []
@@ -376,18 +466,18 @@ export default function GroceryLists() {
         </div>
 
         <nav className="hidden md:flex items-center gap-8">
-          <a href="/cookbooks" className="text-white/80 hover:text-white transition-colors">
+          <button onClick={() => router.push('/cookbooks')} className="text-white/80 hover:text-white transition-colors">
             Cookbooks
-          </a>
-          <a href="/meal-planner" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/meal-planner')} className="text-white/80 hover:text-white transition-colors">
             Meal Planner
-          </a>
-          <a href="/grocery-list" className="text-white hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/grocery-list')} className="text-white hover:text-white transition-colors">
             Grocery Lists
-          </a>
-          <a href="/discover" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/discover')} className="text-white/80 hover:text-white transition-colors">
             Discover
-          </a>
+          </button>
         </nav>
 
         <div className="flex items-center gap-4">
@@ -443,8 +533,8 @@ export default function GroceryLists() {
                             background: `linear-gradient(135deg, ${list.visual.gradient.from}, ${list.visual.gradient.to})`
                           }}
                         />
-                      ) : list.visual?.type === 'emoji' && list.visual.emoji ? (
-                        <span className="text-2xl">{list.visual.emoji}</span>
+                      ) : list.visual?.type === 'emoji' ? (
+                        <span className="text-2xl">{list.visual.emoji || '🛒'}</span>
                       ) : list.visual?.type === 'image' && list.visual.imageUrl ? (
                         <img 
                           src={list.visual.imageUrl} 
@@ -513,34 +603,58 @@ export default function GroceryLists() {
               <div className="p-4 border-b border-white/10 bg-[#1e1f26]/50">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-semibold">Recipes</h3>
-                  <ChevronDown className="h-4 w-4 text-white/60" />
+                  <button 
+                    onClick={() => setRecipesCollapsed(!recipesCollapsed)}
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                  >
+                    <ChevronDown className={`h-4 w-4 text-white/60 transition-transform ${recipesCollapsed ? 'rotate-180' : ''}`} />
+                  </button>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {getFilteredRecipes().map((recipe) => (
-                    <div key={recipe.id} className="flex-shrink-0 bg-[#14151a] rounded-lg overflow-hidden w-32">
-                      <div className="relative">
-                        <button className="absolute top-2 right-2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white text-xs">
-                          ✕
-                        </button>
-                        {recipe.imageUrl ? (
-                          <img
-                            src={recipe.imageUrl}
-                            alt={recipe.title}
-                            className="w-full h-20 object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-20 bg-gray-800 flex items-center justify-center">
-                            <span className="text-gray-600 text-lg">🍽️</span>
-                          </div>
-                        )}
+                {!recipesCollapsed && (
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {getFilteredRecipes().map((recipe) => (
+                      <div key={recipe.id} className="flex-shrink-0 bg-[#14151a] rounded-lg overflow-hidden w-32">
+                        <div className="relative">
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleRemoveRecipeFromList(recipe.id)
+                            }}
+                            className="absolute top-2 right-2 w-6 h-6 bg-black/50 hover:bg-red-600/80 rounded-full flex items-center justify-center text-white text-xs transition-colors"
+                          >
+                            ✕
+                          </button>
+                          {recipe.imageUrl ? (
+                            <img
+                              src={recipe.imageUrl}
+                              alt={recipe.title}
+                              className="w-full h-20 object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-20 bg-gray-800 flex items-center justify-center">
+                              <span className="text-gray-600 text-lg">🍽️</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-2">
+                          <h4 className="text-xs font-medium text-white line-clamp-2">{recipe.title}</h4>
+                          <p className="text-xs text-white/60 mt-1">View recipe →</p>
+                        </div>
                       </div>
-                      <div className="p-2">
-                        <h4 className="text-xs font-medium text-white line-clamp-2">{recipe.title}</h4>
-                        <p className="text-xs text-white/60 mt-1">View recipe →</p>
-                      </div>
+                    ))}
+                    
+                    {/* Add Recipe Button */}
+                    <div className="flex-shrink-0 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg overflow-hidden w-32 hover:border-[#2B966F] hover:bg-[#2B966F]/10 transition-all">
+                      <button
+                        onClick={() => setShowAddRecipeModal(true)}
+                        className="w-full h-full text-white/60 hover:text-white flex items-center justify-center"
+                      >
+                        <Plus className="h-8 w-8" />
+                      </button>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Main Ingredients Section */}
@@ -607,7 +721,6 @@ export default function GroceryLists() {
                                 {item.checked && <span className="text-[#2B966F] text-sm">✓</span>}
                               </button>
                               <div className="flex items-center gap-2 flex-1">
-                                <span className="text-lg flex-shrink-0">{item.emoji}</span>
                                 {editingItem === item.id ? (
                                   <div className="flex items-center gap-2 flex-1">
                                     <Input
@@ -648,7 +761,18 @@ export default function GroceryLists() {
                                   <div className="text-sm font-medium flex-1">
                                     <div className="flex items-center gap-2">
                                       <span className={item.checked ? 'line-through text-white/60' : 'text-white'}>
-                                        {getDisplayMeasurement(item)} {item.name}
+                                        {formatMeasurement(
+                                          item.original_quantity_min,
+                                          item.original_quantity_max,
+                                          item.original_unit,
+                                          item.metric_quantity_min,
+                                          item.metric_quantity_max,
+                                          item.metric_unit,
+                                          item.imperial_quantity_min,
+                                          item.imperial_quantity_max,
+                                          item.imperial_unit,
+                                          unitPreference
+                                        )} {item.sort_name}
                                       </span>
                                       {!item.checked && (
                                         <div className="flex items-center gap-1 ml-auto">
@@ -821,7 +945,7 @@ export default function GroceryLists() {
                     }`}
                   >
                     <div className="w-8 h-8 mx-auto mb-2 rounded" style={{
-                      background: 'linear-gradient(135deg, #667eea, #764ba2)'
+                      background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`
                     }}></div>
                     <span className="text-xs text-white">Gradient</span>
                   </button>
@@ -834,7 +958,7 @@ export default function GroceryLists() {
                     }`}
                   >
                     <div className="w-8 h-8 mx-auto mb-2 flex items-center justify-center text-lg">
-                      🛒
+                      {newEmoji || '🛒'}
                     </div>
                     <span className="text-xs text-white">Emoji</span>
                   </button>
@@ -854,11 +978,43 @@ export default function GroceryLists() {
                 </div>
               </div>
 
+              {newVisualType === 'gradient' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-white mb-2">Gradient Colors</label>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-xs text-white/70 mb-1">From</label>
+                      <input
+                        type="color"
+                        value={gradientFrom}
+                        onChange={(e) => setGradientFrom(e.target.value)}
+                        className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs text-white/70 mb-1">To</label>
+                      <input
+                        type="color"
+                        value={gradientTo}
+                        onChange={(e) => setGradientTo(e.target.value)}
+                        className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <div 
+                      className="w-full h-8 rounded" 
+                      style={{background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`}}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
               {newVisualType === 'emoji' && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-white mb-2">Choose Emoji</label>
-                  <div className="grid grid-cols-6 gap-2 p-3 bg-[#14151a] rounded-lg">
-                    {['🛒', '🍎', '🥕', '🥛', '🍞', '🧀', '🥩', '🐟', '🌽', '🍅', '🥬', '🍌', '🍊', '🥖', '🍝', '🍕', '🥗', '🍲'].map((emoji) => (
+                  <div className="grid grid-cols-8 gap-1 p-3 bg-[#14151a] rounded-lg max-h-32 overflow-y-auto">
+                    {foodEmojis.map((emoji) => (
                       <button
                         key={emoji}
                         onClick={() => setNewEmoji(emoji)}
@@ -875,14 +1031,20 @@ export default function GroceryLists() {
 
               {newVisualType === 'image' && (
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-white mb-2">Image URL</label>
-                  <Input
-                    type="url"
-                    placeholder="https://example.com/image.jpg"
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    className="bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
-                  />
+                  <label className="block text-sm font-medium text-white mb-2">Choose Image</label>
+                  
+                  <label className="block w-full">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <div className="w-full p-6 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg text-center cursor-pointer hover:border-white/40 transition-colors">
+                      <span className="text-white/70 text-lg">📁 Click to upload image</span>
+                      <p className="text-white/50 text-sm mt-1">JPG, PNG, GIF up to 10MB</p>
+                    </div>
+                  </label>
                 </div>
               )}
 
@@ -892,7 +1054,7 @@ export default function GroceryLists() {
                   {newVisualType === 'gradient' ? (
                     <div 
                       className="w-full h-full"
-                      style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}
+                      style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
                     />
                   ) : newVisualType === 'emoji' ? (
                     <span className="text-3xl">{newEmoji}</span>
@@ -920,6 +1082,61 @@ export default function GroceryLists() {
               >
                 Save Changes
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Recipe Modal */}
+      {showAddRecipeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1e1f26] rounded-lg max-w-md w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="text-xl font-semibold text-white">Add Recipe to List</h2>
+              <button 
+                onClick={() => setShowAddRecipeModal(false)}
+                className="text-[#FF3A25] font-medium text-lg"
+              >
+                Cancel
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-white mb-2">Available Recipes</label>
+                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2">
+                  {recipes
+                    .filter(recipe => !selectedList?.recipeIds.includes(recipe.id))
+                    .map((recipe) => (
+                    <div
+                      key={recipe.id}
+                      onClick={() => handleAddRecipeToList(recipe)}
+                      className="p-2 rounded cursor-pointer transition-colors hover:bg-[#14151a]"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center flex-shrink-0">
+                          {recipe.imageUrl ? (
+                            <img
+                              src={recipe.imageUrl}
+                              alt={recipe.title}
+                              className="w-full h-full object-cover rounded"
+                            />
+                          ) : (
+                            <span className="text-gray-600 text-sm">🍽️</span>
+                          )}
+                        </div>
+                        <span className="text-white text-sm">{recipe.title}</span>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {recipes.filter(recipe => !selectedList?.recipeIds.includes(recipe.id)).length === 0 && (
+                    <div className="text-center text-white/60 py-4">
+                      All recipes are already in this list
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

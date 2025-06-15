@@ -1,6 +1,7 @@
 // Database-based grocery list storage utilities
 import { supabase } from './supabaseClient';
 import { convertMeasurement } from './unitConversion';
+// Removed unused imports
 
 // Helper interface for unit conversions
 export interface UnitConversion {
@@ -10,27 +11,28 @@ export interface UnitConversion {
 
 export interface GroceryItem {
   id: string;
-  name: string;
+  name: string; // Full display string like "½ kg boneless chicken" or "¼ to ⅓ teaspoon salt"
+  sort_name: string; // Just the ingredient name like "boneless chicken" for alphabetical sorting
   
-  // Original quantity and unit as provided in recipe
-  original_quantity: number;
+  // Original quantity ranges (as provided in recipe)
+  original_quantity_min?: number;
+  original_quantity_max?: number;
   original_unit?: string;
   
-  // Metric conversion
-  metric_quantity?: number;
+  // Metric conversion ranges
+  metric_quantity_min?: number;
+  metric_quantity_max?: number;
   metric_unit?: string;
   
-  // Imperial conversion
-  imperial_quantity?: number;
+  // Imperial conversion ranges
+  imperial_quantity_min?: number;
+  imperial_quantity_max?: number;
   imperial_unit?: string;
   
   // Metadata
   category: 'produce' | 'meat-seafood' | 'dairy-eggs' | 'pantry' | 'spices' | 'frozen' | 'bakery' | 'other';
   recipeId: string;
   checked: boolean;
-  emoji?: string;
-  sort_name?: string; // For better alphabetical sorting
-  normalized_name?: string; // For proper deduplication
   created_at?: string;
   updated_at?: string;
 }
@@ -60,6 +62,7 @@ export interface Recipe {
   source: string;
   original_url?: string;
   created_at: string;
+  normalized_ingredients?: any[]; // Use any[] to match AI-normalized data structure
 }
 
 // Convert original quantity/unit to metric and imperial equivalents
@@ -87,78 +90,17 @@ export const convertToAllUnits = (originalQuantity: number, originalUnit?: strin
 const normalizeIngredientName = (name: string): string => {
   const lowerName = name.toLowerCase().trim();
   
-  // Common ingredient mappings for normalization
-  const normalizations: { [key: string]: string } = {
-    // Sugar variants
-    'brown sugar': 'sugar',
-    'white sugar': 'sugar', 
-    'granulated sugar': 'sugar',
-    'powdered sugar': 'sugar',
-    'confectioners sugar': 'sugar',
-    'confectioners\' sugar': 'sugar',
-    'caster sugar': 'sugar',
-    'raw sugar': 'sugar',
-    
-    // Flour variants  
-    'all-purpose flour': 'flour',
-    'all purpose flour': 'flour',
-    'bread flour': 'flour',
-    'cake flour': 'flour', 
-    'whole wheat flour': 'flour',
-    'self-rising flour': 'flour',
-    'self rising flour': 'flour',
-    'plain flour': 'flour',
-    
-    // Salt variants
-    'kosher salt': 'salt',
-    'sea salt': 'salt',
-    'table salt': 'salt',
-    'fine salt': 'salt',
-    'coarse salt': 'salt',
-    
-    // Oil variants
-    'olive oil': 'oil',
-    'vegetable oil': 'oil', 
-    'canola oil': 'oil',
-    'coconut oil': 'oil',
-    'avocado oil': 'oil',
-    
-    // Butter variants
-    'unsalted butter': 'butter',
-    'salted butter': 'butter',
-    'melted butter': 'butter',
-    
-    // Add more common normalizations...
-  };
+  // IMPORTANT: For compound ingredients like "lemon juice", "olive oil", etc.
+  // we want to preserve the full name, not just the last word
   
-  // Check for exact matches first
-  if (normalizations[lowerName]) {
-    return normalizations[lowerName];
-  }
-  
-  // Check for partial matches
-  for (const [variant, normalized] of Object.entries(normalizations)) {
-    if (lowerName.includes(variant)) {
-      return normalized;
-    }
-  }
-  
-  // Extract the core ingredient name
+  // Remove common descriptors but preserve compound names
   let simplified = lowerName;
-  
-  // Remove common descriptors
   simplified = simplified.replace(/^(fresh|frozen|dried|canned|raw|cooked|organic|free-range|grass-fed)\s+/i, '');
   simplified = simplified.replace(/^(large|medium|small|extra large|jumbo|baby|mini)\s+/i, '');
   simplified = simplified.replace(/^(chopped|minced|sliced|diced|crushed|ground|grated|shredded)\s+/i, '');
   
-  // Handle compound ingredients - take the last meaningful word
-  const words = simplified.split(/\s+/).filter(word => 
-    word.length > 1 && !['of', 'in', 'with', 'for', 'to', 'a', 'an', 'the'].includes(word)
-  );
-  
-  if (words.length > 1) {
-    return words[words.length - 1];
-  }
+  // Remove preparation methods from the end
+  simplified = simplified.replace(/\s+(chopped|minced|sliced|diced|crushed|ground|grated|shredded)$/i, '');
   
   return simplified || lowerName;
 };
@@ -228,15 +170,166 @@ export const parseIngredient = (ingredient: string): {
   };
 };
 
+// Simple fallback ingredient parsing - only used when AI data unavailable
+const simpleFallbackParse = (ingredient: string): { 
+  name: string; 
+  sort_name: string;
+  original_quantity_min: number;
+  original_quantity_max: number;
+  original_unit?: string;
+} => {
+  console.log(`⚡ Simple fallback parsing: "${ingredient}"`);
+  
+  let remaining = ingredient;
+  let quantity = 1;
+  let unit: string | undefined;
+  
+  // Extract quantity (including fractions and ranges)
+  const quantityMatch = ingredient.match(/^([\d½¼¾⅛⅓⅔⅜⅝⅞\s\/\-\.]+)(?:\s*to\s*([\d½¼¾⅛⅓⅔⅜⅝⅞\s\/\-\.]+))?/);
+  if (quantityMatch) {
+    // Convert fractions to decimals
+    const convertFraction = (str: string): number => {
+      // Handle mixed numbers like "1½" 
+      const mixedMatch = str.match(/^(\d+)\s*([½¼¾⅛⅓⅔⅜⅝⅞])/);
+      if (mixedMatch) {
+        const whole = parseInt(mixedMatch[1]);
+        const fractionChar = mixedMatch[2];
+        const fractionValue: { [key: string]: number } = {
+          '½': 0.5,
+          '¼': 0.25,
+          '¾': 0.75,
+          '⅛': 0.125,
+          '⅓': 0.33,
+          '⅔': 0.67,
+          '⅜': 0.375,
+          '⅝': 0.625,
+          '⅞': 0.875
+        };
+        return whole + (fractionValue[fractionChar] || 0);
+      }
+      
+      // Handle standalone fractions
+      const fractionMap: { [key: string]: number } = {
+        '½': 0.5,
+        '¼': 0.25,
+        '¾': 0.75,
+        '⅛': 0.125,
+        '⅓': 0.33,
+        '⅔': 0.67,
+        '⅜': 0.375,
+        '⅝': 0.625,
+        '⅞': 0.875
+      };
+      
+      for (const [frac, val] of Object.entries(fractionMap)) {
+        if (str === frac) return val;
+      }
+      
+      return parseFloat(str) || 1;
+    };
+    
+    // Check if it's a range
+    if (quantityMatch[2]) {
+      // It's a range like "1 to 2"
+      const min = convertFraction(quantityMatch[1]);
+      const max = convertFraction(quantityMatch[2]);
+      quantity = min; // Will be overridden below
+      remaining = ingredient.substring(quantityMatch[0].length).trim();
+      
+      // We'll handle the range properly below
+      const unitMatch = remaining.match(/^(teaspoons?|tablespoons?|tbsps?|tsps?|cups?|pounds?|lbs?|ounces?|ozs?|grams?|gs?|kilograms?|kgs?|kg|liters?|milliliters?|ml|inch|inches)\s+/i);
+      if (unitMatch) {
+        unit = unitMatch[1].toLowerCase();
+        remaining = remaining.substring(unitMatch[0].length).trim();
+      }
+      
+      const cleanIngredient = remaining
+        .replace(/\([^)]*\)/g, '')
+        .replace(/,.*$/, '')
+        .trim();
+      
+      return {
+        name: ingredient,
+        sort_name: cleanIngredient || remaining,
+        original_quantity_min: min,
+        original_quantity_max: max,
+        original_unit: unit
+      };
+    } else {
+      // Single quantity
+      quantity = convertFraction(quantityMatch[1]);
+      remaining = ingredient.substring(quantityMatch[0].length).trim();
+    }
+  }
+  
+  // Extract unit
+  const unitMatch = remaining.match(/^(teaspoons?|tablespoons?|tbsps?|tsps?|cups?|pounds?|lbs?|ounces?|ozs?|grams?|gs?|kilograms?|kgs?|liters?|milliliters?|ml|inch|inches)\s+/i);
+  if (unitMatch) {
+    unit = unitMatch[1].toLowerCase();
+    remaining = remaining.substring(unitMatch[0].length).trim();
+  }
+  
+  // Clean up the ingredient name
+  const cleanIngredient = remaining
+    .replace(/\([^)]*\)/g, '') // Remove parentheses
+    .replace(/,.*$/, '') // Remove everything after comma
+    .trim();
+  
+  console.log(`⚡ Fallback result: qty=${quantity}, unit="${unit}", ingredient="${cleanIngredient}"`);
+  
+  return {
+    name: ingredient,
+    sort_name: cleanIngredient || remaining,
+    original_quantity_min: quantity,
+    original_quantity_max: quantity,
+    original_unit: unit
+  };
+};
+
+
+// NEW SIMPLIFIED: Use AI data when available, simple fallback otherwise
+export const parseIngredientForGrocery = (ingredient: string, normalizedData?: any): { 
+  name: string; 
+  sort_name: string;
+  original_quantity_min: number;
+  original_quantity_max: number;
+  original_unit?: string;
+} => {
+  console.log(`🚀 NEW Parsing ingredient: "${ingredient}"`);
+  
+  // TRUST THE AI - Use normalized data when available
+  if (normalizedData) {
+    console.log(`🤖 Using AI normalized data for "${ingredient}":`, JSON.stringify(normalizedData, null, 2));
+    
+    const hasRange = normalizedData.range;
+    const minQty = hasRange ? normalizedData.range.min : (normalizedData.quantity || 1);
+    const maxQty = hasRange ? normalizedData.range.max : (normalizedData.quantity || 1);
+    
+    console.log(`🔢 Extracted: minQty=${minQty}, maxQty=${maxQty}, unit="${normalizedData.unit}", ingredient="${normalizedData.ingredient}"`);
+    
+    return {
+      name: ingredient, // Keep beautiful formatted display string
+      sort_name: normalizedData.ingredient || 'unknown', // AI already extracted clean ingredient name!
+      original_quantity_min: minQty || 1,
+      original_quantity_max: maxQty || 1,
+      original_unit: normalizedData.unit || undefined
+    };
+  }
+  
+  // SIMPLE FALLBACK - Only when AI data unavailable
+  console.log(`⚠️ No AI data available, using simple fallback`);
+  return simpleFallbackParse(ingredient);
+};
+
 // Note: normalizeQuantity function was removed as it's now handled by the convertToAllUnits function
 
-// Combine ingredients with same normalized name
+// Combine ingredients with same sort name (ingredient name)
 export const combineIngredients = (ingredients: GroceryItem[]): GroceryItem[] => {
-  const grouped: { [normalizedName: string]: GroceryItem[] } = {};
+  const grouped: { [sortName: string]: GroceryItem[] } = {};
   
-  // Group by normalized name
+  // Group by sort_name (just the ingredient name)
   ingredients.forEach(item => {
-    const key = item.normalized_name || item.sort_name || item.name.toLowerCase();
+    const key = item.sort_name.toLowerCase();
     if (!grouped[key]) {
       grouped[key] = [];
     }
@@ -254,10 +347,13 @@ export const combineIngredients = (ingredients: GroceryItem[]): GroceryItem[] =>
       current.name.length > best.name.length ? current : best
     ).name;
     
-    // Sum quantities for each unit system
-    let totalOriginal = 0;
-    let totalMetric = 0;
-    let totalImperial = 0;
+    // Sum ranges for each unit system
+    let totalOriginalMin = 0;
+    let totalOriginalMax = 0;
+    let totalMetricMin = 0;
+    let totalMetricMax = 0;
+    let totalImperialMin = 0;
+    let totalImperialMax = 0;
     
     // Keep track of units (use the first non-null unit found)
     let originalUnit = group[0].original_unit;
@@ -265,9 +361,12 @@ export const combineIngredients = (ingredients: GroceryItem[]): GroceryItem[] =>
     let imperialUnit = group.find(item => item.imperial_unit)?.imperial_unit;
     
     group.forEach(item => {
-      totalOriginal += item.original_quantity || 0;
-      totalMetric += item.metric_quantity || 0;
-      totalImperial += item.imperial_quantity || 0;
+      totalOriginalMin += item.original_quantity_min || 0;
+      totalOriginalMax += item.original_quantity_max || 0;
+      totalMetricMin += item.metric_quantity_min || 0;
+      totalMetricMax += item.metric_quantity_max || 0;
+      totalImperialMin += item.imperial_quantity_min || 0;
+      totalImperialMax += item.imperial_quantity_max || 0;
       
       // Use the first non-undefined unit we find
       if (!originalUnit && item.original_unit) originalUnit = item.original_unit;
@@ -278,12 +377,16 @@ export const combineIngredients = (ingredients: GroceryItem[]): GroceryItem[] =>
     return {
       ...group[0],
       name: bestName,
-      original_quantity: totalOriginal,
+      sort_name: group[0].sort_name, // Keep the sort name for grouping
+      original_quantity_min: totalOriginalMin > 0 ? totalOriginalMin : undefined,
+      original_quantity_max: totalOriginalMax > 0 ? totalOriginalMax : undefined,
       original_unit: originalUnit,
-      metric_quantity: totalMetric > 0 ? totalMetric : undefined,
-      metric_unit: totalMetric > 0 ? metricUnit : undefined,
-      imperial_quantity: totalImperial > 0 ? totalImperial : undefined,
-      imperial_unit: totalImperial > 0 ? imperialUnit : undefined
+      metric_quantity_min: totalMetricMin > 0 ? totalMetricMin : undefined,
+      metric_quantity_max: totalMetricMax > 0 ? totalMetricMax : undefined,
+      metric_unit: totalMetricMin > 0 ? metricUnit : undefined,
+      imperial_quantity_min: totalImperialMin > 0 ? totalImperialMin : undefined,
+      imperial_quantity_max: totalImperialMax > 0 ? totalImperialMax : undefined,
+      imperial_unit: totalImperialMin > 0 ? imperialUnit : undefined
     };
   });
 };
@@ -301,18 +404,19 @@ export const getGroceryLists = async (): Promise<GroceryList[]> => {
         grocery_items (
           id,
           name,
-          original_quantity,
+          sort_name,
+          original_quantity_min,
+          original_quantity_max,
           original_unit,
-          metric_quantity,
+          metric_quantity_min,
+          metric_quantity_max,
           metric_unit,
-          imperial_quantity,
+          imperial_quantity_min,
+          imperial_quantity_max,
           imperial_unit,
           category,
           recipe_id,
           checked,
-          emoji,
-          sort_name,
-          normalized_name,
           created_at,
           updated_at
         ),
@@ -341,18 +445,19 @@ export const getGroceryLists = async (): Promise<GroceryList[]> => {
       items: list.grocery_items?.map(item => ({
         id: item.id,
         name: item.name,
-        original_quantity: item.original_quantity || 1,
+        sort_name: item.sort_name || item.name.toLowerCase(),
+        original_quantity_min: item.original_quantity_min,
+        original_quantity_max: item.original_quantity_max,
         original_unit: item.original_unit,
-        metric_quantity: item.metric_quantity,
+        metric_quantity_min: item.metric_quantity_min,
+        metric_quantity_max: item.metric_quantity_max,
         metric_unit: item.metric_unit,
-        imperial_quantity: item.imperial_quantity,
+        imperial_quantity_min: item.imperial_quantity_min,
+        imperial_quantity_max: item.imperial_quantity_max,
         imperial_unit: item.imperial_unit,
         category: (item.category as GroceryItem['category']) || 'pantry',
         recipeId: item.recipe_id || '',
         checked: item.checked || false,
-        emoji: item.emoji || getIngredientEmoji(item.name),
-        sort_name: item.sort_name || item.name.toLowerCase(),
-        normalized_name: item.normalized_name || item.name.toLowerCase(),
         created_at: item.created_at,
         updated_at: item.updated_at
       })) || []
@@ -370,28 +475,101 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
     const allIngredients: Omit<GroceryItem, 'id'>[] = [];
     
     recipes.forEach(recipe => {
-      recipe.ingredients?.forEach((ingredient) => {
-        const parsed = parseIngredient(ingredient);
-        allIngredients.push({
-          name: parsed.name,
-          original_quantity: parsed.original_quantity,
-          original_unit: parsed.original_unit,
-          metric_quantity: parsed.metric_quantity,
-          metric_unit: parsed.metric_unit,
-          imperial_quantity: parsed.imperial_quantity,
-          imperial_unit: parsed.imperial_unit,
-          category: categorizeIngredient(parsed.name),
-          recipeId: recipe.id,
-          checked: false,
-          emoji: getIngredientEmoji(parsed.name),
-          sort_name: parsed.sort_name,
-          normalized_name: parsed.normalized_name
-        });
+      // Use the raw ingredient strings (they are now beautifully formatted with ranges and Unicode fractions)
+      console.log(`📊 Using ${recipe.ingredients?.length || 0} formatted ingredients for recipe: ${recipe.title}`);
+      recipe.ingredients?.forEach((ingredient, index) => {
+        // The ingredient string is now the full display text like "½ kg boneless chicken" or "¼ to ⅓ teaspoon salt"
+        const normalized = recipe.normalized_ingredients?.[index];
+        
+        if (normalized) {
+          // Use NEW simplified parsing with AI data
+          const parsed = parseIngredientForGrocery(ingredient, normalized);
+          
+          // Auto-calculate metric/imperial conversions
+          let metricMin, metricMax, metricUnit, imperialMin, imperialMax, imperialUnit;
+          
+          if (parsed.original_unit) {
+            console.log(`🔄 Converting AI-parsed: ${parsed.original_quantity_min}-${parsed.original_quantity_max} ${parsed.original_unit} ${parsed.sort_name}`);
+            const minConversions = convertToAllUnits(parsed.original_quantity_min, parsed.original_unit, parsed.sort_name);
+            const maxConversions = parsed.original_quantity_max !== parsed.original_quantity_min 
+              ? convertToAllUnits(parsed.original_quantity_max, parsed.original_unit, parsed.sort_name)
+              : minConversions;
+            
+            metricMin = minConversions.metric?.quantity;
+            metricMax = maxConversions.metric?.quantity;
+            metricUnit = minConversions.metric?.unit;
+            imperialMin = minConversions.imperial?.quantity;
+            imperialMax = maxConversions.imperial?.quantity;
+            imperialUnit = minConversions.imperial?.unit;
+            
+            console.log(`✅ AI-converted: metric=${metricMin}-${metricMax} ${metricUnit}, imperial=${imperialMin}-${imperialMax} ${imperialUnit}`);
+          } else {
+            console.log(`⚠️ No unit for AI-normalized ingredient: "${parsed.sort_name}"`);
+          }
+          
+          allIngredients.push({
+            name: parsed.name, // Beautiful formatted display string
+            sort_name: parsed.sort_name, // Clean ingredient name from AI
+            
+            // Quantities from AI
+            original_quantity_min: parsed.original_quantity_min,
+            original_quantity_max: parsed.original_quantity_max,
+            original_unit: parsed.original_unit,
+            
+            // Auto-populated conversions
+            metric_quantity_min: metricMin,
+            metric_quantity_max: metricMax,
+            metric_unit: metricUnit,
+            imperial_quantity_min: imperialMin,
+            imperial_quantity_max: imperialMax,
+            imperial_unit: imperialUnit,
+            
+            category: categorizeIngredient(parsed.sort_name),
+            recipeId: recipe.id,
+            checked: false
+          });
+        } else {
+          // Fallback to simple parsing if no normalized data
+          const parsed = parseIngredientForGrocery(ingredient); // No AI data passed
+          
+          // Auto-calculate metric/imperial conversions
+          let metricMin, metricMax, metricUnit, imperialMin, imperialMax, imperialUnit;
+          
+          if (parsed.original_unit) {
+            const minConversions = convertToAllUnits(parsed.original_quantity_min, parsed.original_unit, parsed.sort_name);
+            const maxConversions = convertToAllUnits(parsed.original_quantity_max, parsed.original_unit, parsed.sort_name);
+            
+            metricMin = minConversions.metric?.quantity;
+            metricMax = maxConversions.metric?.quantity;
+            metricUnit = minConversions.metric?.unit;
+            imperialMin = minConversions.imperial?.quantity;
+            imperialMax = maxConversions.imperial?.quantity;
+            imperialUnit = minConversions.imperial?.unit;
+          }
+          
+          allIngredients.push({
+            name: parsed.name,
+            sort_name: parsed.sort_name,
+            original_quantity_min: parsed.original_quantity_min,
+            original_quantity_max: parsed.original_quantity_max,
+            original_unit: parsed.original_unit,
+            metric_quantity_min: metricMin,
+            metric_quantity_max: metricMax,
+            metric_unit: metricUnit,
+            imperial_quantity_min: imperialMin,
+            imperial_quantity_max: imperialMax,
+            imperial_unit: imperialUnit,
+            category: categorizeIngredient(parsed.sort_name),
+            recipeId: recipe.id,
+            checked: false
+          });
+        }
       });
     });
 
-    // Combine duplicate ingredients
-    const combinedIngredients = combineIngredients(allIngredients as GroceryItem[]);
+    // Don't combine duplicate ingredients - keep them separate for now
+    // TODO: Smart combining that handles unit conversions properly
+    const combinedIngredients = allIngredients as GroceryItem[];
 
     // Create the grocery list in database
     const { data: list, error: listError } = await supabase
@@ -435,18 +613,19 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
       const groceryItems = combinedIngredients.map(item => ({
         list_id: list.id,
         name: item.name,
+        sort_name: item.sort_name,
         recipe_id: item.recipeId,
-        original_quantity: item.original_quantity,
+        original_quantity_min: item.original_quantity_min,
+        original_quantity_max: item.original_quantity_max,
         original_unit: item.original_unit,
-        metric_quantity: item.metric_quantity,
+        metric_quantity_min: item.metric_quantity_min,
+        metric_quantity_max: item.metric_quantity_max,
         metric_unit: item.metric_unit,
-        imperial_quantity: item.imperial_quantity,
+        imperial_quantity_min: item.imperial_quantity_min,
+        imperial_quantity_max: item.imperial_quantity_max,
         imperial_unit: item.imperial_unit,
         category: item.category,
-        checked: false,
-        emoji: item.emoji,
-        sort_name: item.sort_name,
-        normalized_name: item.normalized_name
+        checked: false
       }));
 
       const { error: itemsError } = await supabase
@@ -613,19 +792,6 @@ const categorizeIngredient = (name: string): GroceryItem['category'] => {
   return 'pantry';
 };
 
-// Get emoji for ingredient (same logic as before)
-export const getIngredientEmoji = (name: string): string => {
-  const lowerName = name.toLowerCase();
-  
-  if (lowerName.includes('onion')) return '🧅';
-  if (lowerName.includes('garlic')) return '🧄';
-  if (lowerName.includes('tomato')) return '🍅';
-  if (lowerName.includes('salt')) return '🧂';
-  if (lowerName.includes('sugar')) return '🍬';
-  if (lowerName.includes('flour')) return '🌾';
-  
-  return '🛒';
-};
 
 // Update grocery list
 export const updateGroceryList = async (list: GroceryList): Promise<boolean> => {
@@ -634,19 +800,20 @@ export const updateGroceryList = async (list: GroceryList): Promise<boolean> => 
       .from('grocery_lists')
       .update({
         name: list.name,
-        visual: list.visual,
-        updated_at: new Date().toISOString()
+        visual: list.visual
       })
       .eq('id', list.id);
 
     if (error) {
       console.error('Error updating grocery list:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return false;
     }
 
     return true;
   } catch (error) {
     console.error('Error updating grocery list:', error);
+    console.error('Catch error details:', JSON.stringify(error, null, 2));
     return false;
   }
 };
@@ -710,17 +877,18 @@ export const updateGroceryItem = async (listId: string, itemId: string, updates:
     const dbUpdates: any = {};
     
     if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.original_quantity !== undefined) dbUpdates.original_quantity = updates.original_quantity;
+    if (updates.sort_name !== undefined) dbUpdates.sort_name = updates.sort_name;
+    if (updates.original_quantity_min !== undefined) dbUpdates.original_quantity_min = updates.original_quantity_min;
+    if (updates.original_quantity_max !== undefined) dbUpdates.original_quantity_max = updates.original_quantity_max;
     if (updates.original_unit !== undefined) dbUpdates.original_unit = updates.original_unit;
-    if (updates.metric_quantity !== undefined) dbUpdates.metric_quantity = updates.metric_quantity;
+    if (updates.metric_quantity_min !== undefined) dbUpdates.metric_quantity_min = updates.metric_quantity_min;
+    if (updates.metric_quantity_max !== undefined) dbUpdates.metric_quantity_max = updates.metric_quantity_max;
     if (updates.metric_unit !== undefined) dbUpdates.metric_unit = updates.metric_unit;
-    if (updates.imperial_quantity !== undefined) dbUpdates.imperial_quantity = updates.imperial_quantity;
+    if (updates.imperial_quantity_min !== undefined) dbUpdates.imperial_quantity_min = updates.imperial_quantity_min;
+    if (updates.imperial_quantity_max !== undefined) dbUpdates.imperial_quantity_max = updates.imperial_quantity_max;
     if (updates.imperial_unit !== undefined) dbUpdates.imperial_unit = updates.imperial_unit;
     if (updates.category !== undefined) dbUpdates.category = updates.category;
     if (updates.checked !== undefined) dbUpdates.checked = updates.checked;
-    if (updates.emoji !== undefined) dbUpdates.emoji = updates.emoji;
-    if (updates.sort_name !== undefined) dbUpdates.sort_name = updates.sort_name;
-    if (updates.normalized_name !== undefined) dbUpdates.normalized_name = updates.normalized_name;
 
     // Automatically update the updated_at timestamp
     dbUpdates.updated_at = new Date().toISOString();
@@ -853,23 +1021,43 @@ export const addRecipeToGroceryList = async (listId: string, recipe: Recipe): Pr
     // Parse and add new ingredients from the recipe
     const newIngredients: any[] = [];
     
-    recipe.ingredients?.forEach((ingredient) => {
-      const parsed = parseIngredient(ingredient);
+    // Use the formatted ingredient strings with normalized data
+    recipe.ingredients?.forEach((ingredient, index) => {
+      const normalized = recipe.normalized_ingredients?.[index];
+      
+      const parsed = parseIngredientForGrocery(ingredient, normalized);
+      
+      // Auto-calculate metric/imperial conversions
+      let metricMin, metricMax, metricUnit, imperialMin, imperialMax, imperialUnit;
+      
+      if (parsed.original_unit) {
+        const minConversions = convertToAllUnits(parsed.original_quantity_min, parsed.original_unit, parsed.sort_name);
+        const maxConversions = convertToAllUnits(parsed.original_quantity_max, parsed.original_unit, parsed.sort_name);
+        
+        metricMin = minConversions.metric?.quantity;
+        metricMax = maxConversions.metric?.quantity;
+        metricUnit = minConversions.metric?.unit;
+        imperialMin = minConversions.imperial?.quantity;
+        imperialMax = maxConversions.imperial?.quantity;
+        imperialUnit = minConversions.imperial?.unit;
+      }
+      
       newIngredients.push({
         list_id: listId,
         name: parsed.name,
-        recipe_id: recipe.id,
-        original_quantity: parsed.original_quantity,
-        original_unit: parsed.original_unit,
-        metric_quantity: parsed.metric_quantity,
-        metric_unit: parsed.metric_unit,
-        imperial_quantity: parsed.imperial_quantity,
-        imperial_unit: parsed.imperial_unit,
-        category: categorizeIngredient(parsed.name),
-        checked: false,
-        emoji: getIngredientEmoji(parsed.name),
         sort_name: parsed.sort_name,
-        normalized_name: parsed.normalized_name
+        recipe_id: recipe.id,
+        original_quantity_min: parsed.original_quantity_min,
+        original_quantity_max: parsed.original_quantity_max,
+        original_unit: parsed.original_unit,
+        metric_quantity_min: metricMin,
+        metric_quantity_max: metricMax,
+        metric_unit: metricUnit,
+        imperial_quantity_min: imperialMin,
+        imperial_quantity_max: imperialMax,
+        imperial_unit: imperialUnit,
+        category: categorizeIngredient(parsed.sort_name),
+        checked: false
       });
     });
 
@@ -924,3 +1112,4 @@ export const removeRecipeFromGroceryList = async (listId: string, recipeId: stri
     return false;
   }
 };
+

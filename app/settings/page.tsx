@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 type UnitPreference = 'original' | 'metric' | 'imperial'
 
@@ -13,6 +14,9 @@ export default function Settings() {
   const [unitPreference, setUnitPreference] = useState<UnitPreference>('original')
   const [isSaving, setIsSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  
+  // Save this page as the last visited
+  useNavigationPersistence()
 
   useEffect(() => {
     if (!loading && !user) {

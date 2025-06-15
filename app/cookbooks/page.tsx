@@ -10,12 +10,16 @@ import RecipeDetailModal from '../../components/RecipeDetailModal'
 import { BookOpen, Search, Filter, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 export default function Cookbooks() {
   const { user, signOut, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
   const router = useRouter()
+  
+  // Save this page as the last visited
+  useNavigationPersistence()
 
   // Recipe state management
   const [recipes, setRecipes] = useState<any[]>([])
@@ -124,7 +128,8 @@ export default function Cookbooks() {
           instructions: recipe.instructions,
           platform: recipe.platform,
           source: recipe.source,
-          original_url: originalUrl
+          original_url: originalUrl,
+          normalizedIngredients: recipe.normalizedIngredients
         })
       })
 
@@ -240,7 +245,8 @@ export default function Cookbooks() {
           instructions: data.instructions,
           platform: data.platform,
           source: data.source,
-          thumbnail: data.thumbnail || ''
+          thumbnail: data.thumbnail || '',
+          normalizedIngredients: data.normalizedIngredients || []
         }
 
         // Auto-save the recipe to database
@@ -401,18 +407,18 @@ export default function Cookbooks() {
         </div>
 
         <nav className="hidden md:flex items-center gap-8">
-          <a href="/cookbooks" className="text-white hover:text-white transition-colors">
+          <button onClick={() => router.push('/cookbooks')} className="text-white hover:text-white transition-colors">
             Cookbooks
-          </a>
-          <a href="/meal-planner" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/meal-planner')} className="text-white/80 hover:text-white transition-colors">
             Meal Planner
-          </a>
-          <a href="/grocery-list" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/grocery-list')} className="text-white/80 hover:text-white transition-colors">
             Grocery Lists
-          </a>
-          <a href="/discover" className="text-white/80 hover:text-white transition-colors">
+          </button>
+          <button onClick={() => router.push('/discover')} className="text-white/80 hover:text-white transition-colors">
             Discover
-          </a>
+          </button>
         </nav>
 
         <div className="flex items-center gap-4">

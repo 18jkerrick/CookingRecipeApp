@@ -24,9 +24,9 @@ export default function RecipeCard({
         case 'text':
           return 'Getting Recipe from Text';
         case 'audio':
-          return 'Listening to the Audio, Hold On';
+          return 'Listening to the Audio';
         case 'video':
-          return 'Analyzing Video & Images...This May Take a While';
+          return 'Analyzing Video & Images';
         default:
           return 'Extracting recipe...';
       }
