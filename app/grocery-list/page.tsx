@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
-import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings } from "lucide-react"
+import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { 
   GroceryList, 
@@ -23,6 +23,7 @@ import {
   removeRecipeFromGroceryList,
 } from '../../lib/groceryStorageDB'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
+import BuyGroceriesModal from './BuyGroceriesModal'
 
 // Recipe interface for local use
 interface Recipe {
@@ -85,6 +86,11 @@ export default function GroceryLists() {
   const [editName, setEditName] = useState('')
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false)
   const [recipesCollapsed, setRecipesCollapsed] = useState(false)
+  const [showBuyGroceriesModal, setShowBuyGroceriesModal] = useState(false)
+  const [zipCode, setZipCode] = useState('')
+  const [priceComparison, setPriceComparison] = useState<any>(null)
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false)
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -660,7 +666,16 @@ export default function GroceryLists() {
               {/* Main Ingredients Section */}
               <div className="flex-1 overflow-auto">
                 <div className="p-4">
-                  <div className="flex items-center justify-end mb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      onClick={() => setShowBuyGroceriesModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#2B966F] hover:bg-[#2B966F]/90 text-white rounded-md transition-colors text-sm font-medium"
+                      disabled={!selectedList || selectedList.items.filter(item => !item.checked).length === 0}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      Buy Groceries
+                    </button>
+                    
                     <div className="flex items-center gap-2">
                       <div className="relative">
                         <button
@@ -1141,6 +1156,13 @@ export default function GroceryLists() {
           </div>
         </div>
       )}
+
+      {/* Buy Groceries Modal */}
+      <BuyGroceriesModal
+        isOpen={showBuyGroceriesModal}
+        onClose={() => setShowBuyGroceriesModal(false)}
+        items={selectedList?.items || []}
+      />
     </div>
   )
 }
