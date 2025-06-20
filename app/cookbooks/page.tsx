@@ -3,10 +3,10 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
-import PushNotificationPrompt from '../../components/PushNotificationPrompt'
-import RecipeCard from '../../components/RecipeCard'
-import RecipeDetailModal from '../../components/RecipeDetailModal'
+import { supabase } from '../../lib/db/supabase'
+import PushNotificationPrompt from '../../components/shared/PushNotificationPrompt'
+import RecipeCard from '../../components/features/recipe/RecipeCard'
+import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'
 import { BookOpen, Search, Filter, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

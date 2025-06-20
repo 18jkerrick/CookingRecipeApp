@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getYoutubeCaptions } from '@/lib/parser/youtube';
-import { getTiktokCaptions } from '@/lib/parser/tiktok';
-import { getInstagramCaptions } from '@/lib/parser/instagram';
-import { getCookingWebsiteData, CookingWebsiteData } from '@/lib/parser/cooking-website';
-import { getPinterestSourceUrl, isLikelyCookingWebsite } from '@/lib/parser/pinterest';
-import { getFacebookCaptions } from '@/lib/parser/facebook';
+import { getYoutubeCaptions } from '@/lib/parsers/youtube';
+import { getTiktokCaptions } from '@/lib/parsers/tiktok';
+import { getInstagramCaptions } from '@/lib/parsers/instagram';
+import { getCookingWebsiteData, CookingWebsiteData } from '@/lib/parsers/cooking-website';
+import { getPinterestSourceUrl, isLikelyCookingWebsite } from '@/lib/parsers/pinterest';
+import { getFacebookCaptions } from '@/lib/parsers/facebook';
 import { cleanCaption } from '@/lib/ai/cleanCaption';
 import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
-import { fetchAudio } from '@/lib/parser/audio';
+import { fetchAudio } from '@/lib/parsers/audio';
 import { transcribeAudio } from '@/lib/ai/transcribeAudio';
 import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
-import { extractTextFromVideo, getLastTikTokPhotoData } from '@/lib/parser/video';
+import { extractTextFromVideo, getLastTikTokPhotoData } from '@/lib/parsers/video';
 import { detectMusicContent } from '@/lib/ai/detectMusicContent';
 import { generateRecipeTitle } from '@/lib/utils/titleGenerator';
 import { getThumbnailUrl } from '@/lib/utils/thumbnailExtractor';
 import { extractVideoTitle } from '@/lib/utils/titleExtractor';
-import { parseIngredients, NormalizedIngredient, formatIngredient } from '@/lib/ingredientParser';
-import { normalizeIngredientsWithAIBatch, AINormalizedIngredient } from '@/lib/aiIngredientNormalizer';
+import { parseIngredients, NormalizedIngredient, formatIngredient } from '@/lib/parsers/ingredient-parser';
+import { normalizeIngredientsWithAIBatch, AINormalizedIngredient } from '@/lib/ai/ingredient-normalizer';
 
 interface Recipe {
   ingredients: string[];

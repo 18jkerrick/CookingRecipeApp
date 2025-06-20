@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/db/supabase'
 import { getLastVisitedPage } from '../hooks/useNavigationPersistence'
 
 interface AuthContextType {

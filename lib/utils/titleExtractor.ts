@@ -1,5 +1,5 @@
-import { getYoutubeTitle } from '@/lib/parser/youtube';
-import { getFacebookTitle } from '@/lib/parser/facebook';
+import { getYoutubeTitle } from '@/lib/parsers/youtube';
+import { getFacebookTitle } from '@/lib/parsers/facebook';
 
 /**
  * Extract video title from platform data or captions

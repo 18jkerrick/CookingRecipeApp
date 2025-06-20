@@ -3,10 +3,10 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase } from '../../lib/db/supabase'
 import { Search, Filter, Plus, Settings } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '../../lib/mealPlanStorage'
+import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '../../lib/db/meal-plan'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 // Types for meal planning (Recipe interface for local use)

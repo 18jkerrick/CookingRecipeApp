@@ -24,6 +24,8 @@
 .DS_Store
 *.pem
 /screenshots
+tasks.md
+architecture.md
 
 # debug
 npm-debug.log*

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { supabase } from '@/lib/db/supabase';
 
 // Service interfaces
 interface GroceryItem {
@@ -155,7 +154,7 @@ async function getWalmartPlusPrices(items: GroceryItem[], zipCode: string): Prom
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const supabase = createRouteHandlerClient({ cookies });
+    // Using the shared supabase client
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {

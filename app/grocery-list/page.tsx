@@ -3,7 +3,7 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase } from '../../lib/db/supabase'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
 import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -21,9 +21,9 @@ import {
   deleteGroceryItem,
   addRecipeToGroceryList,
   removeRecipeFromGroceryList,
-} from '../../lib/groceryStorageDB'
+} from '../../lib/db/grocery'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
-import BuyGroceriesModal from './BuyGroceriesModal'
+import BuyGroceriesModal from '../../components/features/grocery/BuyGroceriesModal'
 
 // Recipe interface for local use
 interface Recipe {

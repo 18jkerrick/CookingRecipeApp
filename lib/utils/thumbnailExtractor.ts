@@ -1,4 +1,4 @@
-import { extractThumbnailFromHTML, resolveUrl } from '@/lib/parser/cooking-website';
+import { extractThumbnailFromHTML, resolveUrl } from '@/lib/parsers/cooking-website';
 
 /**
  * Extract thumbnail URL from video platforms
