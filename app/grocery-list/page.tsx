@@ -376,21 +376,16 @@ export default function GroceryLists() {
     const success = await removeRecipeFromGroceryList(selectedList.id, recipeId)
     console.log('Remove recipe result:', success)
     if (success) {
-      // Update the local state immediately
-      setSelectedList(prev => prev ? {
-        ...prev,
-        recipeIds: prev.recipeIds.filter(id => id !== recipeId)
-      } : null)
-      
-      // Update the grocery lists state
-      setGroceryLists(prev => prev.map(list => 
-        list.id === selectedList.id 
-          ? { ...list, recipeIds: list.recipeIds.filter(id => id !== recipeId) }
-          : list
-      ))
-      
-      // Reload to get updated items from database
+      // Reload to get updated items and recipes from database
       await loadGroceryLists()
+      
+      // Update selectedList to reflect the changes
+      const updatedLists = await getGroceryLists()
+      const updatedList = updatedLists.find(list => list.id === selectedList.id)
+      if (updatedList) {
+        setSelectedList(updatedList)
+        setGroceryLists(updatedLists)
+      }
     } else {
       console.error('Failed to remove recipe from list')
     }
