@@ -344,21 +344,17 @@ export default function GroceryLists() {
     const success = await addRecipeToGroceryList(selectedList.id, recipe)
     console.log('Add recipe result:', success)
     if (success) {
-      // Update the local state immediately
-      setSelectedList(prev => prev ? {
-        ...prev,
-        recipeIds: [...prev.recipeIds, recipe.id]
-      } : null)
-      
-      // Update the grocery lists state
-      setGroceryLists(prev => prev.map(list => 
-        list.id === selectedList.id 
-          ? { ...list, recipeIds: [...list.recipeIds, recipe.id] }
-          : list
-      ))
-      
       // Reload to get updated items from database
       await loadGroceryLists()
+      
+      // Update selectedList to reflect the changes
+      const updatedLists = await getGroceryLists()
+      const updatedList = updatedLists.find(list => list.id === selectedList.id)
+      if (updatedList) {
+        setSelectedList(updatedList)
+        setGroceryLists(updatedLists)
+      }
+      
       setShowAddRecipeModal(false)
     } else {
       console.error('Failed to add recipe to list')
