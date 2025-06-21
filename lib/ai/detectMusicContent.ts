@@ -5,14 +5,19 @@ const openai = new OpenAI({
 });
 
 export async function detectMusicContent(transcript: string): Promise<boolean> {
-  try {
-    
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Analyze the transcript to determine if it contains music, song lyrics, or non-cooking content.
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`🎶 Music detection attempt ${attempt}/${MAX_RETRIES}...`);
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Analyze the transcript to determine if it contains music, song lyrics, or non-cooking content.
 
 RETURN TRUE if the content is:
 - Song lyrics or music
@@ -30,24 +35,38 @@ RETURN FALSE if the content contains:
 - Food preparation descriptions
 
 Respond with only "true" or "false" - no explanation needed.`
-        },
-        {
-          role: "user", 
-          content: `Transcript: ${transcript}`
-        }
-      ],
-      temperature: 0,
-      max_tokens: 10
-    });
+          },
+          {
+            role: "user", 
+            content: `Transcript: ${transcript}`
+          }
+        ],
+        temperature: 0,
+        max_tokens: 10
+      });
 
-    const result = response.choices[0]?.message?.content?.trim().toLowerCase();
-    const isMusic = result === 'true';
-    
-    return isMusic;
-    
-  } catch (error) {
-    console.error('Error detecting music content:', error);
-    // Default to false (assume it's cooking content) to avoid blocking valid recipes
-    return false;
+      const result = response.choices[0]?.message?.content?.trim().toLowerCase();
+      const isMusic = result === 'true';
+      
+      console.log(`✅ Music detection successful on attempt ${attempt}`);
+      return isMusic;
+      
+    } catch (error: any) {
+      console.error(`❌ Music detection attempt ${attempt} failed:`, error);
+      
+      // Check if it's a rate limit error and we have retries left
+      if (error?.status === 429 && attempt < MAX_RETRIES) {
+        console.log(`⏳ Rate limit hit, waiting ${RETRY_DELAY}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        continue;
+      }
+      
+      // If it's the last attempt or not a rate limit error, fall back
+      console.log('🔄 Falling back to default: assuming cooking content');
+      return false; // Default to false (assume it's cooking content) to avoid blocking valid recipes
+    }
   }
+  
+  // This should never be reached, but just in case
+  return false;
 } 

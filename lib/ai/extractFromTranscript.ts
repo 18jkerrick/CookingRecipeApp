@@ -104,134 +104,265 @@ export async function extractRecipeFromTranscript(transcript: string): Promise<R
     Transcript: ${transcript}
     `;
 
-  try {
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.1, // Low temperature for consistent output
-      max_tokens: 2000,
-    });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from OpenAI');
-    }
-
-
-    // Parse JSON response
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+  
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const parsed = JSON.parse(content) as RecipeData;
+      console.log(`🍽️ Transcript extraction attempt ${attempt}/${MAX_RETRIES}...`);
       
-      // Validate the response structure
-      if (!parsed.ingredients || !parsed.instructions) {
-        throw new Error('Invalid response structure from AI');
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.1, // Low temperature for consistent output
+        max_tokens: 2000,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response from OpenAI');
       }
 
-      if (!Array.isArray(parsed.ingredients) || !Array.isArray(parsed.instructions)) {
-        throw new Error('Ingredients and instructions must be arrays');
+      // Parse JSON response
+      try {
+        const parsed = JSON.parse(content) as RecipeData;
+        
+        // Validate the response structure
+        if (!parsed.ingredients || !parsed.instructions) {
+          throw new Error('Invalid response structure from AI');
+        }
+
+        if (!Array.isArray(parsed.ingredients) || !Array.isArray(parsed.instructions)) {
+          throw new Error('Ingredients and instructions must be arrays');
+        }
+
+        // Post-processing validation: ensure ingredient-instruction consistency
+        const validatedRecipe = validateIngredientInstructionConsistency(parsed);
+        
+        if (validatedRecipe.ingredients.length > parsed.ingredients.length) {
+          // Additional ingredients were added during validation
+        }
+
+        console.log(`✅ Transcript extraction successful on attempt ${attempt}`);
+        return validatedRecipe;
+
+      } catch (parseError) {
+        console.error(`❌ JSON parsing failed on attempt ${attempt}:`, parseError);
+        
+        // Fallback parsing attempt
+        return fallbackParseTranscript(content);
       }
-
-      // Post-processing validation: ensure ingredient-instruction consistency
-      const validatedRecipe = validateIngredientInstructionConsistency(parsed);
       
-      if (validatedRecipe.ingredients.length > parsed.ingredients.length) {
-        // Additional ingredients were added during validation
+    } catch (error: any) {
+      console.error(`❌ Transcript extraction attempt ${attempt} failed:`, error);
+      
+      // Check if it's a rate limit error and we have retries left
+      if (error?.status === 429 && attempt < MAX_RETRIES) {
+        console.log(`⏳ Rate limit hit, waiting ${RETRY_DELAY}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        continue;
       }
-
-      return validatedRecipe;
-
-    } catch (parseError) {
-      console.error('Failed to parse JSON from AI response:', parseError);
       
-      // Fallback parsing attempt
-      return fallbackParseTranscript(content);
+      // If it's the last attempt or not a rate limit error, fall back
+      console.log('🔄 Falling back to empty recipe');
+      return {
+        ingredients: [],
+        instructions: []
+      };
     }
-
-  } catch (error) {
-    console.error('OpenAI API error during transcript extraction:', error);
-    
-    // Return empty recipe as fallback
-    return {
-      ingredients: [],
-      instructions: []
-    };
   }
+  
+  // This should never be reached, but just in case
+  return {
+    ingredients: [],
+    instructions: []
+  };
 }
 
 /**
  * Validates that all ingredients mentioned in instructions are included in the ingredients list
+ * AND that all ingredients in the list are actually used in instructions
  */
 function validateIngredientInstructionConsistency(recipe: RecipeData): RecipeData {
+  console.log('🔍 Cross-validating ingredients and instructions...');
+  
+  // Normalize ingredient names for comparison (remove quantities/units)
+  const normalizeIngredient = (ingredient: string): string => {
+    return ingredient.toLowerCase()
+      .replace(/^\d+\.?\d*\s*/, '') // Remove quantities like "2", "1.5", "½"
+      .replace(/^~\s*/, '') // Remove approximate symbol
+      .replace(/^(cup|cups|tablespoons?|tbsp|teaspoons?|tsp|pounds?|lbs?|ounces?|oz|cans?|jars?|bunches?|heads?|cloves?|slices?|pieces?)\s+/i, '') // Remove units
+      .replace(/^(small|medium|large|extra)\s+/i, '') // Remove size descriptors
+      .replace(/\s*\([^)]*\)/g, '') // Remove parenthetical notes
+      .replace(/\s*,.*$/, '') // Remove everything after comma
+      .trim();
+  };
+
+  // Extract normalized ingredient names from ingredients list
   const ingredientNames = new Set(
-    recipe.ingredients.map(ing => 
-      ing.toLowerCase()
-        .replace(/^\d+\s*/, '') // Remove quantities
-        .replace(/^~?\d*\.?\d*\s*/, '') // Remove approximate quantities  
-        .replace(/^(cup|cups|tbsp|tsp|lb|oz|can|jar|bunch|head|cloves?)\s+/i, '') // Remove units
-        .trim()
-    )
+    recipe.ingredients.map(ing => normalizeIngredient(ing))
   );
 
-  const missingIngredients: string[] = [];
-  
-  // Common ingredient keywords to look for in instructions
-  const ingredientKeywords = [
-    'broth', 'stock', 'water', 'salt', 'pepper', 'sugar', 'flour', 'butter', 'oil',
-    'onion', 'garlic', 'ginger', 'lemon', 'lime', 'herbs', 'spices', 'cheese',
-    'cream', 'milk', 'wine', 'vinegar', 'sauce', 'paste', 'powder', 'noodles'
+  console.log(`📋 Current ingredients: ${Array.from(ingredientNames).join(', ')}`);
+
+  const missingIngredients: Set<string> = new Set();
+  const unusedIngredients: Set<string> = new Set(ingredientNames);
+
+  // Comprehensive list of compound ingredients (prioritize these over individual words)
+  const compoundIngredients = [
+    'lemon juice', 'lime juice', 'orange juice', 'apple juice',
+    'olive oil', 'vegetable oil', 'coconut oil', 'sesame oil', 'canola oil',
+    'soy sauce', 'fish sauce', 'hot sauce', 'worcestershire sauce',
+    'coconut milk', 'almond milk', 'chicken broth', 'vegetable broth', 'beef broth',
+    'brown sugar', 'white sugar', 'powdered sugar',
+    'sea salt', 'kosher salt', 'table salt',
+    'black pepper', 'white pepper', 'red pepper flakes',
+    'garlic powder', 'onion powder', 'curry powder', 'chili powder',
+    'baking powder', 'baking soda',
+    'vanilla extract', 'almond extract',
+    'cherry tomatoes', 'grape tomatoes', 'roma tomatoes',
+    'sweet potato', 'red onion', 'white onion', 'yellow onion',
+    'bell pepper', 'red pepper', 'green pepper',
+    'parmesan cheese', 'mozzarella cheese', 'cheddar cheese',
+    'heavy cream', 'sour cream', 'cream cheese',
+    'pine nuts', 'cashew nuts'
   ];
 
-  recipe.instructions.forEach(instruction => {
+  // Single-word ingredients (only detect these if not part of compound)
+  const singleIngredients = [
+    // Proteins
+    'chicken', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'shrimp', 'lobster', 'crab', 'turkey', 'duck', 'tofu', 'tempeh',
+    // Vegetables
+    'onion', 'garlic', 'ginger', 'carrot', 'celery', 'tomato', 'pepper', 'mushroom', 'broccoli', 'spinach', 'kale', 'cabbage',
+    // Grains/Starches
+    'rice', 'pasta', 'noodles', 'quinoa', 'bread', 'flour', 'potatoes',
+    // Dairy
+    'milk', 'cream', 'butter', 'cheese', 'yogurt',
+    // Seasonings
+    'salt', 'pepper', 'paprika', 'cumin', 'oregano', 'basil', 'thyme', 'rosemary', 'cilantro', 'parsley',
+    // Nuts/Seeds
+    'almonds', 'peanuts', 'walnuts', 'sesame seeds', 'sunflower seeds',
+    // Herbs/Spices
+    'cinnamon', 'nutmeg', 'allspice', 'cardamom'
+  ];
+
+  // Check each instruction for ingredient mentions
+  recipe.instructions.forEach((instruction, index) => {
     const lowerInstruction = instruction.toLowerCase();
+    console.log(`🔍 Checking instruction ${index + 1}: "${instruction.substring(0, 50)}..."`);
     
-    // Look for ingredient mentions in instructions
-    ingredientKeywords.forEach(keyword => {
-      if (lowerInstruction.includes(keyword)) {
-        // Check if this ingredient (or a similar one) is already in the list
-        const hasIngredient = Array.from(ingredientNames).some(ing => 
-          ing.includes(keyword) || keyword.includes(ing.split(' ')[0])
-        );
+    // First, check for compound ingredients (higher priority)
+    compoundIngredients.forEach(compound => {
+      if (lowerInstruction.includes(compound)) {
+        // Check if this compound ingredient exists in our ingredients list
+        const foundInList = Array.from(ingredientNames).some(ing => {
+          return ing.includes(compound) || compound.includes(ing) ||
+                 // Handle partial matches like "lemon" matching "lemon juice"
+                 compound.split(' ').some(word => ing.includes(word));
+        });
         
-        if (!hasIngredient && !missingIngredients.includes(keyword)) {
-          // Special case handling for common instruction phrases
-          if (lowerInstruction.includes('vegetable broth') || lowerInstruction.includes('vegetable stock')) {
-            if (!missingIngredients.includes('vegetable broth')) {
-              missingIngredients.push('vegetable broth');
+        if (foundInList) {
+          // Mark related ingredients as used
+          ingredientNames.forEach(ing => {
+            if (ing.includes(compound) || compound.includes(ing) ||
+                compound.split(' ').some(word => ing.includes(word))) {
+              unusedIngredients.delete(ing);
             }
-          } else if (lowerInstruction.includes('chicken broth') || lowerInstruction.includes('chicken stock')) {
-            if (!missingIngredients.includes('chicken broth')) {
-              missingIngredients.push('chicken broth');
-            }
-          } else if (lowerInstruction.includes('salt and pepper')) {
-            if (!missingIngredients.includes('salt')) missingIngredients.push('salt');
-            if (!missingIngredients.includes('pepper')) missingIngredients.push('pepper');
+          });
+        } else {
+          // Missing compound ingredient
+          console.log(`❌ Missing compound ingredient "${compound}" found in instruction: "${instruction.substring(0, 60)}..."`);
+          missingIngredients.add(compound);
+        }
+      }
+    });
+    
+    // Then check for single-word ingredients (only if not already covered by compounds)
+    singleIngredients.forEach(single => {
+      // Skip if this single word is part of a compound ingredient we already found
+      const isPartOfCompound = compoundIngredients.some(compound => 
+        compound.includes(single) && lowerInstruction.includes(compound)
+      );
+      
+      if (!isPartOfCompound) {
+        // Use word boundary matching to avoid false positives like "creamy" matching "cream"
+        const wordBoundaryRegex = new RegExp(`\\b${single}\\b`, 'i');
+        const exactMatch = wordBoundaryRegex.test(lowerInstruction);
+        
+        // Additional checks to avoid adjective forms and descriptive phrases
+        const isAdjective = lowerInstruction.includes(`${single}y `) || // creamy, cheesy, etc.
+                           lowerInstruction.includes(`${single}ed `) || // seasoned, etc.
+                           lowerInstruction.includes(`${single}ing `); // cooking, etc.
+        
+        // Avoid matching in descriptive contexts
+        const isDescriptive = lowerInstruction.includes(`${single}y sauce`) ||
+                             lowerInstruction.includes(`${single}y texture`) ||
+                             lowerInstruction.includes(`${single}y consistency`) ||
+                             lowerInstruction.includes(`well ${single}ed`) ||
+                             lowerInstruction.includes(`until ${single}ed`);
+        
+        if (exactMatch && !isAdjective && !isDescriptive) {
+          // Check if this ingredient exists in our ingredients list
+          const foundInList = Array.from(ingredientNames).some(ing => {
+            return ing.includes(single) || single.includes(ing);
+          });
+          
+          if (foundInList) {
+            // Mark this ingredient as used
+            ingredientNames.forEach(ing => {
+              if (ing.includes(single) || single.includes(ing)) {
+                unusedIngredients.delete(ing);
+              }
+            });
           } else {
-            missingIngredients.push(keyword);
+            // Only add if it's a significant word and not too generic
+            if (single.length > 3 && !['with', 'from', 'into', 'over', 'until', 'well'].includes(single)) {
+              console.log(`❌ Missing ingredient "${single}" found in instruction: "${instruction.substring(0, 60)}..."`);
+              missingIngredients.add(single);
+            }
           }
         }
       }
     });
   });
 
-  // Add missing ingredients to the recipe
-  if (missingIngredients.length > 0) {
-    return {
-      ingredients: [...recipe.ingredients, ...missingIngredients],
-      instructions: recipe.instructions
-    };
+  // Create final recipe with validation results
+  const finalIngredients = [...recipe.ingredients];
+  const addedIngredients: string[] = [];
+  
+  // Add missing ingredients
+  missingIngredients.forEach(ingredient => {
+    if (!finalIngredients.some(existing => normalizeIngredient(existing).includes(ingredient))) {
+      finalIngredients.push(ingredient);
+      addedIngredients.push(ingredient);
+    }
+  });
+  
+  // Log validation results
+  if (addedIngredients.length > 0) {
+    console.log(`✅ Added missing ingredients: ${addedIngredients.join(', ')}`);
   }
-
-  return recipe;
+  
+  if (unusedIngredients.size > 0) {
+    console.log(`⚠️ Unused ingredients (not referenced in instructions): ${Array.from(unusedIngredients).join(', ')}`);
+    // Note: We keep unused ingredients in the list since they might be garnishes or optional
+  }
+  
+  console.log(`✅ Final ingredient count: ${finalIngredients.length} (added ${addedIngredients.length})`);
+  
+  return {
+    ingredients: finalIngredients,
+    instructions: recipe.instructions
+  };
 }
 
 /**

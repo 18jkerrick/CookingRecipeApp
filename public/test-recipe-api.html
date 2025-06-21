@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Instacart Recipe API</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #00C851; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #009638; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 5px; white-space: pre-wrap; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Test Instacart Recipe API</h1>
+    
+    <div class="section">
+        <h2>1. Test Retailers API</h2>
+        <label>ZIP Code: <input type="text" id="zipCode" value="94105" maxlength="5"></label>
+        <button onclick="testRetailers()">Test Retailers</button>
+        <div id="retailersResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Test Recipe Creation API</h2>
+        <label>Ingredients (one per line):</label>
+        <textarea id="ingredients" rows="5">chicken breast 2 lbs
+broccoli 1 lb
+rice 2 cups
+olive oil 2 tbsp</textarea>
+        <button onclick="testRecipe()">Create Recipe Page</button>
+        <div id="recipeResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Test Full Grocery API</h2>
+        <button onclick="testGroceryAPI()">Test Full Integration</button>
+        <div id="groceryResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        async function testRetailers() {
+            const zipCode = document.getElementById('zipCode').value;
+            const resultDiv = document.getElementById('retailersResult');
+            
+            try {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result';
+                resultDiv.textContent = 'Testing retailers API...';
+                
+                const response = await fetch(`/api/test-instacart?zipCode=${zipCode}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `Success! Found ${data.retailersFound} retailers:\n\n` + 
+                        JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.error}\n\n` + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network Error: ${error.message}`;
+            }
+        }
+
+        async function testRecipe() {
+            const ingredientsText = document.getElementById('ingredients').value;
+            const resultDiv = document.getElementById('recipeResult');
+            
+            try {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result';
+                resultDiv.textContent = 'Creating recipe page...';
+                
+                const response = await fetch('/api/test-instacart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ingredients: ingredientsText })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `Success! Recipe created:<br><br>` +
+                        `<a href="${data.recipeUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${data.recipeUrl}</a><br><br>` +
+                        `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.error}\n\n` + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network Error: ${error.message}`;
+            }
+        }
+
+        async function testGroceryAPI() {
+            const resultDiv = document.getElementById('groceryResult');
+            
+            try {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result';
+                resultDiv.textContent = 'Testing full grocery integration...';
+                
+                const testItems = [
+                    { name: 'chicken breast', quantity: 2, unit: 'lbs' },
+                    { name: 'broccoli', quantity: 1, unit: 'lb' },
+                    { name: 'rice', quantity: 2, unit: 'cups' },
+                    { name: 'olive oil', quantity: 1, unit: 'bottle' }
+                ];
+                
+                const response = await fetch('/api/grocery-delivery/instacart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: testItems,
+                        zipCode: document.getElementById('zipCode').value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    let output = `Success! Full integration test:\n\n`;
+                    output += `Recipe URL: ${data.recipePageUrl || 'None created'}\n`;
+                    output += `Cart URL: ${data.cartUrl}\n`;
+                    output += `Retailers found: ${data.debug?.retailersFound || 0}\n`;
+                    output += `Items matched: ${data.debug?.matchedItems}/${data.debug?.totalItems}\n\n`;
+                    
+                    if (data.recipePageUrl) {
+                        resultDiv.innerHTML = output + 
+                            `<a href="${data.recipePageUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open Recipe Page</a><br><br>` +
+                            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    } else {
+                        resultDiv.textContent = output + JSON.stringify(data, null, 2);
+                    }
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.error}\n\n` + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
