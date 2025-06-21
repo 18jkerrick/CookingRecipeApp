@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Store Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 20px auto; padding: 20px; }
+        button { background: #00C851; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #009638; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 5px; white-space: pre-wrap; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+    </style>
+</head>
+<body>
+    <h1>Debug Store Grouping Issue</h1>
+    
+    <h2>Problem: Only showing Safeway despite finding 46+ retailers</h2>
+    
+    <button onclick="testStoreGrouping('19425')">Test ZIP 19425 Store Grouping</button>
+    <button onclick="testStoreGrouping('94109')">Test ZIP 94109 Store Grouping</button>
+    
+    <div id="result" class="result" style="display:none;"></div>
+
+    <script>
+        async function testStoreGrouping(zipCode) {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result';
+                resultDiv.textContent = `Testing store grouping for ZIP ${zipCode}...`;
+                
+                const testItems = [
+                    { name: 'butter', quantity: 1, unit: 'stick' },
+                    { name: 'sugar', quantity: 1, unit: 'cup' }
+                ];
+                
+                const response = await fetch('/api/grocery-delivery/instacart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: testItems,
+                        zipCode: zipCode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    
+                    let output = `ANALYSIS for ZIP ${zipCode}:\n\n`;
+                    output += `Retailers found: ${data.debug?.retailersFound || 0}\n`;
+                    output += `Store options in response: ${data.storeOptions?.length || 0}\n`;
+                    output += `Stores listed: ${data.storeOptions?.map(s => s.store).join(', ') || 'None'}\n\n`;
+                    
+                    // Analyze each store option
+                    if (data.storeOptions && data.storeOptions.length > 0) {
+                        output += `STORE BREAKDOWN:\n`;
+                        data.storeOptions.forEach((store, idx) => {
+                            output += `${idx + 1}. ${store.store}: ${store.itemCount} items, $${store.pricing.total}\n`;
+                        });
+                        output += `\n`;
+                    }
+                    
+                    // Show debug info
+                    if (data.debug) {
+                        output += `DEBUG INFO:\n`;
+                        output += `Total items processed: ${data.debug.totalItems}\n`;
+                        output += `Items matched: ${data.debug.matchedItems}\n`;
+                        output += `Fallback mode: ${data.debug.fallbackMode || 'false'}\n`;
+                        output += `API errors: ${data.debug.retailersError || data.debug.recipeError || 'None'}\n\n`;
+                    }
+                    
+                    // Show availability info
+                    if (data.availability) {
+                        output += `AVAILABILITY:\n`;
+                        output += `Available: ${data.availability.available}\n`;
+                        output += `Stores from API: ${data.availability.stores?.length || 0}\n`;
+                        output += `Store names: ${data.availability.stores?.join(', ') || 'None'}\n\n`;
+                    }
+                    
+                    output += `FULL RESPONSE:\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.textContent = output;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `ERROR for ZIP ${zipCode}:\n${data.error}\n\n` +
+                        `Full response:\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network Error for ZIP ${zipCode}: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

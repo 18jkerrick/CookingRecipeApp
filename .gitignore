@@ -23,7 +23,6 @@
 # misc
 .DS_Store
 *.pem
-/screenshots
 tasks.md
 architecture.md
 
