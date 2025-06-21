@@ -24,6 +24,7 @@ import {
 } from '../../lib/db/grocery'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 import BuyGroceriesModal from '../../components/features/grocery/BuyGroceriesModal'
+import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'
 
 // Recipe interface for local use
 interface Recipe {
@@ -91,6 +92,8 @@ export default function GroceryLists() {
   const [priceComparison, setPriceComparison] = useState<any>(null)
   const [isLoadingPrices, setIsLoadingPrices] = useState(false)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+  const [showRecipeDetailModal, setShowRecipeDetailModal] = useState(false)
+  const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -361,6 +364,11 @@ export default function GroceryLists() {
     }
   }
 
+  const handleViewRecipe = (recipe: Recipe) => {
+    setSelectedRecipeForDetail(recipe)
+    setShowRecipeDetailModal(true)
+  }
+
   const handleRemoveRecipeFromList = async (recipeId: string) => {
     if (!selectedList) return
     
@@ -615,7 +623,7 @@ export default function GroceryLists() {
                 {!recipesCollapsed && (
                   <div className="flex gap-3 overflow-x-auto pb-2">
                     {getFilteredRecipes().map((recipe) => (
-                      <div key={recipe.id} className="flex-shrink-0 bg-[#14151a] rounded-lg overflow-hidden w-32">
+                      <div key={recipe.id} className="flex-shrink-0 bg-[#14151a] rounded-lg overflow-hidden w-32 h-36 flex flex-col">
                         <div className="relative">
                           <button 
                             onClick={(e) => {
@@ -639,15 +647,20 @@ export default function GroceryLists() {
                             </div>
                           )}
                         </div>
-                        <div className="p-2">
-                          <h4 className="text-xs font-medium text-white line-clamp-2">{recipe.title}</h4>
-                          <p className="text-xs text-white/60 mt-1">View recipe →</p>
+                        <div className="p-2 flex-1 flex flex-col justify-between">
+                          <h4 className="text-xs font-medium text-white line-clamp-2 h-8 overflow-hidden">{recipe.title}</h4>
+                          <button 
+                            onClick={() => handleViewRecipe(recipe)}
+                            className="text-xs text-white/60 hover:text-white transition-colors cursor-pointer text-left"
+                          >
+                            View recipe →
+                          </button>
                         </div>
                       </div>
                     ))}
                     
                     {/* Add Recipe Button */}
-                    <div className="flex-shrink-0 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg overflow-hidden w-32 hover:border-[#2B966F] hover:bg-[#2B966F]/10 transition-all">
+                    <div className="flex-shrink-0 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg overflow-hidden w-32 h-36 hover:border-[#2B966F] hover:bg-[#2B966F]/10 transition-all">
                       <button
                         onClick={() => setShowAddRecipeModal(true)}
                         className="w-full h-full text-white/60 hover:text-white flex items-center justify-center"
@@ -1158,6 +1171,14 @@ export default function GroceryLists() {
         isOpen={showBuyGroceriesModal}
         onClose={() => setShowBuyGroceriesModal(false)}
         items={selectedList?.items || []}
+      />
+
+      {/* Recipe Detail Modal */}
+      <RecipeDetailModal
+        isOpen={showRecipeDetailModal}
+        onClose={() => setShowRecipeDetailModal(false)}
+        recipe={selectedRecipeForDetail}
+        showActionButtons={false}
       />
     </div>
   )

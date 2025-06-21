@@ -45,6 +45,7 @@ interface RecipeDetailModalProps {
   onSave?: () => void;
   onDelete?: () => Promise<void>;
   onUpdate?: (updatedRecipe: any) => void; // New callback for when recipe is updated
+  showActionButtons?: boolean; // Control whether to show action buttons
 }
 
 interface EditableRecipe {
@@ -254,7 +255,7 @@ const categorizeIngredient = (name: string): string => {
   return 'pantry';
 };
 
-export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = false, onSave, onDelete, onUpdate }: RecipeDetailModalProps) {
+export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = false, onSave, onDelete, onUpdate, showActionButtons = true }: RecipeDetailModalProps) {
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableRecipe, setEditableRecipe] = useState<EditableRecipe | null>(null);
@@ -1171,8 +1172,8 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
               <h1 className="text-xl sm:text-2xl font-bold text-white">{recipe.title}</h1>
             )}
             
-            {/* Action Buttons - Only show when not in edit mode */}
-            {!isEditMode && (
+            {/* Action Buttons - Only show when not in edit mode and showActionButtons is true */}
+            {!isEditMode && showActionButtons && (
               <div className="flex justify-center space-x-4 sm:space-x-6 mt-6">
                 <button
                   onClick={() => {
