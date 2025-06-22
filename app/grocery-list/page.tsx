@@ -1166,6 +1166,8 @@ export default function GroceryLists() {
         isOpen={showBuyGroceriesModal}
         onClose={() => setShowBuyGroceriesModal(false)}
         items={selectedList?.items || []}
+        groceryListTitle={selectedList?.name}
+        groceryListId={selectedList?.id}
       />
 
       {/* Recipe Detail Modal */}

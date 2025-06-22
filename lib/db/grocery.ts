@@ -772,23 +772,83 @@ const generateRandomGradient = (): { from: string; to: string } => {
   return gradients[Math.floor(Math.random() * gradients.length)];
 };
 
-// Categorize ingredients (same logic as before)
+// Enhanced categorize ingredients function
 const categorizeIngredient = (name: string): GroceryItem['category'] => {
-  const lowerName = name.toLowerCase();
-  
-  if (lowerName.includes('onion') || lowerName.includes('garlic') || lowerName.includes('tomato')) {
+  // Clean the name first - remove quantities and units that might be embedded
+  let cleanName = name.toLowerCase();
+
+  // If name contains " - ", extract the ingredient part before the dash
+  if (cleanName.includes(' - ')) {
+    cleanName = cleanName.split(' - ')[0].trim();
+  }
+
+  // Remove common quantity patterns from the beginning
+  cleanName = cleanName
+    .replace(/^\d+(\.\d+)?\s*(to\s+\d+(\.\d+)?)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?)\s*/i, '')
+    .replace(/^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?)\s*/i, '')
+    .replace(/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?)\s*/i, '')
+    .replace(/^\d+(\.\d+)?\s*/i, '')
+    .trim();
+
+  // Produce
+  if (cleanName.includes('onion') || cleanName.includes('garlic') || cleanName.includes('tomato') ||
+      cleanName.includes('pepper') || cleanName.includes('lettuce') || cleanName.includes('carrot') ||
+      cleanName.includes('celery') || cleanName.includes('potato') || cleanName.includes('apple') ||
+      cleanName.includes('banana') || cleanName.includes('lemon') || cleanName.includes('lime') ||
+      cleanName.includes('mushroom') || cleanName.includes('spinach') || cleanName.includes('broccoli') ||
+      cleanName.includes('cauliflower') || cleanName.includes('cucumber') || cleanName.includes('avocado') ||
+      cleanName.includes('bell pepper') || cleanName.includes('jalapeño') || cleanName.includes('cilantro') ||
+      cleanName.includes('parsley') || cleanName.includes('basil') || cleanName.includes('rosemary') ||
+      cleanName.includes('thyme') || cleanName.includes('oregano') || cleanName.includes('sage')) {
     return 'produce';
   }
-  if (lowerName.includes('chicken') || lowerName.includes('beef') || lowerName.includes('fish')) {
+
+  // Meat & Seafood - Enhanced patterns
+  if (cleanName.includes('chicken') || cleanName.includes('beef') || cleanName.includes('pork') ||
+      cleanName.includes('fish') || cleanName.includes('salmon') || cleanName.includes('shrimp') ||
+      cleanName.includes('ground') || cleanName.includes('steak') || cleanName.includes('lamb') ||
+      cleanName.includes('pepperoni') || cleanName.includes('bacon') || cleanName.includes('ham') ||
+      cleanName.includes('turkey') || cleanName.includes('duck') || cleanName.includes('sausage') ||
+      cleanName.includes('chuck roast') || cleanName.includes('roast') || cleanName.includes('brisket') ||
+      cleanName.includes('ribs') || cleanName.includes('tenderloin') || cleanName.includes('sirloin') ||
+      cleanName.includes('filet') || cleanName.includes('cod') || cleanName.includes('tuna') ||
+      cleanName.includes('crab') || cleanName.includes('lobster') || cleanName.includes('scallop')) {
     return 'meat-seafood';
   }
-  if (lowerName.includes('milk') || lowerName.includes('cheese') || lowerName.includes('butter')) {
+
+  // Dairy & Eggs
+  if (cleanName.includes('milk') || cleanName.includes('cheese') || cleanName.includes('butter') ||
+      cleanName.includes('cream') || cleanName.includes('yogurt') || cleanName.includes('egg') ||
+      cleanName.includes('cream cheese') || cleanName.includes('sour cream') || cleanName.includes('cottage cheese') ||
+      cleanName.includes('mozzarella') || cleanName.includes('cheddar') || cleanName.includes('parmesan') ||
+      cleanName.includes('provolone') || cleanName.includes('swiss') || cleanName.includes('goat cheese') ||
+      cleanName.includes('ricotta') || cleanName.includes('mascarpone') || cleanName.includes('heavy cream')) {
     return 'dairy-eggs';
   }
-  if (lowerName.includes('salt') || lowerName.includes('pepper') || lowerName.includes('spice')) {
+
+  // Spices & Seasonings
+  if (cleanName.includes('salt') || cleanName.includes('pepper') || cleanName.includes('spice') ||
+      cleanName.includes('cumin') || cleanName.includes('paprika') || cleanName.includes('chili powder') ||
+      cleanName.includes('garlic powder') || cleanName.includes('onion powder') || cleanName.includes('cinnamon') ||
+      cleanName.includes('nutmeg') || cleanName.includes('ginger') || cleanName.includes('turmeric') ||
+      cleanName.includes('cardamom') || cleanName.includes('cloves') || cleanName.includes('bay leaves') ||
+      cleanName.includes('vanilla') || cleanName.includes('extract') || cleanName.includes('seasoning')) {
     return 'spices';
   }
-  
+
+  // Bakery
+  if (cleanName.includes('bread') || cleanName.includes('roll') || cleanName.includes('bagel') ||
+      cleanName.includes('tortilla') || cleanName.includes('pita') || cleanName.includes('baguette') ||
+      cleanName.includes('croissant') || cleanName.includes('muffin') || cleanName.includes('bun')) {
+    return 'bakery';
+  }
+
+  // Frozen
+  if (cleanName.includes('frozen') || cleanName.includes('ice cream') || cleanName.includes('sorbet')) {
+    return 'frozen';
+  }
+
+  // Default to pantry
   return 'pantry';
 };
 

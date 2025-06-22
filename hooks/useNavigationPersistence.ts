@@ -8,7 +8,8 @@ const PERSISTABLE_PAGES = [
   '/cookbooks',
   '/meal-planner',
   '/grocery-list',
-  '/settings'
+  '/settings',
+  '/test-retailers'
 ]
 
 export function useNavigationPersistence() {

@@ -20,6 +20,7 @@
     "@types/fluent-ffmpeg": "^2.1.27",
     "autoprefixer": "^10.4.21",
     "aws4": "^1.13.2",
+    "cheerio": "^1.0.0-rc.12",
     "clsx": "^2.1.1",
     "docx": "^9.5.0",
     "dotenv": "^16.5.0",
@@ -45,7 +46,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@testing-library/jest-dom": "^5.16.5",
-    "@testing-library/react": "^13.4.0",
+    "@testing-library/react": "^14.0.0",
     "@testing-library/user-event": "^14.4.3",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^20.17.54",

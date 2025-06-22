@@ -23,8 +23,9 @@
 # misc
 .DS_Store
 *.pem
-tasks.md
 architecture.md
+tasks.md
+screenshots/
 
 # debug
 npm-debug.log*
