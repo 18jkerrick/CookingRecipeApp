@@ -73,30 +73,17 @@ export default function GroceryLists() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedRecipes, setSelectedRecipes] = useState<Recipe[]>([])
   const [newListName, setNewListName] = useState('')
-  const [showEditVisualModal, setShowEditVisualModal] = useState(false)
-  const [editingVisualList, setEditingVisualList] = useState<GroceryList | null>(null)
-  const [newVisualType, setNewVisualType] = useState<'gradient' | 'emoji' | 'image'>('gradient')
-  const [newEmoji, setNewEmoji] = useState('')
-  const [newImageUrl, setNewImageUrl] = useState('')
-  const [gradientFrom, setGradientFrom] = useState('#667eea')
-  const [gradientTo, setGradientTo] = useState('#764ba2')
-  const [editListName, setEditListName] = useState('')
 
-  const foodEmojis = [
-    '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝',
-    '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠',
-    '🥐', '🥖', '🍞', '🥨', '🥯', '🧇', '🥞', '🧈', '🍳', '🥚', '🧀', '🥓', '🥩', '🍗', '🍖',
-    '🌭', '🍔', '🍟', '🍕', '🥪', '🌮', '🌯', '🫔', '🥙', '🧆', '🥘', '🍝', '🍜', '🍲', '🍛',
-    '🍣', '🍱', '🥟', '🦪', '🍤', '🦞', '🦀', '🐙', '🦑', '🍘', '🍙', '🍚', '🍥', '🥮', '🍢',
-    '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🧊', '🥤',
-    '☕', '🍵', '🧃', '🥛', '🍼', '🫖', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃',
-    '🫗', '🥄', '🍴', '🥢', '🔪', '🏺', '🍽️', '🥗', '🥣', '🥡'
-  ]
   const [editingItem, setEditingItem] = useState<string | null>(null)
   const [editQuantity, setEditQuantity] = useState('')
   const [editUnit, setEditUnit] = useState('')
   const [editName, setEditName] = useState('')
   const [quantityError, setQuantityError] = useState('')
+  const [showEditVisualModal, setShowEditVisualModal] = useState(false)
+  const [editingVisualList, setEditingVisualList] = useState<GroceryList | null>(null)
+  const [gradientFrom, setGradientFrom] = useState('#667eea')
+  const [gradientTo, setGradientTo] = useState('#764ba2')
+  const [editListName, setEditListName] = useState('')
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false)
   const [recipesCollapsed, setRecipesCollapsed] = useState(false)
   const [showBuyGroceriesModal, setShowBuyGroceriesModal] = useState(false)
@@ -107,17 +94,7 @@ export default function GroceryLists() {
   const [showRecipeDetailModal, setShowRecipeDetailModal] = useState(false)
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null)
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const result = e.target?.result as string
-        setNewImageUrl(result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
+
 
   useEffect(() => {
     setIsClient(true)
@@ -415,6 +392,39 @@ export default function GroceryLists() {
     }
   }
 
+  const handleEditVisual = (list: GroceryList) => {
+    setEditingVisualList(list)
+    setGradientFrom(list.visual?.gradient?.from || '#667eea')
+    setGradientTo(list.visual?.gradient?.to || '#764ba2')
+    setEditListName(list.name)
+    setShowEditVisualModal(true)
+  }
+
+  const handleSaveVisual = async () => {
+    if (editingVisualList) {
+      const newVisual: GroceryList['visual'] = {
+        type: 'gradient',
+        gradient: { from: gradientFrom, to: gradientTo }
+      }
+
+      const updatedList = { ...editingVisualList, visual: newVisual, name: editListName }
+      const success = await updateGroceryList(updatedList)
+
+      if (success) {
+        setGroceryLists(prev => prev.map(list =>
+          list.id === editingVisualList.id ? updatedList : list
+        ))
+
+        if (selectedList?.id === editingVisualList.id) {
+          setSelectedList(updatedList)
+        }
+
+        setShowEditVisualModal(false)
+        setEditingVisualList(null)
+      }
+    }
+  }
+
   const handleDeleteItem = async (itemId: string) => {
     if (selectedList) {
       const success = await deleteGroceryItem(selectedList.id, itemId)
@@ -430,49 +440,7 @@ export default function GroceryLists() {
     }
   }
 
-  const handleEditVisual = (list: GroceryList) => {
-    setEditingVisualList(list)
-    setNewVisualType(list.visual?.type || 'gradient')
-    setNewEmoji(list.visual?.emoji || '🛒')
-    setNewImageUrl(list.visual?.imageUrl || '')
-    setGradientFrom(list.visual?.gradient?.from || '#667eea')
-    setGradientTo(list.visual?.gradient?.to || '#764ba2')
-    setEditListName(list.name)
-    setShowEditVisualModal(true)
-  }
 
-  const handleSaveVisual = async () => {
-    if (editingVisualList) {
-      let newVisual: GroceryList['visual']
-      
-      if (newVisualType === 'gradient') {
-        // Use the selected gradient colors
-        newVisual = { type: 'gradient', gradient: { from: gradientFrom, to: gradientTo } }
-      } else if (newVisualType === 'emoji') {
-        newVisual = { type: 'emoji', emoji: newEmoji || '📝' }
-      } else {
-        newVisual = { type: 'image', imageUrl: newImageUrl }
-      }
-      
-      const updatedList = { ...editingVisualList, visual: newVisual, name: editListName }
-      console.log('Updating grocery list with:', updatedList)
-      const success = await updateGroceryList(updatedList)
-      console.log('Update result:', success)
-      
-      if (success) {
-        setGroceryLists(prev => prev.map(list => 
-          list.id === editingVisualList.id ? updatedList : list
-        ))
-        
-        if (selectedList?.id === editingVisualList.id) {
-          setSelectedList(updatedList)
-        }
-        
-        setShowEditVisualModal(false)
-        setEditingVisualList(null)
-      }
-    }
-  }
 
 
 
@@ -727,69 +695,47 @@ export default function GroceryLists() {
                 <div
                   key={list.id}
                   onClick={() => setSelectedList(list)}
-                  className={`bg-[#14151a] rounded-lg p-3 cursor-pointer transition-all overflow-hidden ${
-                    selectedList?.id === list.id ? 'ring-2 ring-[#FF3A25]' : 'hover:bg-[#14151a]/80'
+                  className={`rounded-lg p-4 cursor-pointer transition-all overflow-hidden relative ${
+                    selectedList?.id === list.id ? 'ring-2 ring-[#FF3A25]' : 'hover:opacity-90'
                   }`}
+                  style={{
+                    background: list.visual?.type === 'gradient' && list.visual.gradient
+                      ? `linear-gradient(135deg, ${list.visual.gradient.from}, ${list.visual.gradient.to})`
+                      : `linear-gradient(135deg, #667eea, #764ba2)`
+                  }}
                 >
-                  <div className="flex gap-3">
-                    {/* Visual Element */}
-                    <div className="w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
-                      {list.visual?.type === 'gradient' && list.visual.gradient ? (
-                        <div 
-                          className="w-full h-full"
-                          style={{
-                            background: `linear-gradient(135deg, ${list.visual.gradient.from}, ${list.visual.gradient.to})`
+                  {/* Semi-transparent overlay for better text readability */}
+                  <div className="absolute inset-0 bg-black/40 rounded-lg"></div>
+
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-white text-base line-clamp-1 drop-shadow-lg tracking-wide">
+                        {list.name}
+                      </h3>
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditVisual(list)
                           }}
-                        />
-                      ) : list.visual?.type === 'emoji' ? (
-                        <span className="text-2xl">{list.visual.emoji || '🛒'}</span>
-                      ) : list.visual?.type === 'image' && list.visual.imageUrl ? (
-                        <img 
-                          src={list.visual.imageUrl} 
-                          alt={list.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div 
-                          className="w-full h-full"
-                          style={{
-                            background: `linear-gradient(135deg, #667eea, #764ba2)`
+                          className="text-white hover:text-gray-200 transition-colors drop-shadow-lg"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteList(list.id)
                           }}
-                        />
-                      )}
-                    </div>
-                    
-                    {/* List Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-medium text-white text-sm line-clamp-1">
-                          {list.name}
-                        </h3>
-                        <div className="flex items-center gap-1 ml-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditVisual(list)
-                            }}
-                            className="text-white/40 hover:text-[#2B966F] transition-colors"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteList(list.id)
-                            }}
-                            className="text-white/40 hover:text-red-400 transition-colors"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
+                          className="text-white hover:text-gray-200 transition-colors drop-shadow-lg"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <p className="text-white/60 text-xs">
-                        {list.items.length} items • {list.recipeIds.length} recipes
-                      </p>
                     </div>
+                    <p className="text-white text-sm drop-shadow-lg font-medium tracking-wide">
+                      {list.items.length} items • {list.recipeIds.length} recipes
+                    </p>
                   </div>
                 </div>
               ))}
@@ -1313,187 +1259,7 @@ export default function GroceryLists() {
         </div>
       )}
 
-      {/* Edit Visual Modal */}
-      {showEditVisualModal && editingVisualList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{zIndex: 60}}>
-          <div className="bg-[#1e1f26] border border-white/10 rounded-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white">Edit Grocery List</h2>
-              <button 
-                onClick={() => {
-                  setShowEditVisualModal(false)
-                  setEditingVisualList(null)
-                }}
-                className="text-[#FF3A25] font-medium text-lg"
-              >
-                Cancel
-              </button>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-white mb-2">List Name</label>
-                <Input
-                  type="text"
-                  placeholder="Enter list name..."
-                  value={editListName}
-                  onChange={(e) => setEditListName(e.target.value)}
-                  className="bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-white mb-3">Visual Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setNewVisualType('gradient')}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      newVisualType === 'gradient' 
-                        ? 'border-[#FF3A25] bg-[#FF3A25]/20' 
-                        : 'border-white/20 hover:border-white/40'
-                    }`}
-                  >
-                    <div className="w-8 h-8 mx-auto mb-2 rounded" style={{
-                      background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`
-                    }}></div>
-                    <span className="text-xs text-white">Gradient</span>
-                  </button>
-                  <button
-                    onClick={() => setNewVisualType('emoji')}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      newVisualType === 'emoji' 
-                        ? 'border-[#FF3A25] bg-[#FF3A25]/20' 
-                        : 'border-white/20 hover:border-white/40'
-                    }`}
-                  >
-                    <div className="w-8 h-8 mx-auto mb-2 flex items-center justify-center text-lg">
-                      {newEmoji || '🛒'}
-                    </div>
-                    <span className="text-xs text-white">Emoji</span>
-                  </button>
-                  <button
-                    onClick={() => setNewVisualType('image')}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      newVisualType === 'image' 
-                        ? 'border-[#FF3A25] bg-[#FF3A25]/20' 
-                        : 'border-white/20 hover:border-white/40'
-                    }`}
-                  >
-                    <div className="w-8 h-8 mx-auto mb-2 bg-gray-700 rounded flex items-center justify-center text-gray-400">
-                      📷
-                    </div>
-                    <span className="text-xs text-white">Image</span>
-                  </button>
-                </div>
-              </div>
 
-              {newVisualType === 'gradient' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-white mb-2">Gradient Colors</label>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs text-white/70 mb-1">From</label>
-                      <input
-                        type="color"
-                        value={gradientFrom}
-                        onChange={(e) => setGradientFrom(e.target.value)}
-                        className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs text-white/70 mb-1">To</label>
-                      <input
-                        type="color"
-                        value={gradientTo}
-                        onChange={(e) => setGradientTo(e.target.value)}
-                        className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <div 
-                      className="w-full h-8 rounded" 
-                      style={{background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`}}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {newVisualType === 'emoji' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-white mb-2">Choose Emoji</label>
-                  <div className="grid grid-cols-8 gap-1 p-3 bg-[#14151a] rounded-lg max-h-32 overflow-y-auto">
-                    {foodEmojis.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => setNewEmoji(emoji)}
-                        className={`p-2 rounded text-xl hover:bg-white/10 transition-colors ${
-                          newEmoji === emoji ? 'bg-[#FF3A25]/20 ring-1 ring-[#FF3A25]' : ''
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {newVisualType === 'image' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-white mb-2">Choose Image</label>
-                  
-                  <label className="block w-full">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                    <div className="w-full p-6 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg text-center cursor-pointer hover:border-white/40 transition-colors">
-                      <span className="text-white/70 text-lg">📁 Click to upload image</span>
-                      <p className="text-white/50 text-sm mt-1">JPG, PNG, GIF up to 10MB</p>
-                    </div>
-                  </label>
-                </div>
-              )}
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-white mb-2">Preview</label>
-                <div className="w-16 h-16 rounded-lg mx-auto flex items-center justify-center overflow-hidden">
-                  {newVisualType === 'gradient' ? (
-                    <div 
-                      className="w-full h-full"
-                      style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
-                    />
-                  ) : newVisualType === 'emoji' ? (
-                    <span className="text-3xl">{newEmoji}</span>
-                  ) : newImageUrl ? (
-                    <img 
-                      src={newImageUrl} 
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-700 flex items-center justify-center text-gray-400">
-                      📷
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <button
-                onClick={handleSaveVisual}
-                disabled={(newVisualType === 'image' && !newImageUrl) || !editListName.trim()}
-                className="w-full px-4 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Add Recipe Modal */}
       {showAddRecipeModal && (
@@ -1566,6 +1332,77 @@ export default function GroceryLists() {
         recipe={selectedRecipeForDetail}
         showActionButtons={false}
       />
+
+      {/* Edit List Modal */}
+      {showEditVisualModal && editingVisualList && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{zIndex: 60}}>
+          <div className="bg-[#1e1f26] border border-white/10 rounded-xl w-full max-w-md">
+            <div className="flex justify-between items-center p-6 border-b border-white/10">
+              <h2 className="text-xl font-semibold text-white">Edit Grocery List</h2>
+              <button
+                onClick={() => {
+                  setShowEditVisualModal(false)
+                  setEditingVisualList(null)
+                }}
+                className="text-[#FF3A25] font-medium text-lg"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-white mb-2">List Name</label>
+                <Input
+                  type="text"
+                  placeholder="Enter list name..."
+                  value={editListName}
+                  onChange={(e) => setEditListName(e.target.value)}
+                  className="bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-white mb-2">Gradient Colors</label>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-white/70 mb-1">From</label>
+                    <input
+                      type="color"
+                      value={gradientFrom}
+                      onChange={(e) => setGradientFrom(e.target.value)}
+                      className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-white/70 mb-1">To</label>
+                    <input
+                      type="color"
+                      value={gradientTo}
+                      onChange={(e) => setGradientTo(e.target.value)}
+                      className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div
+                    className="w-full h-8 rounded"
+                    style={{background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`}}
+                  ></div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveVisual}
+                disabled={!editListName.trim()}
+                className="w-full px-4 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
