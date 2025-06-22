@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/db/supabase'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
-import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle } from "lucide-react"
+import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle, Share } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import NetflixCarousel from '../../components/features/grocery/NetflixCarousel'
 import { 
@@ -26,6 +26,8 @@ import {
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 import BuyGroceriesModal from '../../components/features/grocery/BuyGroceriesModal'
 import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'
+import { Document, Paragraph, TextRun, HeadingLevel, Packer } from 'docx'
+import jsPDF from 'jspdf'
 
 // Recipe interface for local use
 interface Recipe {
@@ -180,6 +182,7 @@ export default function GroceryLists() {
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
   const [showRecipeDetailModal, setShowRecipeDetailModal] = useState(false)
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null)
+  const [showShareDropdown, setShowShareDropdown] = useState<string | null>(null)
 
   // Scroll position preservation
   const scrollPositions = useRef<{ [key: string]: number }>({})
@@ -223,6 +226,22 @@ export default function GroceryLists() {
       return () => document.removeEventListener('click', handleClickOutside)
     }
   }, [showSortMenu])
+
+  // Close share dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.share-dropdown')) {
+        setShowShareDropdown(null);
+      }
+    };
+
+    if (showShareDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showShareDropdown]);
 
   const loadRecipes = async () => {
     if (!user) return
@@ -641,6 +660,249 @@ export default function GroceryLists() {
     setShowRecipeDetailModal(true)
   }
 
+  // Share export functions
+  const handleExport = (list: GroceryList, format: string) => {
+    switch (format) {
+      case 'txt':
+        exportListAsTxt(list);
+        break;
+      case 'pdf':
+        exportListAsPdf(list);
+        break;
+      case 'docx':
+        exportListAsDocx(list);
+        break;
+      case 'html':
+        exportListAsHtml(list);
+        break;
+      case 'excel':
+        exportListAsExcel(list);
+        break;
+      case 'url':
+        shareListUrl(list);
+        break;
+      case 'clipboard':
+        copyListToClipboard(list);
+        break;
+    }
+    setShowShareDropdown(null);
+  };
+
+  const exportListAsTxt = (list: GroceryList) => {
+    let content = `${list.name}\n`;
+    content += '='.repeat(list.name.length) + '\n\n';
+
+    content += 'GROCERY LIST:\n';
+    list.items.forEach((item) => {
+      const quantity = item.original_quantity_min === item.original_quantity_max
+        ? item.original_quantity_min?.toString() || '1'
+        : `${item.original_quantity_min || 1}-${item.original_quantity_max || 1}`;
+      const unit = item.original_unit ? ` ${item.original_unit}` : '';
+      content += `• ${quantity}${unit} ${item.sort_name}\n`;
+    });
+
+    content += `\nTotal items: ${list.items.length}\n`;
+    content += `Generated on: ${new Date().toLocaleDateString()}\n`;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportListAsPdf = (list: GroceryList) => {
+    const doc = new jsPDF();
+
+    // Title
+    doc.setFontSize(20);
+    doc.text(list.name, 20, 30);
+
+    // Items
+    doc.setFontSize(12);
+    let yPosition = 50;
+
+    list.items.forEach((item) => {
+      const quantity = item.original_quantity_min === item.original_quantity_max
+        ? item.original_quantity_min?.toString() || '1'
+        : `${item.original_quantity_min || 1}-${item.original_quantity_max || 1}`;
+      const unit = item.original_unit ? ` ${item.original_unit}` : '';
+      const text = `• ${quantity}${unit} ${item.sort_name}`;
+
+      doc.text(text, 20, yPosition);
+      yPosition += 10;
+
+      // Add new page if needed
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 30;
+      }
+    });
+
+    // Footer
+    doc.setFontSize(10);
+    doc.text(`Total items: ${list.items.length}`, 20, yPosition + 10);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition + 20);
+
+    doc.save(`${list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+  };
+
+  const exportListAsDocx = async (list: GroceryList) => {
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            text: list.name,
+            heading: HeadingLevel.HEADING_1,
+          }),
+          new Paragraph({
+            text: "",
+          }),
+          ...list.items.map((item) => {
+            const quantity = item.original_quantity_min === item.original_quantity_max
+              ? item.original_quantity_min?.toString() || '1'
+              : `${item.original_quantity_min || 1}-${item.original_quantity_max || 1}`;
+            const unit = item.original_unit ? ` ${item.original_unit}` : '';
+            return new Paragraph({
+              children: [
+                new TextRun(`• ${quantity}${unit} ${item.sort_name}`)
+              ],
+            });
+          }),
+          new Paragraph({
+            text: "",
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(`Total items: ${list.items.length}`)
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(`Generated on: ${new Date().toLocaleDateString()}`)
+            ],
+          }),
+        ],
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.docx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportListAsHtml = (list: GroceryList) => {
+    let html = `<!DOCTYPE html>
+<html>
+<head>
+    <title>${list.name}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        ul { list-style-type: disc; padding-left: 20px; }
+        li { margin: 5px 0; }
+        .footer { margin-top: 30px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>${list.name}</h1>
+    <ul>`;
+
+    list.items.forEach((item) => {
+      const quantity = item.original_quantity_min === item.original_quantity_max
+        ? item.original_quantity_min?.toString() || '1'
+        : `${item.original_quantity_min || 1}-${item.original_quantity_max || 1}`;
+      const unit = item.original_unit ? ` ${item.original_unit}` : '';
+      html += `        <li>${quantity}${unit} ${item.sort_name}</li>\n`;
+    });
+
+    html += `    </ul>
+    <div class="footer">
+        <p>Total items: ${list.items.length}</p>
+        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+    </div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportListAsExcel = (list: GroceryList) => {
+    // Create CSV content (Excel can open CSV files)
+    let content = `Item,Quantity,Unit\n`;
+    list.items.forEach(item => {
+      const quantity = item.original_quantity_min === item.original_quantity_max
+        ? item.original_quantity_min?.toString() || '1'
+        : `${item.original_quantity_min || 1}-${item.original_quantity_max || 1}`;
+      const unit = item.original_unit || '';
+      content += `"${item.sort_name}","${quantity}","${unit}"\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const shareListUrl = (list: GroceryList) => {
+    const listUrl = `${window.location.origin}/grocery-list/${encodeURIComponent(list.name)}`;
+
+    navigator.clipboard.writeText(listUrl).then(() => {
+      alert('Grocery list URL copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy URL:', err);
+      alert('Failed to copy URL to clipboard.');
+    });
+  };
+
+  const copyListToClipboard = (list: GroceryList) => {
+    let content = `${list.name}\n`;
+    content += '='.repeat(list.name.length) + '\n\n';
+
+    content += 'GROCERY LIST:\n';
+    list.items.forEach((item) => {
+      const quantity = item.original_quantity_min === item.original_quantity_max
+        ? item.original_quantity_min?.toString() || '1'
+        : `${item.original_quantity_min || 1}-${item.original_quantity_max || 1}`;
+      const unit = item.original_unit ? ` ${item.original_unit}` : '';
+      content += `• ${quantity}${unit} ${item.sort_name}\n`;
+    });
+
+    content += `\nTotal items: ${list.items.length}\n`;
+    content += `Generated on: ${new Date().toLocaleDateString()}\n`;
+
+    navigator.clipboard.writeText(content).then(() => {
+      alert('Grocery list copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy list:', err);
+      alert('Failed to copy list to clipboard.');
+    });
+  };
+
   const handleRemoveRecipeFromList = async (recipeId: string) => {
     if (!selectedList) return
     
@@ -853,7 +1115,7 @@ export default function GroceryLists() {
           </div>
 
           {/* Grocery Lists */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 dark-scrollbar">
             <div className="space-y-3">
               {groceryLists.map((list) => (
                 <div
@@ -877,6 +1139,108 @@ export default function GroceryLists() {
                         {list.name}
                       </h3>
                       <div className="flex items-center gap-1 ml-2">
+                        <div className="relative share-dropdown">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setShowShareDropdown(showShareDropdown === list.id ? null : list.id)
+                            }}
+                            className="text-white hover:text-gray-200 transition-colors drop-shadow-lg translate-y-px"
+                          >
+                            <Share className="h-4 w-4" />
+                          </button>
+
+                          {showShareDropdown === list.id && (
+                            <div className="absolute bottom-full mb-2 right-0 w-48 bg-[#1e1f26] border border-white/10 rounded-lg shadow-lg z-10">
+                              <div className="py-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'url')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                  <span>Share URL</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'clipboard')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  <span>Copy to Clipboard</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'pdf')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <span>Export as PDF</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'docx')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <span>Export as DOC</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'txt')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <span>Export as TXT</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'excel')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                  </svg>
+                                  <span>Export as Excel</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleExport(list, 'html')
+                                  }}
+                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                  </svg>
+                                  <span>Export as HTML</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -981,7 +1345,7 @@ export default function GroceryLists() {
               </div>
 
               {/* Main Ingredients Section */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden dark-scrollbar">
                 <div className="p-4 max-w-full">
                   <div className="flex items-center justify-between mb-4">
                     <button
@@ -1414,7 +1778,7 @@ export default function GroceryLists() {
               
               <div className="mb-6">
                 <label className="block text-sm font-medium text-white mb-2">Select Recipes</label>
-                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2">
+                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2 dark-scrollbar">
                   {recipes.map((recipe) => (
                     <div
                       key={recipe.id}
@@ -1481,7 +1845,7 @@ export default function GroceryLists() {
             <div className="p-4">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-white mb-2">Available Recipes</label>
-                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2">
+                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2 dark-scrollbar">
                   {recipes
                     .filter(recipe => !selectedList?.recipeIds.includes(recipe.id))
                     .map((recipe) => (

@@ -7,6 +7,33 @@
 body {
   font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
+  /* Apply dark scrollbar globally */
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #1a202c;
+}
+
+body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body::-webkit-scrollbar-track {
+  background: #1a202c;
+  border-radius: 4px;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+  border: 1px solid #2d3748;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
+
+body::-webkit-scrollbar-corner {
+  background: #1a202c;
 }
 
 html {
@@ -33,6 +60,36 @@ html {
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* Dark mode scrollbar styling */
+  .dark-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #4a5568 #1a202c;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-track {
+    background: #1a202c;
+    border-radius: 4px;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb {
+    background: #4a5568;
+    border-radius: 4px;
+    border: 1px solid #2d3748;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #718096;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-corner {
+    background: #1a202c;
   }
 
 }
