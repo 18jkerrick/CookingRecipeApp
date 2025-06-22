@@ -96,6 +96,7 @@ export default function GroceryLists() {
   const [editQuantity, setEditQuantity] = useState('')
   const [editUnit, setEditUnit] = useState('')
   const [editName, setEditName] = useState('')
+  const [quantityError, setQuantityError] = useState('')
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false)
   const [recipesCollapsed, setRecipesCollapsed] = useState(false)
   const [showBuyGroceriesModal, setShowBuyGroceriesModal] = useState(false)
@@ -263,39 +264,135 @@ export default function GroceryLists() {
   }
 
 
+  // Validate quantity format
+  const validateQuantity = (quantity: string): { isValid: boolean; error: string; min?: number; max?: number } => {
+    if (!quantity.trim()) {
+      return { isValid: false, error: 'Quantity is required' }
+    }
+
+    // Remove extra spaces
+    const cleanQuantity = quantity.trim()
+
+    // Check for range formats: "4-5" or "4 to 5"
+    if (cleanQuantity.includes('-')) {
+      const parts = cleanQuantity.split('-').map(p => p.trim())
+      if (parts.length !== 2) {
+        return { isValid: false, error: 'Range format should be "4-5"' }
+      }
+
+      const min = parseFloat(parts[0])
+      const max = parseFloat(parts[1])
+
+      if (isNaN(min) || isNaN(max)) {
+        return { isValid: false, error: 'Range values must be numbers (e.g., "4-5")' }
+      }
+
+      if (min <= 0 || max <= 0) {
+        return { isValid: false, error: 'Quantities must be positive numbers' }
+      }
+
+      if (min >= max) {
+        return { isValid: false, error: 'First number must be less than second (e.g., "4-5")' }
+      }
+
+      return { isValid: true, error: '', min, max }
+    }
+
+    // Check for "X to Y" format
+    if (cleanQuantity.toLowerCase().includes(' to ')) {
+      const parts = cleanQuantity.toLowerCase().split(' to ').map(p => p.trim())
+      if (parts.length !== 2) {
+        return { isValid: false, error: 'Range format should be "4 to 5"' }
+      }
+
+      const min = parseFloat(parts[0])
+      const max = parseFloat(parts[1])
+
+      if (isNaN(min) || isNaN(max)) {
+        return { isValid: false, error: 'Range values must be numbers (e.g., "4 to 5")' }
+      }
+
+      if (min <= 0 || max <= 0) {
+        return { isValid: false, error: 'Quantities must be positive numbers' }
+      }
+
+      if (min >= max) {
+        return { isValid: false, error: 'First number must be less than second (e.g., "4 to 5")' }
+      }
+
+      return { isValid: true, error: '', min, max }
+    }
+
+    // Single number
+    const singleValue = parseFloat(cleanQuantity)
+    if (isNaN(singleValue)) {
+      return { isValid: false, error: 'Enter a number (e.g., "4") or range (e.g., "4-5" or "4 to 5")' }
+    }
+
+    if (singleValue <= 0) {
+      return { isValid: false, error: 'Quantity must be a positive number' }
+    }
+
+    return { isValid: true, error: '', min: singleValue, max: singleValue }
+  }
+
   const handleStartEdit = (item: GroceryItem) => {
     setEditingItem(item.id)
-    setEditQuantity((item.original_quantity_min || 1).toString())
+    setQuantityError('') // Clear any previous errors
+
+    // Handle ranges properly - if min and max are different, show as range
+    const hasRange = item.original_quantity_max && item.original_quantity_min !== item.original_quantity_max
+    if (hasRange) {
+      setEditQuantity(`${item.original_quantity_min}-${item.original_quantity_max}`)
+    } else {
+      setEditQuantity((item.original_quantity_min || 1).toString())
+    }
+
     setEditUnit(item.original_unit || '')
-    setEditName(item.name)
+    setEditName(item.sort_name)
   }
 
   const handleSaveEdit = async () => {
     if (selectedList && editingItem) {
+      // Validate quantity format
+      const validation = validateQuantity(editQuantity)
+
+      if (!validation.isValid) {
+        setQuantityError(validation.error)
+        return // Don't save if validation fails
+      }
+
+      // Clear error if validation passes
+      setQuantityError('')
+
+      const quantityMin = validation.min!
+      const quantityMax = validation.max!
+
       const success = await updateGroceryItem(selectedList.id, editingItem, {
-        original_quantity_min: parseFloat(editQuantity) || 1,
-        original_quantity_max: parseFloat(editQuantity) || 1,
+        original_quantity_min: quantityMin,
+        original_quantity_max: quantityMax,
         original_unit: editUnit || undefined,
         name: editName
       })
-      
+
       if (success) {
         setSelectedList(prev => {
           if (!prev) return null
           return {
             ...prev,
-            items: prev.items.map(item => 
-              item.id === editingItem 
-                ? { ...item, original_quantity_min: parseFloat(editQuantity) || 1, original_quantity_max: parseFloat(editQuantity) || 1, original_unit: editUnit || undefined, name: editName }
+            items: prev.items.map(item =>
+              item.id === editingItem
+                ? { ...item, original_quantity_min: quantityMin, original_quantity_max: quantityMax, original_unit: editUnit || undefined, name: editName }
                 : item
             )
           }
         })
-        
+
         setEditingItem(null)
         setEditQuantity('')
         setEditUnit('')
         setEditName('')
+        setQuantityError('')
       }
     }
   }
@@ -305,6 +402,17 @@ export default function GroceryLists() {
     setEditQuantity('')
     setEditUnit('')
     setEditName('')
+    setQuantityError('')
+  }
+
+  // Real-time validation as user types
+  const handleQuantityChange = (value: string) => {
+    setEditQuantity(value)
+
+    // Clear error when user starts typing
+    if (quantityError && value.trim()) {
+      setQuantityError('')
+    }
   }
 
   const handleDeleteItem = async (itemId: string) => {
@@ -663,7 +771,7 @@ export default function GroceryLists() {
                               e.stopPropagation()
                               handleEditVisual(list)
                             }}
-                            className="text-white/40 hover:text-white transition-colors"
+                            className="text-white/40 hover:text-[#2B966F] transition-colors"
                           >
                             <Edit3 className="h-3 w-3" />
                           </button>
@@ -821,6 +929,127 @@ export default function GroceryLists() {
 
                             if (isCondensed) {
                               const condensedItem = item as CondensedGroceryItem
+
+                              // Check if the condensed group is in editing mode
+                              const hasEditingItem = condensedItem.originalItems.some(origItem => editingItem === origItem.id)
+
+                              if (hasEditingItem) {
+                                // Show all items as edit forms when condensed group is being edited
+                                return (
+                                  <div key={condensedItem.id} className="space-y-2">
+                                    {condensedItem.originalItems.map((origItem, index) => {
+                                      // Get the current values for this specific item
+                                      const isCurrentlyEditing = editingItem === origItem.id
+                                      const currentQuantity = isCurrentlyEditing ? editQuantity :
+                                        (origItem.original_quantity_max && origItem.original_quantity_min !== origItem.original_quantity_max)
+                                          ? `${origItem.original_quantity_min}-${origItem.original_quantity_max}`
+                                          : origItem.original_quantity_min.toString()
+                                      const currentUnit = isCurrentlyEditing ? editUnit : (origItem.original_unit || '')
+                                      const currentName = isCurrentlyEditing ? editName : origItem.sort_name
+
+                                      return (
+                                        <div
+                                          key={origItem.id}
+                                          className="flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg"
+                                        >
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <div className="flex flex-col">
+                                              <Input
+                                                type="text"
+                                                value={currentQuantity}
+                                                onChange={(e) => {
+                                                  if (isCurrentlyEditing) {
+                                                    handleQuantityChange(e.target.value)
+                                                  } else {
+                                                    // Start editing this item
+                                                    handleStartEdit(origItem)
+                                                    // The value will be set by handleStartEdit
+                                                  }
+                                                }}
+                                                onFocus={() => {
+                                                  if (!isCurrentlyEditing) {
+                                                    handleStartEdit(origItem)
+                                                  }
+                                                }}
+                                                className={`w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm ${
+                                                  isCurrentlyEditing && quantityError ? 'ring-1 ring-red-500' : ''
+                                                }`}
+                                                placeholder="4 or 4-5"
+                                              />
+                                              {isCurrentlyEditing && quantityError && (
+                                                <span className="text-red-400 text-xs mt-1 w-20">{quantityError}</span>
+                                              )}
+                                            </div>
+                                            <Input
+                                              type="text"
+                                              value={currentUnit}
+                                              onChange={(e) => {
+                                                if (isCurrentlyEditing) {
+                                                  setEditUnit(e.target.value)
+                                                } else {
+                                                  handleStartEdit(origItem)
+                                                }
+                                              }}
+                                              onFocus={() => {
+                                                if (!isCurrentlyEditing) {
+                                                  handleStartEdit(origItem)
+                                                }
+                                              }}
+                                              className="w-24 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                              placeholder="Unit"
+                                            />
+                                            <Input
+                                              type="text"
+                                              value={currentName}
+                                              onChange={(e) => {
+                                                if (isCurrentlyEditing) {
+                                                  setEditName(e.target.value)
+                                                } else {
+                                                  handleStartEdit(origItem)
+                                                }
+                                              }}
+                                              onFocus={() => {
+                                                if (!isCurrentlyEditing) {
+                                                  handleStartEdit(origItem)
+                                                }
+                                              }}
+                                              className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                              placeholder="Item name"
+                                            />
+                                            {index === 0 && (
+                                              <>
+                                                <button
+                                                  onClick={handleSaveEdit}
+                                                  disabled={isCurrentlyEditing && (!!quantityError || !editQuantity.trim())}
+                                                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                                >
+                                                  Save
+                                                </button>
+                                                <button
+                                                  onClick={handleCancelEdit}
+                                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </>
+                                            )}
+                                            {index > 0 && (
+                                              <button
+                                                onClick={() => handleDeleteItem(origItem.id)}
+                                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                              >
+                                                Delete
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )
+                              }
+
+                              // Show condensed view when not editing
                               return (
                                 <div
                                   key={condensedItem.id}
@@ -848,6 +1077,25 @@ export default function GroceryLists() {
                                       </div>
                                     </div>
                                   </div>
+                                  {!condensedItem.checked && (
+                                    <div className="flex items-center gap-1 ml-auto">
+                                      <button
+                                        onClick={() => handleStartEdit(condensedItem.originalItems[0])}
+                                        className="p-2 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
+                                      >
+                                        <Edit3 className="h-5 w-5" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          // Delete all original items in the condensed group
+                                          condensedItem.originalItems.forEach(item => handleDeleteItem(item.id))
+                                        }}
+                                        className="p-2 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                      >
+                                        <Trash2 className="h-5 w-5" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )
                             } else {
@@ -868,40 +1116,50 @@ export default function GroceryLists() {
                                   </button>
                                   <div className="flex items-center gap-2 flex-1">
                                     {editingItem === regularItem.id ? (
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <Input
-                                          type="text"
-                                          value={editQuantity}
-                                          onChange={(e) => setEditQuantity(e.target.value)}
-                                          className="w-16 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                          placeholder="Qty"
-                                        />
-                                        <Input
-                                          type="text"
-                                          value={editUnit}
-                                          onChange={(e) => setEditUnit(e.target.value)}
-                                          className="w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                          placeholder="Unit"
-                                        />
-                                        <Input
-                                          type="text"
-                                          value={editName}
-                                          onChange={(e) => setEditName(e.target.value)}
-                                          className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                          placeholder="Item name"
-                                        />
-                                        <button
-                                          onClick={handleSaveEdit}
-                                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
-                                        >
-                                          Save
-                                        </button>
-                                        <button
-                                          onClick={handleCancelEdit}
-                                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-                                        >
-                                          Cancel
-                                        </button>
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex flex-col">
+                                            <Input
+                                              type="text"
+                                              value={editQuantity}
+                                              onChange={(e) => handleQuantityChange(e.target.value)}
+                                              className={`w-16 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm ${
+                                                quantityError ? 'ring-1 ring-red-500' : ''
+                                              }`}
+                                              placeholder="4 or 4-5"
+                                            />
+                                            {quantityError && (
+                                              <span className="text-red-400 text-xs mt-1 w-16">{quantityError}</span>
+                                            )}
+                                          </div>
+                                          <Input
+                                            type="text"
+                                            value={editUnit}
+                                            onChange={(e) => setEditUnit(e.target.value)}
+                                            className="w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                            placeholder="Unit"
+                                          />
+                                          <Input
+                                            type="text"
+                                            value={editName}
+                                            onChange={(e) => setEditName(e.target.value)}
+                                            className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                            placeholder="Item name"
+                                          />
+                                          <button
+                                            onClick={handleSaveEdit}
+                                            disabled={!!quantityError || !editQuantity.trim()}
+                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                          >
+                                            Save
+                                          </button>
+                                          <button
+                                            onClick={handleCancelEdit}
+                                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
                                       </div>
                                     ) : (
                                       <div className="text-sm font-medium flex-1">
@@ -929,7 +1187,7 @@ export default function GroceryLists() {
                                             <div className="flex items-center gap-1 ml-auto">
                                               <button
                                                 onClick={() => handleStartEdit(regularItem)}
-                                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all"
+                                                className="p-2 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
                                               >
                                                 <Edit3 className="h-5 w-5" />
                                               </button>

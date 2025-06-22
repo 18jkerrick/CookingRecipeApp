@@ -656,9 +656,10 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
         checked: false
       }));
 
-      const { error: itemsError } = await supabase
+      const { data: insertedItems, error: itemsError } = await supabase
         .from('grocery_items')
-        .insert(groceryItems);
+        .insert(groceryItems)
+        .select();
 
       if (itemsError) {
         console.error('Error creating grocery items:', itemsError);
@@ -667,6 +668,37 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
         await supabase.from('grocery_lists').delete().eq('id', list.id);
         return null;
       }
+
+      // Map the inserted items with their real database IDs
+      const itemsWithRealIds = insertedItems?.map(dbItem => ({
+        id: dbItem.id,
+        name: dbItem.name,
+        sort_name: dbItem.sort_name,
+        original_quantity_min: dbItem.original_quantity_min,
+        original_quantity_max: dbItem.original_quantity_max,
+        original_unit: dbItem.original_unit,
+        metric_quantity_min: dbItem.metric_quantity_min,
+        metric_quantity_max: dbItem.metric_quantity_max,
+        metric_unit: dbItem.metric_unit,
+        imperial_quantity_min: dbItem.imperial_quantity_min,
+        imperial_quantity_max: dbItem.imperial_quantity_max,
+        imperial_unit: dbItem.imperial_unit,
+        category: dbItem.category as GroceryItem['category'],
+        recipeId: dbItem.recipe_id,
+        checked: dbItem.checked,
+        created_at: dbItem.created_at,
+        updated_at: dbItem.updated_at
+      })) || [];
+
+      return {
+        id: list.id,
+        name: list.name,
+        created_at: list.created_at,
+        updated_at: list.created_at,
+        visual: list.visual,
+        recipeIds: recipes.map(r => r.id),
+        items: itemsWithRealIds
+      };
     }
 
     return {
@@ -676,10 +708,7 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
       updated_at: list.created_at,
       visual: list.visual,
       recipeIds: recipes.map(r => r.id),
-      items: combinedIngredients.map((item, index) => ({
-        ...item,
-        id: `${list.id}-${index}`
-      }))
+      items: []
     };
   } catch (error) {
     console.error('Error creating grocery list:', error);
