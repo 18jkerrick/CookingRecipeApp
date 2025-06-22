@@ -30,7 +30,7 @@ export interface GroceryItem {
   imperial_unit?: string;
   
   // Metadata
-  category: 'produce' | 'meat-seafood' | 'dairy-eggs' | 'pantry' | 'spices' | 'frozen' | 'bakery' | 'other';
+  category: 'produce' | 'meat-seafood' | 'dairy-eggs-fridge' | 'pantry' | 'herbs-spices' | 'frozen' | 'bakery' | 'flours-sugars' | 'oils-vinegars' | 'pastas-grains-legumes' | 'uncategorized' | 'dairy-eggs' | 'spices' | 'other';
   recipeId: string;
   checked: boolean;
   created_at?: string;
@@ -237,7 +237,7 @@ const simpleFallbackParse = (ingredient: string): {
       remaining = ingredient.substring(quantityMatch[0].length).trim();
       
       // We'll handle the range properly below
-      const unitMatch = remaining.match(/^(teaspoons?|tablespoons?|tbsps?|tsps?|cups?|pounds?|lbs?|ounces?|ozs?|grams?|gs?|kilograms?|kgs?|kg|liters?|milliliters?|ml|inch|inches)\s+/i);
+      const unitMatch = remaining.match(/^(teaspoons?|tablespoons?|tbsps?|tsps?|cups?|pounds?|lbs?|ounces?|ozs?|grams?|gs?|kilograms?|kgs?|kg|liters?|milliliters?|ml|inch|inches|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|sprigs?|packs?)\s+/i);
       if (unitMatch) {
         unit = unitMatch[1].toLowerCase();
         remaining = remaining.substring(unitMatch[0].length).trim();
@@ -246,7 +246,11 @@ const simpleFallbackParse = (ingredient: string): {
       const cleanIngredient = remaining
         .replace(/\([^)]*\)/g, '')
         .replace(/,.*$/, '')
-        .trim();
+        .replace(/\s*-\s*$/, '') // Remove trailing dashes
+        .trim()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
       
       return {
         name: ingredient,
@@ -263,7 +267,7 @@ const simpleFallbackParse = (ingredient: string): {
   }
   
   // Extract unit
-  const unitMatch = remaining.match(/^(teaspoons?|tablespoons?|tbsps?|tsps?|cups?|pounds?|lbs?|ounces?|ozs?|grams?|gs?|kilograms?|kgs?|liters?|milliliters?|ml|inch|inches)\s+/i);
+  const unitMatch = remaining.match(/^(teaspoons?|tablespoons?|tbsps?|tsps?|cups?|pounds?|lbs?|ounces?|ozs?|grams?|gs?|kilograms?|kgs?|liters?|milliliters?|ml|inch|inches|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|sprigs?|packs?)\s+/i);
   if (unitMatch) {
     unit = unitMatch[1].toLowerCase();
     remaining = remaining.substring(unitMatch[0].length).trim();
@@ -273,7 +277,11 @@ const simpleFallbackParse = (ingredient: string): {
   const cleanIngredient = remaining
     .replace(/\([^)]*\)/g, '') // Remove parentheses
     .replace(/,.*$/, '') // Remove everything after comma
-    .trim();
+    .replace(/\s*-\s*$/, '') // Remove trailing dashes
+    .trim()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
   
   console.log(`⚡ Fallback result: qty=${quantity}, unit="${unit}", ingredient="${cleanIngredient}"`);
   
@@ -306,10 +314,30 @@ export const parseIngredientForGrocery = (ingredient: string, normalizedData?: a
     const maxQty = hasRange ? normalizedData.range.max : (normalizedData.quantity || 1);
     
     console.log(`🔢 Extracted: minQty=${minQty}, maxQty=${maxQty}, unit="${normalizedData.unit}", ingredient="${normalizedData.ingredient}"`);
-    
+
+    // Clean the AI ingredient name to remove any remaining quantities/units
+    let cleanIngredientName = normalizedData.ingredient || 'unknown';
+
+    // Remove quantities and units that might still be in the AI data
+    cleanIngredientName = cleanIngredientName
+      .replace(/^\d+(\.\d+)?\s*(to\s+\d+(\.\d+)?)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|sprigs?|packs?|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?)\s*/i, '')
+      .replace(/^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|sprigs?|packs?|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?)\s*/i, '')
+      .replace(/^\d+(\.\d+)?\s*/i, '')
+      .replace(/\s*-\s*\d+.*$/, '') // Remove " - 4 tbsp" type suffixes
+      .replace(/\s*-\s*$/, '') // Remove trailing dashes like "Chives -"
+      .trim();
+
+    // Capitalize each word for better display
+    cleanIngredientName = cleanIngredientName
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    console.log(`🧹 Cleaned ingredient name: "${normalizedData.ingredient}" → "${cleanIngredientName}"`);
+
     return {
       name: ingredient, // Keep beautiful formatted display string
-      sort_name: normalizedData.ingredient || 'unknown', // AI already extracted clean ingredient name!
+      sort_name: cleanIngredientName, // Clean ingredient name
       original_quantity_min: minQty || 1,
       original_quantity_max: maxQty || 1,
       original_unit: normalizedData.unit || undefined
@@ -524,7 +552,7 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
             imperial_quantity_max: imperialMax,
             imperial_unit: imperialUnit,
             
-            category: categorizeIngredient(parsed.sort_name),
+            category: normalized.category || categorizeIngredient(parsed.sort_name),
             recipeId: recipe.id,
             checked: false
           });
@@ -559,7 +587,7 @@ export const createGroceryList = async (name: string, recipes: Recipe[]): Promis
             imperial_quantity_min: imperialMin,
             imperial_quantity_max: imperialMax,
             imperial_unit: imperialUnit,
-            category: categorizeIngredient(parsed.sort_name),
+            category: categorizeIngredient(parsed.sort_name), // No AI data available for fallback
             recipeId: recipe.id,
             checked: false
           });
@@ -784,22 +812,41 @@ const categorizeIngredient = (name: string): GroceryItem['category'] => {
 
   // Remove common quantity patterns from the beginning
   cleanName = cleanName
-    .replace(/^\d+(\.\d+)?\s*(to\s+\d+(\.\d+)?)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?)\s*/i, '')
-    .replace(/^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?)\s*/i, '')
-    .replace(/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?)\s*/i, '')
+    .replace(/^\d+(\.\d+)?\s*(to\s+\d+(\.\d+)?)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?|sprigs?|packs?)\s*/i, '')
+    .replace(/^\d+(\.\d+)?\s*-\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?|sprigs?|packs?)\s*/i, '')
+    .replace(/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|kilograms?|ml|l|liters?|gallons?|quarts?|pints?|cloves?|pieces?|slices?|cans?|packages?|bags?|boxes?|pinches?|squeezes?|handfuls?|dashes?|splashes?|drops?|bunches?|heads?|stalks?|leaves?|sprigs?|packs?)\s*/i, '')
     .replace(/^\d+(\.\d+)?\s*/i, '')
     .trim();
 
-  // Produce
+  // Herbs & Spices (check first to avoid misclassification)
+  if (cleanName.includes('salt') || cleanName.includes('pepper') || cleanName.includes('spice') ||
+      cleanName.includes('cumin') || cleanName.includes('paprika') || cleanName.includes('chili powder') ||
+      cleanName.includes('garlic powder') || cleanName.includes('onion powder') || cleanName.includes('cinnamon') ||
+      cleanName.includes('nutmeg') || cleanName.includes('ginger') || cleanName.includes('turmeric') ||
+      cleanName.includes('cardamom') || cleanName.includes('cloves') || cleanName.includes('bay leaves') ||
+      cleanName.includes('vanilla') || cleanName.includes('extract') || cleanName.includes('seasoning') ||
+      cleanName.includes('rosemary') || cleanName.includes('thyme') || cleanName.includes('oregano') ||
+      cleanName.includes('basil') || cleanName.includes('sage') || cleanName.includes('cilantro') ||
+      cleanName.includes('parsley') || cleanName.includes('mint') || cleanName.includes('dill') ||
+      cleanName.includes('chives') || cleanName.includes('tarragon') || cleanName.includes('marjoram') ||
+      cleanName.includes('ground') && (cleanName.includes('cardamom') || cleanName.includes('cinnamon') ||
+      cleanName.includes('cloves') || cleanName.includes('cumin') || cleanName.includes('ginger'))) {
+    return 'herbs-spices';
+  }
+
+  // Produce (excluding herbs which are now in herbs-spices)
   if (cleanName.includes('onion') || cleanName.includes('garlic') || cleanName.includes('tomato') ||
-      cleanName.includes('pepper') || cleanName.includes('lettuce') || cleanName.includes('carrot') ||
-      cleanName.includes('celery') || cleanName.includes('potato') || cleanName.includes('apple') ||
-      cleanName.includes('banana') || cleanName.includes('lemon') || cleanName.includes('lime') ||
-      cleanName.includes('mushroom') || cleanName.includes('spinach') || cleanName.includes('broccoli') ||
-      cleanName.includes('cauliflower') || cleanName.includes('cucumber') || cleanName.includes('avocado') ||
-      cleanName.includes('bell pepper') || cleanName.includes('jalapeño') || cleanName.includes('cilantro') ||
-      cleanName.includes('parsley') || cleanName.includes('basil') || cleanName.includes('rosemary') ||
-      cleanName.includes('thyme') || cleanName.includes('oregano') || cleanName.includes('sage')) {
+      cleanName.includes('bell pepper') || cleanName.includes('jalapeño') || cleanName.includes('lettuce') ||
+      cleanName.includes('carrot') || cleanName.includes('celery') || cleanName.includes('potato') ||
+      cleanName.includes('apple') || cleanName.includes('banana') || cleanName.includes('lemon') ||
+      cleanName.includes('lime') || cleanName.includes('mushroom') || cleanName.includes('spinach') ||
+      cleanName.includes('broccoli') || cleanName.includes('cauliflower') || cleanName.includes('cucumber') ||
+      cleanName.includes('avocado') || cleanName.includes('corn') || cleanName.includes('zucchini') ||
+      cleanName.includes('squash') || cleanName.includes('eggplant') || cleanName.includes('asparagus')) {
+    // Exclude items that should be in pantry
+    if (cleanName.includes('tomato paste') || cleanName.includes('tomato sauce')) {
+      return 'pantry';
+    }
     return 'produce';
   }
 
@@ -816,24 +863,42 @@ const categorizeIngredient = (name: string): GroceryItem['category'] => {
     return 'meat-seafood';
   }
 
-  // Dairy & Eggs
+  // Flours & Sugars
+  if (cleanName.includes('flour') || cleanName.includes('sugar') || cleanName.includes('honey') ||
+      cleanName.includes('syrup') || cleanName.includes('molasses') || cleanName.includes('brown sugar') ||
+      cleanName.includes('powdered sugar') || cleanName.includes('confectioner') || cleanName.includes('cornstarch') ||
+      cleanName.includes('baking powder') || cleanName.includes('baking soda') || cleanName.includes('yeast')) {
+    return 'flours-sugars';
+  }
+
+  // Oils & Vinegars
+  if (cleanName.includes('oil') || cleanName.includes('vinegar') || cleanName.includes('olive oil') ||
+      cleanName.includes('vegetable oil') || cleanName.includes('canola oil') || cleanName.includes('coconut oil') ||
+      cleanName.includes('sesame oil') || cleanName.includes('balsamic') || cleanName.includes('apple cider vinegar') ||
+      cleanName.includes('white vinegar') || cleanName.includes('red wine vinegar')) {
+    return 'oils-vinegars';
+  }
+
+  // Pastas, Grains & Legumes
+  if (cleanName.includes('pasta') || cleanName.includes('rice') || cleanName.includes('quinoa') ||
+      cleanName.includes('barley') || cleanName.includes('oats') || cleanName.includes('beans') ||
+      cleanName.includes('lentils') || cleanName.includes('chickpeas') || cleanName.includes('black beans') ||
+      cleanName.includes('kidney beans') || cleanName.includes('pinto beans') || cleanName.includes('navy beans') ||
+      cleanName.includes('split peas') || cleanName.includes('bulgur') || cleanName.includes('couscous') ||
+      cleanName.includes('farro') || cleanName.includes('millet') || cleanName.includes('spaghetti') ||
+      cleanName.includes('penne') || cleanName.includes('linguine') || cleanName.includes('fusilli') ||
+      cleanName.includes('rigatoni') || cleanName.includes('macaroni') || cleanName.includes('noodles')) {
+    return 'pastas-grains-legumes';
+  }
+
+  // Dairy, Eggs & Fridge
   if (cleanName.includes('milk') || cleanName.includes('cheese') || cleanName.includes('butter') ||
       cleanName.includes('cream') || cleanName.includes('yogurt') || cleanName.includes('egg') ||
       cleanName.includes('cream cheese') || cleanName.includes('sour cream') || cleanName.includes('cottage cheese') ||
       cleanName.includes('mozzarella') || cleanName.includes('cheddar') || cleanName.includes('parmesan') ||
       cleanName.includes('provolone') || cleanName.includes('swiss') || cleanName.includes('goat cheese') ||
       cleanName.includes('ricotta') || cleanName.includes('mascarpone') || cleanName.includes('heavy cream')) {
-    return 'dairy-eggs';
-  }
-
-  // Spices & Seasonings
-  if (cleanName.includes('salt') || cleanName.includes('pepper') || cleanName.includes('spice') ||
-      cleanName.includes('cumin') || cleanName.includes('paprika') || cleanName.includes('chili powder') ||
-      cleanName.includes('garlic powder') || cleanName.includes('onion powder') || cleanName.includes('cinnamon') ||
-      cleanName.includes('nutmeg') || cleanName.includes('ginger') || cleanName.includes('turmeric') ||
-      cleanName.includes('cardamom') || cleanName.includes('cloves') || cleanName.includes('bay leaves') ||
-      cleanName.includes('vanilla') || cleanName.includes('extract') || cleanName.includes('seasoning')) {
-    return 'spices';
+    return 'dairy-eggs-fridge';
   }
 
   // Bakery
@@ -848,8 +913,16 @@ const categorizeIngredient = (name: string): GroceryItem['category'] => {
     return 'frozen';
   }
 
-  // Default to pantry
-  return 'pantry';
+  // Pantry (stocks, broths, soup mixes, tomato paste, etc.)
+  if (cleanName.includes('stock') || cleanName.includes('broth') || cleanName.includes('tomato paste') ||
+      cleanName.includes('soup mix') || cleanName.includes('onion soup') || cleanName.includes('bouillon') ||
+      cleanName.includes('sauce') || cleanName.includes('paste') || cleanName.includes('canned') ||
+      cleanName.includes('jar') || cleanName.includes('can')) {
+    return 'pantry';
+  }
+
+  // Default to uncategorized for manual review
+  return 'uncategorized';
 };
 
 
@@ -992,7 +1065,7 @@ export const deleteGroceryItem = async (listId: string, itemId: string): Promise
 };
 
 // Sort grocery items with proper database support
-export const sortGroceryItems = (items: GroceryItem[], sortBy: 'aisle' | 'alphabetical' | 'recipe'): GroceryItem[] => {
+export const sortGroceryItems = (items: GroceryItem[], sortBy: 'aisle' | 'recipe'): GroceryItem[] => {
   const unchecked = items.filter(item => !item.checked);
   const checked = items.filter(item => item.checked);
   
@@ -1000,7 +1073,7 @@ export const sortGroceryItems = (items: GroceryItem[], sortBy: 'aisle' | 'alphab
   
   switch (sortBy) {
     case 'aisle':
-      const categoryOrder = ['produce', 'meat-seafood', 'dairy-eggs', 'bakery', 'frozen', 'pantry', 'spices', 'other'];
+      const categoryOrder = ['produce', 'meat-seafood', 'dairy-eggs-fridge', 'herbs-spices', 'flours-sugars', 'oils-vinegars', 'pastas-grains-legumes', 'pantry', 'frozen', 'bakery', 'uncategorized'];
       sortedUnchecked = unchecked.sort((a, b) => {
         const aIndex = categoryOrder.indexOf(a.category);
         const bIndex = categoryOrder.indexOf(b.category);
@@ -1008,14 +1081,6 @@ export const sortGroceryItems = (items: GroceryItem[], sortBy: 'aisle' | 'alphab
           return aIndex - bIndex;
         }
         return (a.sort_name || a.name).localeCompare(b.sort_name || b.name);
-      });
-      break;
-      
-    case 'alphabetical':
-      sortedUnchecked = unchecked.sort((a, b) => {
-        const aSort = a.sort_name || a.name;
-        const bSort = b.sort_name || b.name;
-        return aSort.localeCompare(bSort);
       });
       break;
       
@@ -1039,13 +1104,20 @@ export const getCategoryDisplayName = (category: GroceryItem['category']): strin
   switch (category) {
     case 'produce': return 'Produce';
     case 'meat-seafood': return 'Meat & Seafood';
-    case 'dairy-eggs': return 'Dairy, Eggs & Fridge';
+    case 'dairy-eggs-fridge': return 'Dairy, Eggs & Fridge';
     case 'bakery': return 'Bakery';
     case 'frozen': return 'Frozen';
     case 'pantry': return 'Pantry';
-    case 'spices': return 'Spices & Seasonings';
-    case 'other': return 'Other';
-    default: return 'Other';
+    case 'herbs-spices': return 'Herbs & Spices';
+    case 'flours-sugars': return 'Flours & Sugars';
+    case 'oils-vinegars': return 'Oils & Vinegars';
+    case 'pastas-grains-legumes': return 'Pastas, Grains & Legumes';
+    case 'uncategorized': return 'Uncategorized';
+    // Legacy categories for backward compatibility
+    case 'dairy-eggs': return 'Dairy, Eggs & Fridge';
+    case 'spices': return 'Herbs & Spices';
+    case 'other': return 'Uncategorized';
+    default: return 'Uncategorized';
   }
 };
 
@@ -1116,7 +1188,7 @@ export const addRecipeToGroceryList = async (listId: string, recipe: Recipe): Pr
         imperial_quantity_min: imperialMin,
         imperial_quantity_max: imperialMax,
         imperial_unit: imperialUnit,
-        category: categorizeIngredient(parsed.sort_name),
+        category: categorizeIngredient(parsed.sort_name), // Manual addition uses fallback categorization
         checked: false
       });
     });

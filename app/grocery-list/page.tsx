@@ -42,6 +42,17 @@ interface Recipe {
   normalized_ingredients?: any[]; // AI-normalized ingredient data
 }
 
+// Condensed grocery item for ingredient grouping
+interface CondensedGroceryItem {
+  id: string; // Combined ID for the condensed item
+  sort_name: string; // The ingredient name (e.g., "Chuck Roast")
+  category: GroceryItem['category'];
+  checked: boolean;
+  isCondensed: true;
+  originalItems: GroceryItem[]; // All the original items that were condensed
+  quantities: string[]; // Array of formatted quantities (e.g., ["4 lbs", "2 lbs"])
+}
+
 export default function GroceryLists() {
   const { user, signOut, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
@@ -57,7 +68,7 @@ export default function GroceryLists() {
   const [selectedList, setSelectedList] = useState<GroceryList | null>(null)
 
   // UI state
-  const [sortBy, setSortBy] = useState<'aisle' | 'alphabetical' | 'recipe'>('aisle')
+  const [sortBy, setSortBy] = useState<'aisle' | 'recipe'>('aisle')
   const [showSortMenu, setShowSortMenu] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedRecipes, setSelectedRecipes] = useState<Recipe[]>([])
@@ -215,12 +226,39 @@ export default function GroceryLists() {
           if (!prev) return null
           return {
             ...prev,
-            items: prev.items.map(item => 
+            items: prev.items.map(item =>
               item.id === itemId ? { ...item, checked: !item.checked } : item
             )
           }
         })
       }
+    }
+  }
+
+  const handleToggleCondensedItem = async (condensedItem: CondensedGroceryItem) => {
+    if (selectedList) {
+      // Toggle all original items in the condensed group
+      const newCheckedState = !condensedItem.checked
+
+      for (const originalItem of condensedItem.originalItems) {
+        const success = await toggleGroceryItem(selectedList.id, originalItem.id)
+        if (!success) {
+          console.error('Failed to toggle item:', originalItem.id)
+          return
+        }
+      }
+
+      // Update the local state
+      setSelectedList(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          items: prev.items.map(item => {
+            const isInGroup = condensedItem.originalItems.some(origItem => origItem.id === item.id)
+            return isInGroup ? { ...item, checked: newCheckedState } : item
+          })
+        }
+      })
     }
   }
 
@@ -394,48 +432,105 @@ export default function GroceryLists() {
 
   const getSortedItems = () => {
     if (!selectedList) return []
-    
+
     // Use the regular items for all sorting methods in database version
     return sortGroceryItems(selectedList.items, sortBy)
   }
 
+  // Condense ingredients with the same sort_name
+  const condenseIngredients = (items: GroceryItem[]): (GroceryItem | CondensedGroceryItem)[] => {
+    const grouped: { [sortName: string]: GroceryItem[] } = {}
+
+    // Group items by sort_name (ingredient name)
+    items.forEach(item => {
+      const key = item.sort_name.toLowerCase()
+      if (!grouped[key]) {
+        grouped[key] = []
+      }
+      grouped[key].push(item)
+    })
+
+    // Convert groups to condensed items or return single items
+    return Object.values(grouped).map(group => {
+      if (group.length === 1) {
+        return group[0] // Return single item as-is
+      }
+
+      // Create condensed item for multiple ingredients with same sort_name
+      const firstItem = group[0]
+      const quantities = group.map(item =>
+        formatMeasurement(
+          item.original_quantity_min,
+          item.original_quantity_max,
+          item.original_unit,
+          item.metric_quantity_min,
+          item.metric_quantity_max,
+          item.metric_unit,
+          item.imperial_quantity_min,
+          item.imperial_quantity_max,
+          item.imperial_unit,
+          unitPreference
+        )
+      )
+
+      const condensedItem: CondensedGroceryItem = {
+        id: `condensed-${firstItem.sort_name.toLowerCase().replace(/\s+/g, '-')}`,
+        sort_name: firstItem.sort_name,
+        category: firstItem.category,
+        checked: group.every(item => item.checked), // All must be checked for condensed to be checked
+        isCondensed: true,
+        originalItems: group,
+        quantities: quantities
+      }
+
+      return condensedItem
+    })
+  }
+
   const getGroupedItems = () => {
     const sortedItems = getSortedItems()
-    
+
     if (sortBy === 'aisle') {
-      const grouped: { [category: string]: GroceryItem[] } = {}
+      const grouped: { [category: string]: (GroceryItem | CondensedGroceryItem)[] } = {}
       const unchecked = sortedItems.filter(item => !item.checked)
       const checked = sortedItems.filter(item => item.checked)
-      
+
+      // Group unchecked items by category, then condense by sort_name
       unchecked.forEach(item => {
         const category = getCategoryDisplayName(item.category)
         if (!grouped[category]) grouped[category] = []
-        grouped[category].push(item)
       })
-      
+
+      // For each category, condense ingredients with same sort_name
+      Object.keys(grouped).forEach(category => {
+        const categoryItems = unchecked.filter(item => getCategoryDisplayName(item.category) === category)
+        const condensedItems = condenseIngredients(categoryItems)
+        grouped[category] = condensedItems
+      })
+
       if (checked.length > 0) {
         grouped['Completed'] = checked
       }
-      
+
       return grouped
     } else if (sortBy === 'recipe') {
       const grouped: { [recipe: string]: GroceryItem[] } = {}
       const unchecked = sortedItems.filter(item => !item.checked)
       const checked = sortedItems.filter(item => item.checked)
-      
+
       unchecked.forEach(item => {
         const recipeName = getRecipeName(item.recipeId)
         if (!grouped[recipeName]) grouped[recipeName] = []
         grouped[recipeName].push(item)
       })
-      
+
       if (checked.length > 0) {
         grouped['Completed'] = checked
       }
-      
+
       return grouped
     }
-    
+
     return { 'All Items': sortedItems }
   }
 
@@ -690,7 +785,7 @@ export default function GroceryLists() {
                           className="flex items-center gap-1 px-3 py-2 bg-[#1e1f26] rounded-md hover:bg-[#1e1f26]/80 transition-colors text-sm"
                         >
                           <Filter className="h-4 w-4" />
-                          Sort by {sortBy === 'aisle' ? 'Aisle' : sortBy === 'alphabetical' ? 'A-Z' : 'Recipe'}
+                          Sort by {sortBy === 'aisle' ? 'Aisle' : 'Recipe'}
                         </button>
                         {showSortMenu && (
                           <div className="absolute right-0 mt-2 w-40 bg-[#1e1f26] rounded-md shadow-lg z-10 border border-white/10">
@@ -699,12 +794,6 @@ export default function GroceryLists() {
                               className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
                             >
                               By Aisle
-                            </button>
-                            <button
-                              onClick={() => { setSortBy('alphabetical'); setShowSortMenu(false); }}
-                              className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
-                            >
-                              Alphabetical
                             </button>
                             <button
                               onClick={() => { setSortBy('recipe'); setShowSortMenu(false); }}
@@ -726,98 +815,140 @@ export default function GroceryLists() {
                           <h3 className="text-lg font-semibold mb-3 text-white/90">{groupName}</h3>
                         )}
                         <div className="space-y-2">
-                          {items.map((item) => (
-                            <div
-                              key={item.id}
-                              className={`flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg hover:bg-[#1e1f26]/80 transition-colors ${
-                                item.checked ? 'opacity-60' : ''
-                              }`}
-                            >
-                              <button
-                                onClick={() => handleToggleItem(item.id)}
-                                className="w-5 h-5 border-2 border-white/30 rounded flex items-center justify-center flex-shrink-0"
-                              >
-                                {item.checked && <span className="text-[#2B966F] text-sm">✓</span>}
-                              </button>
-                              <div className="flex items-center gap-2 flex-1">
-                                {editingItem === item.id ? (
+                          {items.map((item) => {
+                            // Check if this is a condensed item
+                            const isCondensed = 'isCondensed' in item && item.isCondensed
+
+                            if (isCondensed) {
+                              const condensedItem = item as CondensedGroceryItem
+                              return (
+                                <div
+                                  key={condensedItem.id}
+                                  className={`flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg hover:bg-[#1e1f26]/80 transition-colors ${
+                                    condensedItem.checked ? 'opacity-60' : ''
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => handleToggleCondensedItem(condensedItem)}
+                                    className="w-5 h-5 border-2 border-white/30 rounded flex items-center justify-center flex-shrink-0"
+                                  >
+                                    {condensedItem.checked && <span className="text-[#2B966F] text-sm">✓</span>}
+                                  </button>
                                   <div className="flex items-center gap-2 flex-1">
-                                    <Input
-                                      type="text"
-                                      value={editQuantity}
-                                      onChange={(e) => setEditQuantity(e.target.value)}
-                                      className="w-16 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                      placeholder="Qty"
-                                    />
-                                    <Input
-                                      type="text"
-                                      value={editUnit}
-                                      onChange={(e) => setEditUnit(e.target.value)}
-                                      className="w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                      placeholder="Unit"
-                                    />
-                                    <Input
-                                      type="text"
-                                      value={editName}
-                                      onChange={(e) => setEditName(e.target.value)}
-                                      className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                      placeholder="Item name"
-                                    />
-                                    <button
-                                      onClick={handleSaveEdit}
-                                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
-                                    >
-                                      Save
-                                    </button>
-                                    <button
-                                      onClick={handleCancelEdit}
-                                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="text-sm font-medium flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className={item.checked ? 'line-through text-white/60' : 'text-white'}>
-                                        {formatMeasurement(
-                                          item.original_quantity_min,
-                                          item.original_quantity_max,
-                                          item.original_unit,
-                                          item.metric_quantity_min,
-                                          item.metric_quantity_max,
-                                          item.metric_unit,
-                                          item.imperial_quantity_min,
-                                          item.imperial_quantity_max,
-                                          item.imperial_unit,
-                                          unitPreference
-                                        )} {item.sort_name}
-                                      </span>
-                                      {!item.checked && (
-                                        <div className="flex items-center gap-1 ml-auto">
-                                          <button
-                                            onClick={() => handleStartEdit(item)}
-                                            className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all"
-                                          >
-                                            <Edit3 className="h-5 w-5" />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteItem(item.id)}
-                                            className="p-2 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
-                                          >
-                                            <Trash2 className="h-5 w-5" />
-                                          </button>
+                                    <div className="text-sm font-medium flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex-1">
+                                          <div className={condensedItem.checked ? 'line-through text-white/60' : 'text-white text-base font-semibold'}>
+                                            {condensedItem.sort_name}
+                                          </div>
+                                          <div className="text-sm text-white/70 mt-1">
+                                            {condensedItem.quantities.join(' + ')}
+                                          </div>
                                         </div>
-                                      )}
+                                      </div>
                                     </div>
-                                    {sortBy !== 'recipe' && (
-                                      <div className="text-xs text-white/60 mt-1">{getRecipeName(item.recipeId)}</div>
+                                  </div>
+                                </div>
+                              )
+                            } else {
+                              // Regular item rendering
+                              const regularItem = item as GroceryItem
+                              return (
+                                <div
+                                  key={regularItem.id}
+                                  className={`flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg hover:bg-[#1e1f26]/80 transition-colors ${
+                                    regularItem.checked ? 'opacity-60' : ''
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => handleToggleItem(regularItem.id)}
+                                    className="w-5 h-5 border-2 border-white/30 rounded flex items-center justify-center flex-shrink-0"
+                                  >
+                                    {regularItem.checked && <span className="text-[#2B966F] text-sm">✓</span>}
+                                  </button>
+                                  <div className="flex items-center gap-2 flex-1">
+                                    {editingItem === regularItem.id ? (
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <Input
+                                          type="text"
+                                          value={editQuantity}
+                                          onChange={(e) => setEditQuantity(e.target.value)}
+                                          className="w-16 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                          placeholder="Qty"
+                                        />
+                                        <Input
+                                          type="text"
+                                          value={editUnit}
+                                          onChange={(e) => setEditUnit(e.target.value)}
+                                          className="w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                          placeholder="Unit"
+                                        />
+                                        <Input
+                                          type="text"
+                                          value={editName}
+                                          onChange={(e) => setEditName(e.target.value)}
+                                          className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
+                                          placeholder="Item name"
+                                        />
+                                        <button
+                                          onClick={handleSaveEdit}
+                                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                                        >
+                                          Save
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEdit}
+                                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="text-sm font-medium flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex-1">
+                                            <div className={regularItem.checked ? 'line-through text-white/60' : 'text-white text-base font-semibold'}>
+                                              {regularItem.sort_name}
+                                            </div>
+                                            <div className="text-sm text-white/70 mt-1">
+                                              {formatMeasurement(
+                                                regularItem.original_quantity_min,
+                                                regularItem.original_quantity_max,
+                                                regularItem.original_unit,
+                                                regularItem.metric_quantity_min,
+                                                regularItem.metric_quantity_max,
+                                                regularItem.metric_unit,
+                                                regularItem.imperial_quantity_min,
+                                                regularItem.imperial_quantity_max,
+                                                regularItem.imperial_unit,
+                                                unitPreference
+                                              )}
+                                            </div>
+                                          </div>
+                                          {!regularItem.checked && (
+                                            <div className="flex items-center gap-1 ml-auto">
+                                              <button
+                                                onClick={() => handleStartEdit(regularItem)}
+                                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all"
+                                              >
+                                                <Edit3 className="h-5 w-5" />
+                                              </button>
+                                              <button
+                                                onClick={() => handleDeleteItem(regularItem.id)}
+                                                className="p-2 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                              >
+                                                <Trash2 className="h-5 w-5" />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                                </div>
+                              )
+                            }
+                          })}
                         </div>
                       </div>
                     ))}
