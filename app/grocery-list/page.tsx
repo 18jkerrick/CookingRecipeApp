@@ -3,6 +3,7 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/db/supabase'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
 import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle, Share } from "lucide-react"
@@ -183,6 +184,7 @@ export default function GroceryLists() {
   const [showRecipeDetailModal, setShowRecipeDetailModal] = useState(false)
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null)
   const [showShareDropdown, setShowShareDropdown] = useState<string | null>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null)
 
   // Scroll position preservation
   const scrollPositions = useRef<{ [key: string]: number }>({})
@@ -233,6 +235,7 @@ export default function GroceryLists() {
       const target = event.target as Element;
       if (!target.closest('.share-dropdown')) {
         setShowShareDropdown(null);
+        setDropdownPosition(null);
       }
     };
 
@@ -686,6 +689,7 @@ export default function GroceryLists() {
         break;
     }
     setShowShareDropdown(null);
+    setDropdownPosition(null);
   };
 
   const exportListAsTxt = (list: GroceryList) => {
@@ -1139,19 +1143,37 @@ export default function GroceryLists() {
                         {list.name}
                       </h3>
                       <div className="flex items-center gap-1 ml-2">
-                        <div className="relative share-dropdown">
+                        <div className="relative share-dropdown z-[10000]">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              setShowShareDropdown(showShareDropdown === list.id ? null : list.id)
+                              const button = e.currentTarget
+                              const rect = button.getBoundingClientRect()
+
+                              if (showShareDropdown === list.id) {
+                                setShowShareDropdown(null)
+                                setDropdownPosition(null)
+                              } else {
+                                setShowShareDropdown(list.id)
+                                setDropdownPosition({
+                                  top: rect.bottom + 8,
+                                  right: window.innerWidth - rect.right
+                                })
+                              }
                             }}
                             className="text-white hover:text-gray-200 transition-colors drop-shadow-lg translate-y-px"
                           >
                             <Share className="h-4 w-4" />
                           </button>
 
-                          {showShareDropdown === list.id && (
-                            <div className="absolute bottom-full mb-2 right-0 w-48 bg-[#1e1f26] border border-white/10 rounded-lg shadow-lg z-10">
+                          {showShareDropdown === list.id && dropdownPosition && createPortal(
+                            <div
+                              className="fixed w-48 bg-[#1e1f26] border border-white/10 rounded-lg shadow-xl z-[99999]"
+                              style={{
+                                top: `${dropdownPosition.top}px`,
+                                right: `${dropdownPosition.right}px`
+                              }}
+                            >
                               <div className="py-2">
                                 <button
                                   onClick={(e) => {
@@ -1238,7 +1260,8 @@ export default function GroceryLists() {
                                   <span>Export as HTML</span>
                                 </button>
                               </div>
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </div>
                         <button
