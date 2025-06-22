@@ -1,12 +1,13 @@
 'use client'
 
 import { useAuth } from '../../context/AuthContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/db/supabase'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
 import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import NetflixCarousel from '../../components/features/grocery/NetflixCarousel'
 import { 
   GroceryList, 
   GroceryItem, 
@@ -53,6 +54,89 @@ interface CondensedGroceryItem {
   quantities: string[]; // Array of formatted quantities (e.g., ["4 lbs", "2 lbs"])
 }
 
+// Individual Card Image Component
+const CardImage = ({ item, recipes, sortBy }: {
+  item: GroceryItem | CondensedGroceryItem,
+  recipes: Recipe[],
+  sortBy: 'aisle' | 'recipe'
+}) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  if (sortBy === 'aisle') {
+    // Show recipe thumbnails (with carousel if multiple)
+    const recipeIds = 'isCondensed' in item && item.isCondensed
+      ? item.originalItems.map(origItem => origItem.recipeId)
+      : [(item as GroceryItem).recipeId]
+
+    const uniqueRecipeIds = Array.from(new Set(recipeIds))
+    const recipeImages = uniqueRecipeIds
+      .map(id => recipes.find(r => r.id === id))
+      .filter(recipe => recipe?.imageUrl)
+      .map(recipe => recipe!.imageUrl!)
+
+    useEffect(() => {
+      if (recipeImages.length > 1) {
+        const interval = setInterval(() => {
+          setCurrentImageIndex(prev => (prev + 1) % recipeImages.length)
+        }, 3000)
+        return () => clearInterval(interval)
+      }
+    }, [recipeImages.length])
+
+    if (recipeImages.length === 0) {
+      return (
+        <div className="w-full h-full rounded-t-lg bg-gray-800 flex items-center justify-center">
+          <span className="text-gray-600 text-2xl">🍽️</span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="w-full h-full rounded-t-lg overflow-hidden bg-gray-800">
+        <img
+          src={recipeImages[currentImageIndex]}
+          alt="Recipe"
+          className="w-full h-full object-cover"
+        />
+      </div>
+    )
+  } else {
+    // Show aisle category image
+    const category = 'isCondensed' in item && item.isCondensed
+      ? item.category
+      : (item as GroceryItem).category
+
+    const getCategoryImage = (category: GroceryItem['category']) => {
+      const categoryMap: { [key: string]: string } = {
+        'produce': '/produce.png',
+        'bakery': '/bakery.png',
+        'oils-vinegars': '/oils-vinegars.png',
+        'dairy-eggs-fridge': '/Dairy-eggs-fridge.png',
+        'herbs-spices': '/herbs-spices.png',
+        'meat-seafood': '/meat-seafood.png',
+        'frozen': '/frozen.png',
+        'flours-sugars': '/flours-sugars.png',
+        'pantry': '/pantry.png',
+        'pastas-grains-legumes': '/pastas-grains-legumes.png',
+        'uncategorized': '/uncategorized.png'
+      }
+      return categoryMap[category] || '/uncategorized.png'
+    }
+
+    return (
+      <div className="w-full h-full rounded-t-lg overflow-hidden bg-gray-800">
+        <img
+          src={getCategoryImage(category)}
+          alt="Category"
+          className="w-full h-full object-cover"
+        />
+      </div>
+    )
+  }
+}
+
+
+
 export default function GroceryLists() {
   const { user, signOut, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
@@ -75,9 +159,12 @@ export default function GroceryLists() {
   const [newListName, setNewListName] = useState('')
 
   const [editingItem, setEditingItem] = useState<string | null>(null)
-  const [editQuantity, setEditQuantity] = useState('')
-  const [editUnit, setEditUnit] = useState('')
-  const [editName, setEditName] = useState('')
+  // Temporary changes object to hold all modifications until Save/Cancel
+  const [tempChanges, setTempChanges] = useState<Record<string, {
+    quantity?: string
+    unit?: string
+    name?: string
+  }>>({})
   const [quantityError, setQuantityError] = useState('')
   const [showEditVisualModal, setShowEditVisualModal] = useState(false)
   const [editingVisualList, setEditingVisualList] = useState<GroceryList | null>(null)
@@ -93,6 +180,22 @@ export default function GroceryLists() {
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
   const [showRecipeDetailModal, setShowRecipeDetailModal] = useState(false)
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null)
+
+  // Scroll position preservation
+  const scrollPositions = useRef<{ [key: string]: number }>({})
+
+  // Save scroll position for a section
+  const saveScrollPosition = (sectionKey: string, scrollLeft: number) => {
+    scrollPositions.current[sectionKey] = scrollLeft
+  }
+
+  // Restore scroll position for a section
+  const restoreScrollPosition = (sectionKey: string, element: HTMLElement) => {
+    const savedPosition = scrollPositions.current[sectionKey]
+    if (savedPosition !== undefined) {
+      element.scrollLeft = savedPosition
+    }
+  }
 
 
 
@@ -317,79 +420,134 @@ export default function GroceryLists() {
     setEditingItem(item.id)
     setQuantityError('') // Clear any previous errors
 
-    // Handle ranges properly - if min and max are different, show as range
-    const hasRange = item.original_quantity_max && item.original_quantity_min !== item.original_quantity_max
-    if (hasRange) {
-      setEditQuantity(`${item.original_quantity_min}-${item.original_quantity_max}`)
-    } else {
-      setEditQuantity((item.original_quantity_min || 1).toString())
-    }
+    // Initialize temp changes for this item if not already present
+    if (!tempChanges[item.id]) {
+      // Handle ranges properly - if min and max are different, show as range
+      const hasRange = item.original_quantity_max && item.original_quantity_min !== item.original_quantity_max
+      const initialQuantity = hasRange
+        ? `${item.original_quantity_min}-${item.original_quantity_max}`
+        : (item.original_quantity_min || 1).toString()
 
-    setEditUnit(item.original_unit || '')
-    setEditName(item.sort_name)
+      setTempChanges(prev => ({
+        ...prev,
+        [item.id]: {
+          quantity: initialQuantity,
+          unit: item.original_unit || '',
+          name: item.sort_name
+        }
+      }))
+    }
   }
 
   const handleSaveEdit = async () => {
-    if (selectedList && editingItem) {
-      // Validate quantity format
-      const validation = validateQuantity(editQuantity)
+    if (selectedList && Object.keys(tempChanges).length > 0) {
+      // Process all pending changes
+      const updates: Array<{ itemId: string; changes: any }> = []
+      let hasValidationError = false
 
-      if (!validation.isValid) {
-        setQuantityError(validation.error)
-        return // Don't save if validation fails
+      // Validate all changes first
+      for (const [itemId, changes] of Object.entries(tempChanges)) {
+        if (changes.quantity) {
+          const validation = validateQuantity(changes.quantity)
+          if (!validation.isValid) {
+            setQuantityError(validation.error)
+            hasValidationError = true
+            break
+          }
+
+          updates.push({
+            itemId,
+            changes: {
+              original_quantity_min: validation.min!,
+              original_quantity_max: validation.max!,
+              original_unit: changes.unit || undefined,
+              name: changes.name
+            }
+          })
+        }
       }
 
-      // Clear error if validation passes
+      if (hasValidationError) {
+        return // Don't save if any validation fails
+      }
+
+      // Clear error if all validations pass
       setQuantityError('')
 
-      const quantityMin = validation.min!
-      const quantityMax = validation.max!
+      // Apply all updates to database
+      let allSuccessful = true
+      for (const update of updates) {
+        const success = await updateGroceryItem(selectedList.id, update.itemId, update.changes)
+        if (!success) {
+          allSuccessful = false
+          break
+        }
+      }
 
-      const success = await updateGroceryItem(selectedList.id, editingItem, {
-        original_quantity_min: quantityMin,
-        original_quantity_max: quantityMax,
-        original_unit: editUnit || undefined,
-        name: editName
-      })
-
-      if (success) {
+      if (allSuccessful) {
+        // Update local state with all changes
         setSelectedList(prev => {
           if (!prev) return null
           return {
             ...prev,
-            items: prev.items.map(item =>
-              item.id === editingItem
-                ? { ...item, original_quantity_min: quantityMin, original_quantity_max: quantityMax, original_unit: editUnit || undefined, name: editName }
-                : item
-            )
+            items: prev.items.map(item => {
+              const update = updates.find(u => u.itemId === item.id)
+              return update ? { ...item, ...update.changes } : item
+            })
           }
         })
 
+        // Clear all temporary changes and exit editing mode
+        setTempChanges({})
         setEditingItem(null)
-        setEditQuantity('')
-        setEditUnit('')
-        setEditName('')
         setQuantityError('')
       }
     }
   }
 
   const handleCancelEdit = () => {
+    // Clear all temporary changes and exit editing mode
+    setTempChanges({})
     setEditingItem(null)
-    setEditQuantity('')
-    setEditUnit('')
-    setEditName('')
     setQuantityError('')
   }
 
   // Real-time validation as user types
-  const handleQuantityChange = (value: string) => {
-    setEditQuantity(value)
+  const handleQuantityChange = (itemId: string, value: string) => {
+    setTempChanges(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        quantity: value
+      }
+    }))
 
     // Clear error when user starts typing
     if (quantityError && value.trim()) {
       setQuantityError('')
     }
+  }
+
+  // Helper function to update unit for an item
+  const handleUnitChange = (itemId: string, value: string) => {
+    setTempChanges(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        unit: value
+      }
+    }))
+  }
+
+  // Helper function to update name for an item
+  const handleNameChange = (itemId: string, value: string) => {
+    setTempChanges(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        name: value
+      }
+    }))
   }
 
   const handleEditVisual = (list: GroceryList) => {
@@ -568,46 +726,52 @@ export default function GroceryLists() {
 
     if (sortBy === 'aisle') {
       const grouped: { [category: string]: (GroceryItem | CondensedGroceryItem)[] } = {}
-      const unchecked = sortedItems.filter(item => !item.checked)
-      const checked = sortedItems.filter(item => item.checked)
 
-      // Group unchecked items by category, then condense by sort_name
-      unchecked.forEach(item => {
+      // Group all items by category (both checked and unchecked)
+      sortedItems.forEach(item => {
         const category = getCategoryDisplayName(item.category)
         if (!grouped[category]) grouped[category] = []
       })
 
-      // For each category, condense ingredients with same sort_name
+      // For each category, separate checked and unchecked, condense unchecked, then combine
       Object.keys(grouped).forEach(category => {
-        const categoryItems = unchecked.filter(item => getCategoryDisplayName(item.category) === category)
-        const condensedItems = condenseIngredients(categoryItems)
-        grouped[category] = condensedItems
-      })
+        const categoryItems = sortedItems.filter(item => getCategoryDisplayName(item.category) === category)
+        const unchecked = categoryItems.filter(item => !item.checked)
+        const checked = categoryItems.filter(item => item.checked)
 
-      if (checked.length > 0) {
-        grouped['Completed'] = checked
-      }
+        const condensedUnchecked = condenseIngredients(unchecked)
+        const condensedChecked = condenseIngredients(checked)
+
+        // Put unchecked items first, then checked items at the end
+        grouped[category] = [...condensedUnchecked, ...condensedChecked]
+      })
 
       return grouped
     } else if (sortBy === 'recipe') {
       const grouped: { [recipe: string]: GroceryItem[] } = {}
-      const unchecked = sortedItems.filter(item => !item.checked)
-      const checked = sortedItems.filter(item => item.checked)
 
-      unchecked.forEach(item => {
+      // Group all items by recipe
+      sortedItems.forEach(item => {
         const recipeName = getRecipeName(item.recipeId)
         if (!grouped[recipeName]) grouped[recipeName] = []
-        grouped[recipeName].push(item)
       })
 
-      if (checked.length > 0) {
-        grouped['Completed'] = checked
-      }
+      // For each recipe, put unchecked items first, then checked items at the end
+      Object.keys(grouped).forEach(recipeName => {
+        const recipeItems = sortedItems.filter(item => getRecipeName(item.recipeId) === recipeName)
+        const unchecked = recipeItems.filter(item => !item.checked)
+        const checked = recipeItems.filter(item => item.checked)
+
+        grouped[recipeName] = [...unchecked, ...checked]
+      })
 
       return grouped
     }
 
-    return { 'All Items': sortedItems }
+    // For 'all' view, put unchecked first, then checked
+    const unchecked = sortedItems.filter(item => !item.checked)
+    const checked = sortedItems.filter(item => item.checked)
+    return { 'All Items': [...unchecked, ...checked] }
   }
 
   if (!isClient || loading) {
@@ -750,7 +914,7 @@ export default function GroceryLists() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {selectedList ? (
             <>
               {/* Top Section - Recipes in List */}
@@ -817,8 +981,8 @@ export default function GroceryLists() {
               </div>
 
               {/* Main Ingredients Section */}
-              <div className="flex-1 overflow-auto">
-                <div className="p-4">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden">
+                <div className="p-4 max-w-full">
                   <div className="flex items-center justify-between mb-4">
                     <button
                       onClick={() => setShowBuyGroceriesModal(true)}
@@ -862,14 +1026,20 @@ export default function GroceryLists() {
                   </div>
 
                   {/* Grouped Ingredients */}
-                  <div className="space-y-6">
-                    {Object.entries(getGroupedItems()).map(([groupName, items]) => (
-                      <div key={groupName}>
+                  <div className="space-y-8">
+                    {Object.entries(getGroupedItems()).map(([groupName, items], groupIndex) => (
+                      <div key={`${groupName}-${sortBy}`} className="w-full overflow-hidden">
                         {(sortBy === 'aisle' || sortBy === 'recipe') && (
-                          <h3 className="text-lg font-semibold mb-3 text-white/90">{groupName}</h3>
+                          <h3 className="text-2xl font-bold mb-4 text-white tracking-wide capitalize">{groupName}</h3>
                         )}
-                        <div className="space-y-2">
-                          {items.map((item) => {
+                        <NetflixCarousel
+                          key={`carousel-${groupName}-${sortBy}-${selectedList?.id || 'none'}`}
+                          carouselId={`${selectedList?.id || 'none'}-${groupName}-${sortBy}`}
+                          itemWidth={288}
+                          gap={16}
+                          resetKey={`${sortBy}-${selectedList?.id || 'none'}-${items.length}`}
+                        >
+                          {items.flatMap((item) => {
                             // Check if this is a condensed item
                             const isCondensed = 'isCondensed' in item && item.isCondensed
 
@@ -880,241 +1050,268 @@ export default function GroceryLists() {
                               const hasEditingItem = condensedItem.originalItems.some(origItem => editingItem === origItem.id)
 
                               if (hasEditingItem) {
-                                // Show all items as edit forms when condensed group is being edited
-                                return (
-                                  <div key={condensedItem.id} className="space-y-2">
-                                    {condensedItem.originalItems.map((origItem, index) => {
-                                      // Get the current values for this specific item
-                                      const isCurrentlyEditing = editingItem === origItem.id
-                                      const currentQuantity = isCurrentlyEditing ? editQuantity :
-                                        (origItem.original_quantity_max && origItem.original_quantity_min !== origItem.original_quantity_max)
-                                          ? `${origItem.original_quantity_min}-${origItem.original_quantity_max}`
-                                          : origItem.original_quantity_min.toString()
-                                      const currentUnit = isCurrentlyEditing ? editUnit : (origItem.original_unit || '')
-                                      const currentName = isCurrentlyEditing ? editName : origItem.sort_name
-
-                                      return (
-                                        <div
-                                          key={origItem.id}
-                                          className="flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg"
-                                        >
-                                          <div className="flex items-center gap-2 flex-1">
-                                            <div className="flex flex-col">
-                                              <Input
-                                                type="text"
-                                                value={currentQuantity}
-                                                onChange={(e) => {
-                                                  if (isCurrentlyEditing) {
-                                                    handleQuantityChange(e.target.value)
-                                                  } else {
-                                                    // Start editing this item
-                                                    handleStartEdit(origItem)
-                                                    // The value will be set by handleStartEdit
-                                                  }
-                                                }}
-                                                onFocus={() => {
-                                                  if (!isCurrentlyEditing) {
-                                                    handleStartEdit(origItem)
-                                                  }
-                                                }}
-                                                className={`w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm ${
-                                                  isCurrentlyEditing && quantityError ? 'ring-1 ring-red-500' : ''
-                                                }`}
-                                                placeholder="4 or 4-5"
-                                              />
-                                              {isCurrentlyEditing && quantityError && (
-                                                <span className="text-red-400 text-xs mt-1 w-20">{quantityError}</span>
-                                              )}
-                                            </div>
-                                            <Input
-                                              type="text"
-                                              value={currentUnit}
-                                              onChange={(e) => {
-                                                if (isCurrentlyEditing) {
-                                                  setEditUnit(e.target.value)
-                                                } else {
-                                                  handleStartEdit(origItem)
-                                                }
-                                              }}
-                                              onFocus={() => {
-                                                if (!isCurrentlyEditing) {
-                                                  handleStartEdit(origItem)
-                                                }
-                                              }}
-                                              className="w-24 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                              placeholder="Unit"
-                                            />
-                                            <Input
-                                              type="text"
-                                              value={currentName}
-                                              onChange={(e) => {
-                                                if (isCurrentlyEditing) {
-                                                  setEditName(e.target.value)
-                                                } else {
-                                                  handleStartEdit(origItem)
-                                                }
-                                              }}
-                                              onFocus={() => {
-                                                if (!isCurrentlyEditing) {
-                                                  handleStartEdit(origItem)
-                                                }
-                                              }}
-                                              className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                              placeholder="Item name"
-                                            />
-                                            {index === 0 && (
-                                              <>
-                                                <button
-                                                  onClick={handleSaveEdit}
-                                                  disabled={isCurrentlyEditing && (!!quantityError || !editQuantity.trim())}
-                                                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                                                >
-                                                  Save
-                                                </button>
-                                                <button
-                                                  onClick={handleCancelEdit}
-                                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-                                                >
-                                                  Cancel
-                                                </button>
-                                              </>
-                                            )}
-                                            {index > 0 && (
-                                              <button
-                                                onClick={() => handleDeleteItem(origItem.id)}
-                                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-                                              >
-                                                Delete
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                )
-                              }
-
-                              // Show condensed view when not editing
-                              return (
-                                <div
-                                  key={condensedItem.id}
-                                  className={`flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg hover:bg-[#1e1f26]/80 transition-colors ${
-                                    condensedItem.checked ? 'opacity-60' : ''
-                                  }`}
-                                >
-                                  <button
-                                    onClick={() => handleToggleCondensedItem(condensedItem)}
-                                    className="w-5 h-5 border-2 border-white/30 rounded flex items-center justify-center flex-shrink-0"
+                                // Show single editing card with all entries
+                                return [
+                                  <div
+                                    key={`${condensedItem.id}-editing`}
+                                    className="flex-shrink-0 w-72 h-64 bg-[#1e1f26] rounded-lg overflow-hidden flex flex-col"
                                   >
-                                    {condensedItem.checked && <span className="text-[#2B966F] text-sm">✓</span>}
-                                  </button>
-                                  <div className="flex items-center gap-2 flex-1">
-                                    <div className="text-sm font-medium flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex-1">
-                                          <div className={condensedItem.checked ? 'line-through text-white/60' : 'text-white text-base font-semibold'}>
-                                            {condensedItem.sort_name}
-                                          </div>
-                                          <div className="text-sm text-white/70 mt-1">
-                                            {condensedItem.quantities.join(' + ')}
-                                          </div>
-                                        </div>
+                                    {/* Compressed image area when editing */}
+                                    <div className="h-16 overflow-hidden">
+                                      <CardImage item={condensedItem} recipes={recipes} sortBy={sortBy} />
+                                    </div>
+
+                                    {/* Editing content area */}
+                                    <div className="flex-1 p-3 flex flex-col">
+                                      {/* Ingredient name input */}
+                                      <Input
+                                        type="text"
+                                        value={tempChanges[condensedItem.originalItems[0].id]?.name || condensedItem.sort_name}
+                                        onChange={(e) => handleNameChange(condensedItem.originalItems[0].id, e.target.value)}
+                                        className="w-full h-8 mb-2 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm font-semibold"
+                                        placeholder="Item name"
+                                      />
+
+                                      {/* Compact entries container - only as tall as needed */}
+                                      <div className="space-y-2">
+                                        {condensedItem.originalItems.map((origItem, index) => {
+                                          const isCurrentlyEditing = editingItem === origItem.id
+                                          // Get current values from tempChanges or fallback to original values
+                                          const currentQuantity = tempChanges[origItem.id]?.quantity ??
+                                            ((origItem.original_quantity_max && origItem.original_quantity_min !== origItem.original_quantity_max)
+                                              ? `${origItem.original_quantity_min}-${origItem.original_quantity_max}`
+                                              : origItem.original_quantity_min?.toString() || '')
+                                          const currentUnit = tempChanges[origItem.id]?.unit ?? (origItem.original_unit || '')
+
+                                          return (
+                                            <div key={origItem.id} className="flex items-center gap-2">
+                                              <div className="flex gap-1 flex-1">
+                                                <Input
+                                                  type="text"
+                                                  value={currentQuantity}
+                                                  onChange={(e) => {
+                                                    handleQuantityChange(origItem.id, e.target.value)
+                                                  }}
+                                                  onFocus={() => {
+                                                    if (!isCurrentlyEditing) {
+                                                      handleStartEdit(origItem)
+                                                    }
+                                                  }}
+                                                  className={`flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs ${
+                                                    isCurrentlyEditing && quantityError ? 'ring-1 ring-red-500' : ''
+                                                  }`}
+                                                  placeholder="4 or 4-5"
+                                                />
+                                                <Input
+                                                  type="text"
+                                                  value={currentUnit}
+                                                  onChange={(e) => {
+                                                    handleUnitChange(origItem.id, e.target.value)
+                                                  }}
+                                                  onFocus={() => {
+                                                    if (!isCurrentlyEditing) {
+                                                      handleStartEdit(origItem)
+                                                    }
+                                                  }}
+                                                  className="flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs"
+                                                  placeholder="Unit"
+                                                />
+                                              </div>
+                                              {/* Consistent spacing - invisible placeholder for first item, trash icon for others */}
+                                              <div className="w-6 h-6 flex items-center justify-center">
+                                                {index > 0 ? (
+                                                  <button
+                                                    onClick={() => handleDeleteItem(origItem.id)}
+                                                    className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                                  >
+                                                    <Trash2 className="h-3 w-3" />
+                                                  </button>
+                                                ) : (
+                                                  // Invisible placeholder to maintain alignment
+                                                  <div className="w-5 h-5"></div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+
+                                      {/* Error message */}
+                                      {quantityError && (
+                                        <span className="text-red-400 text-xs mt-1">{quantityError}</span>
+                                      )}
+
+                                      {/* Action buttons - positioned right after content */}
+                                      <div className="flex gap-1 mt-3">
+                                        <button
+                                          onClick={handleSaveEdit}
+                                          disabled={!!quantityError || Object.keys(tempChanges).length === 0}
+                                          className="flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+                                        >
+                                          Save
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEdit}
+                                          className="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                        >
+                                          Cancel
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
-                                  {!condensedItem.checked && (
-                                    <div className="flex items-center gap-1 ml-auto">
-                                      <button
-                                        onClick={() => handleStartEdit(condensedItem.originalItems[0])}
-                                        className="p-2 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
-                                      >
-                                        <Edit3 className="h-5 w-5" />
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          // Delete all original items in the condensed group
-                                          condensedItem.originalItems.forEach(item => handleDeleteItem(item.id))
-                                        }}
-                                        className="p-2 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
-                                      >
-                                        <Trash2 className="h-5 w-5" />
-                                      </button>
+                                ]
+                              }
+
+                              // Show condensed view when not editing
+                              return [
+                                <div
+                                  key={condensedItem.id}
+                                  onClick={() => handleToggleCondensedItem(condensedItem)}
+                                  className={`flex-shrink-0 w-72 h-64 bg-[#1e1f26] rounded-lg overflow-hidden hover:bg-[#1e1f26]/80 transition-colors cursor-pointer ${
+                                    condensedItem.checked ? 'opacity-60' : ''
+                                  }`}
+                                >
+                                  <div className="h-40">
+                                    <CardImage item={condensedItem} recipes={recipes} sortBy={sortBy} />
+                                  </div>
+                                  <div className="flex flex-col h-full p-3">
+                                    <div className="flex items-start justify-between h-full">
+                                      <div className="flex-1 pr-2 flex flex-col">
+                                        {/* Dynamic ingredient name - 1 or 2 lines */}
+                                        <div className={`text-lg font-bold tracking-normal line-clamp-2 leading-6 mb-1 ${
+                                          condensedItem.checked ? 'line-through text-white/60' : 'text-white'
+                                        }`}>
+                                          {condensedItem.sort_name}
+                                        </div>
+                                        {/* Quantity appears right below ingredient name */}
+                                        <div className="text-sm text-gray-400 font-normal">
+                                          {condensedItem.quantities.join(' + ')}
+                                        </div>
+                                      </div>
+                                      {!condensedItem.checked && (
+                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleStartEdit(condensedItem.originalItems[0])
+                                            }}
+                                            className="p-1 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
+                                          >
+                                            <Edit3 className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              // Delete all original items in the condensed group
+                                              condensedItem.originalItems.forEach(item => handleDeleteItem(item.id))
+                                            }}
+                                            className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
-                              )
+                              ]
                             } else {
                               // Regular item rendering
                               const regularItem = item as GroceryItem
-                              return (
+                              return [
                                 <div
                                   key={regularItem.id}
-                                  className={`flex items-center gap-3 p-3 bg-[#1e1f26] rounded-lg hover:bg-[#1e1f26]/80 transition-colors ${
+                                  onClick={() => editingItem !== regularItem.id && handleToggleItem(regularItem.id)}
+                                  className={`flex-shrink-0 w-72 h-64 bg-[#1e1f26] rounded-lg overflow-hidden hover:bg-[#1e1f26]/80 transition-colors ${
                                     regularItem.checked ? 'opacity-60' : ''
-                                  }`}
+                                  } ${editingItem !== regularItem.id ? 'cursor-pointer' : ''}`}
                                 >
-                                  <button
-                                    onClick={() => handleToggleItem(regularItem.id)}
-                                    className="w-5 h-5 border-2 border-white/30 rounded flex items-center justify-center flex-shrink-0"
-                                  >
-                                    {regularItem.checked && <span className="text-[#2B966F] text-sm">✓</span>}
-                                  </button>
-                                  <div className="flex items-center gap-2 flex-1">
-                                    {editingItem === regularItem.id ? (
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <div className="flex flex-col">
+                                  {editingItem === regularItem.id ? (
+                                    // Editing mode - use compressed layout
+                                    <>
+                                      {/* Compressed image area when editing */}
+                                      <div className="h-16 overflow-hidden">
+                                        <CardImage item={regularItem} recipes={recipes} sortBy={sortBy} />
+                                      </div>
+
+                                      {/* Editing content area */}
+                                      <div className="flex-1 p-3 flex flex-col">
+                                        {/* Ingredient name input */}
+                                        <Input
+                                          type="text"
+                                          value={tempChanges[regularItem.id]?.name || regularItem.sort_name}
+                                          onChange={(e) => handleNameChange(regularItem.id, e.target.value)}
+                                          className="w-full h-8 mb-2 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm font-semibold"
+                                          placeholder="Item name"
+                                        />
+
+                                        {/* Single entry editing with consistent alignment */}
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <div className="flex gap-1 flex-1">
                                             <Input
                                               type="text"
-                                              value={editQuantity}
-                                              onChange={(e) => handleQuantityChange(e.target.value)}
-                                              className={`w-16 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm ${
+                                              value={tempChanges[regularItem.id]?.quantity ??
+                                                ((regularItem.original_quantity_max && regularItem.original_quantity_min !== regularItem.original_quantity_max)
+                                                  ? `${regularItem.original_quantity_min}-${regularItem.original_quantity_max}`
+                                                  : regularItem.original_quantity_min?.toString() || '')}
+                                              onChange={(e) => handleQuantityChange(regularItem.id, e.target.value)}
+                                              className={`flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs ${
                                                 quantityError ? 'ring-1 ring-red-500' : ''
                                               }`}
                                               placeholder="4 or 4-5"
                                             />
-                                            {quantityError && (
-                                              <span className="text-red-400 text-xs mt-1 w-16">{quantityError}</span>
-                                            )}
+                                            <Input
+                                              type="text"
+                                              value={tempChanges[regularItem.id]?.unit ?? (regularItem.original_unit || '')}
+                                              onChange={(e) => handleUnitChange(regularItem.id, e.target.value)}
+                                              className="flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs"
+                                              placeholder="Unit"
+                                            />
                                           </div>
-                                          <Input
-                                            type="text"
-                                            value={editUnit}
-                                            onChange={(e) => setEditUnit(e.target.value)}
-                                            className="w-20 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                            placeholder="Unit"
-                                          />
-                                          <Input
-                                            type="text"
-                                            value={editName}
-                                            onChange={(e) => setEditName(e.target.value)}
-                                            className="flex-1 h-8 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm"
-                                            placeholder="Item name"
-                                          />
+                                          {/* Invisible placeholder to maintain consistent alignment */}
+                                          <div className="w-6 h-6"></div>
+                                        </div>
+
+                                        {/* Error message */}
+                                        {quantityError && (
+                                          <span className="text-red-400 text-xs mb-2">{quantityError}</span>
+                                        )}
+
+                                        {/* Action buttons - positioned right after content */}
+                                        <div className="flex gap-1 mt-3">
                                           <button
                                             onClick={handleSaveEdit}
-                                            disabled={!!quantityError || !editQuantity.trim()}
-                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                            disabled={!!quantityError || Object.keys(tempChanges).length === 0}
+                                            className="flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
                                           >
                                             Save
                                           </button>
                                           <button
                                             onClick={handleCancelEdit}
-                                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                            className="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
                                           >
                                             Cancel
                                           </button>
                                         </div>
                                       </div>
-                                    ) : (
-                                      <div className="text-sm font-medium flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <div className="flex-1">
-                                            <div className={regularItem.checked ? 'line-through text-white/60' : 'text-white text-base font-semibold'}>
+                                    </>
+                                  ) : (
+                                    // Normal view mode
+                                    <>
+                                      <div className="h-40">
+                                        <CardImage item={regularItem} recipes={recipes} sortBy={sortBy} />
+                                      </div>
+                                      <div className="flex flex-col h-full p-3">
+                                        <div className="flex items-start justify-between h-full">
+                                          <div className="flex-1 pr-2 flex flex-col">
+                                            {/* Dynamic ingredient name - 1 or 2 lines */}
+                                            <div className={`text-lg font-bold tracking-normal line-clamp-2 leading-6 mb-1 ${
+                                              regularItem.checked ? 'line-through text-white/60' : 'text-white'
+                                            }`}>
                                               {regularItem.sort_name}
                                             </div>
-                                            <div className="text-sm text-white/70 mt-1">
+                                            {/* Quantity appears right below ingredient name */}
+                                            <div className="text-sm text-gray-400 font-normal">
                                               {formatMeasurement(
                                                 regularItem.original_quantity_min,
                                                 regularItem.original_quantity_max,
@@ -1130,30 +1327,36 @@ export default function GroceryLists() {
                                             </div>
                                           </div>
                                           {!regularItem.checked && (
-                                            <div className="flex items-center gap-1 ml-auto">
+                                            <div className="flex items-center gap-1 flex-shrink-0">
                                               <button
-                                                onClick={() => handleStartEdit(regularItem)}
-                                                className="p-2 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleStartEdit(regularItem)
+                                                }}
+                                                className="p-1 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
                                               >
-                                                <Edit3 className="h-5 w-5" />
+                                                <Edit3 className="h-4 w-4" />
                                               </button>
                                               <button
-                                                onClick={() => handleDeleteItem(regularItem.id)}
-                                                className="p-2 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleDeleteItem(regularItem.id)
+                                                }}
+                                                className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
                                               >
-                                                <Trash2 className="h-5 w-5" />
+                                                <Trash2 className="h-4 w-4" />
                                               </button>
                                             </div>
                                           )}
                                         </div>
                                       </div>
-                                    )}
-                                  </div>
+                                    </>
+                                  )}
                                 </div>
-                              )
+                              ]
                             }
                           })}
-                        </div>
+                        </NetflixCarousel>
                       </div>
                     ))}
                   </div>
