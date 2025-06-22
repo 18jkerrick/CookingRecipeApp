@@ -1,0 +1,6 @@
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orange circle (carrot) -->
+  <circle cx="11" cy="14" r="7" fill="#FF7009"/>
+  <!-- Green triangle (arrow/leaves) -->
+  <path d="M11 1L5 7H17L11 1Z" fill="#0AAD0A"/>
+</svg>

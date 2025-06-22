@@ -4,6 +4,7 @@ import { NormalizedIngredient } from './ingredientParser';
 export interface AINormalizedIngredient extends NormalizedIngredient {
   confidence: number; // 0-1 score of parsing confidence
   range?: { min: number; max: number }; // For range quantities like "1 to 2"
+  category?: string; // AI-assigned grocery store category
 }
 
 // OpenAI-powered ingredient normalizer
@@ -26,7 +27,7 @@ export async function normalizeIngredientWithAI(ingredientText: string): Promise
       messages: [
         {
           role: "system",
-          content: `You are an expert chef and ingredient parser. Your job is to extract structured data from ingredient descriptions.
+          content: `You are an expert chef and ingredient parser. Your job is to extract structured data from ingredient descriptions and assign the most appropriate grocery store category.
 
 CRITICAL RULES:
 1. Extract ONLY the core ingredient name (no brands, no descriptive adjectives unless essential)
@@ -35,16 +36,74 @@ CRITICAL RULES:
 4. Convert mixed fractions to decimals (1½ → 1.5)
 5. Separate preparation methods from the ingredient name
 6. Keep only essential notes, remove marketing/brand text
+7. Assign the most appropriate category from the list below
+
+REQUIRED CATEGORIES (choose the most appropriate one):
+- "produce" (ONLY fresh fruits, vegetables, fresh herbs - NOT processed/packaged versions)
+- "meat-seafood" (ONLY actual meat, poultry, fish, seafood - NOT stocks, broths, or seasonings)
+- "dairy-eggs-fridge" (milk, cheese, butter, eggs, yogurt, refrigerated items)
+- "herbs-spices" (dried spices, seasonings, extracts, dried herbs)
+- "flours-sugars" (flour, sugar, baking powder, baking soda, cornstarch, honey, syrups)
+- "oils-vinegars" (cooking oils, vinegars, salad dressings)
+- "pastas-grains-legumes" (pasta, rice, quinoa, beans, lentils, oats, cereals)
+- "pantry" (canned goods, sauces, stocks, broths, condiments, jarred items, pastes, processed foods)
+- "frozen" (frozen foods, ice cream)
+- "bakery" (bread, rolls, tortillas, bagels)
+- "uncategorized" (if unsure)
+
+CRITICAL CATEGORIZATION RULES:
+1. Look at the ENTIRE ingredient name, not individual words
+2. Consider the FORM and PROCESSING level of the ingredient
+3. PROCESSED versions of produce go to "pantry" (tomato paste, garlic paste, lemon juice)
+4. STOCKS and BROTHS go to "pantry" even if they contain meat/vegetable names
+5. SOUP MIXES and SEASONINGS go to "pantry" even if they contain produce names
+6. STARCHES and POWDERS go to "flours-sugars" or "pantry" depending on use
 
 EXAMPLES:
-Input: "1½ cups (130 grams) onions (sliced (optional, *updated, cuts down acidity from tomatoes))"
-Output: {"quantity": 1.5, "unit": "cups", "ingredient": "onions", "preparation": "sliced", "notes": "optional"}
+Input: "1½ cups fresh onions, sliced"
+Output: {"quantity": 1.5, "unit": "cups", "ingredient": "fresh onions", "preparation": "sliced", "category": "produce"}
 
-Input: "600 grams (1.3 lbs.) fresh tomatoes ((or 1 cup passata/canned tomato puree or ⅓ cup double concentrate tomato paste - for 1x))"
-Output: {"quantity": 600, "unit": "grams", "ingredient": "fresh tomatoes", "notes": "or 1 cup passata"}
+Input: "600 grams fresh tomatoes"
+Output: {"quantity": 600, "unit": "grams", "ingredient": "fresh tomatoes", "category": "produce"}
 
-Input: "¼ to ⅓ teaspoon salt ( (adjust to taste))"
-Output: {"quantity": 0.3, "unit": "teaspoon", "ingredient": "salt", "notes": "adjust to taste"}
+Input: "¼ teaspoon salt"
+Output: {"quantity": 0.25, "unit": "teaspoon", "ingredient": "salt", "category": "herbs-spices"}
+
+Input: "2 lbs ground beef"
+Output: {"quantity": 2, "unit": "lbs", "ingredient": "ground beef", "category": "meat-seafood"}
+
+CRITICAL EXAMPLES (common mistakes to avoid):
+Input: "1 can diced tomatoes"
+Output: {"quantity": 1, "unit": "can", "ingredient": "diced tomatoes", "category": "pantry"}
+WRONG: "produce" (canned = processed = pantry)
+
+Input: "2 tbsp corn starch"
+Output: {"quantity": 2, "unit": "tbsp", "ingredient": "corn starch", "category": "flours-sugars"}
+WRONG: "produce" (starch = processed powder = flours-sugars)
+
+Input: "1 tbsp garlic paste"
+Output: {"quantity": 1, "unit": "tbsp", "ingredient": "garlic paste", "category": "pantry"}
+WRONG: "produce" (paste = processed = pantry)
+
+Input: "2 cups beef stock"
+Output: {"quantity": 2, "unit": "cups", "ingredient": "beef stock", "category": "pantry"}
+WRONG: "meat-seafood" (stock = liquid = pantry)
+
+Input: "1 packet Lipton onion soup mix"
+Output: {"quantity": 1, "unit": "packet", "ingredient": "Lipton onion soup mix", "category": "pantry"}
+WRONG: "produce" (soup mix = processed seasoning = pantry)
+
+Input: "¼ cup lemon juice"
+Output: {"quantity": 0.25, "unit": "cup", "ingredient": "lemon juice", "category": "pantry"}
+WRONG: "produce" (juice = processed liquid = pantry)
+
+Input: "1 cup blended tomatoes"
+Output: {"quantity": 1, "unit": "cup", "ingredient": "blended tomatoes", "category": "pantry"}
+WRONG: "produce" (blended = processed = pantry)
+
+Input: "1 lb meat"
+Output: {"quantity": 1, "unit": "lb", "ingredient": "meat", "category": "meat-seafood"}
+WRONG: "uncategorized" (meat = obviously meat-seafood)
 
 Return ONLY valid JSON with no additional text.`
         },
@@ -80,7 +139,8 @@ Return ONLY valid JSON with no additional text.`
       preparation: parsed.preparation || undefined,
       notes: parsed.notes || undefined,
       original: ingredientText,
-      confidence: 0.9 // High confidence for AI parsing
+      confidence: 0.9, // High confidence for AI parsing
+      category: parsed.category || 'uncategorized' // AI-assigned category
     };
 
     console.log(`✅ AI normalized: "${ingredientText}" → ${JSON.stringify(normalized)}`);
@@ -211,43 +271,98 @@ export async function normalizeIngredientsWithAIBatch(ingredientTexts: string[])
       messages: [
         {
           role: "system",
-          content: `You are an expert chef and ingredient parser. Parse multiple ingredients into structured data.
+          content: `You are an expert chef and ingredient parser. Parse multiple ingredients into structured data and assign appropriate grocery store categories.
 
 CRITICAL RULES:
 1. PRESERVE ALL QUANTITIES - never drop numbers from ingredients, even tiny ones like ⅛ (0.125)
 2. For ranges like "1 to 2", "¼ to ⅓", "1½ to 2", create range field with min/max
-3. For single quantities like "½", "1", "2.5", "⅛", put in quantity field 
+3. For single quantities like "½", "1", "2.5", "⅛", put in quantity field
 4. Convert fractions: ½→0.5, ¼→0.25, ¾→0.75, ⅓→0.33, ⅔→0.67, ⅛→0.125, ⅜→0.375, ⅝→0.625, ⅞→0.875, 1½→1.5, etc.
 5. Extract core ingredient name (lowercase, remove excessive parentheses)
 6. Extract preparation methods if present (sliced, chopped, minced, etc.)
 7. Keep only essential notes, remove marketing text
 8. Use standard units: teaspoon/teaspoons, tablespoon/tablespoons, cup/cups, etc.
 9. NEVER ignore small quantities like ⅛ or 0.125 - they are important!
+10. Assign the most appropriate category from the list below
+
+REQUIRED CATEGORIES (choose the most appropriate one):
+- "produce" (ONLY fresh fruits, vegetables, fresh herbs - NOT processed/packaged versions)
+- "meat-seafood" (ONLY actual meat, poultry, fish, seafood - NOT stocks, broths, or seasonings)
+- "dairy-eggs-fridge" (milk, cheese, butter, eggs, yogurt, refrigerated items)
+- "herbs-spices" (dried spices, seasonings, extracts, dried herbs)
+- "flours-sugars" (flour, sugar, baking powder, baking soda, cornstarch, honey, syrups)
+- "oils-vinegars" (cooking oils, vinegars, salad dressings)
+- "pastas-grains-legumes" (pasta, rice, quinoa, beans, lentils, oats, cereals)
+- "pantry" (canned goods, sauces, stocks, broths, condiments, jarred items, pastes, processed foods)
+- "frozen" (frozen foods, ice cream)
+- "bakery" (bread, rolls, tortillas, bagels)
+- "uncategorized" (if unsure)
+
+CRITICAL CATEGORIZATION RULES:
+1. Look at the ENTIRE ingredient name, not individual words
+2. Consider the FORM and PROCESSING level of the ingredient
+3. PROCESSED versions of produce go to "pantry" (tomato paste, garlic paste, lemon juice)
+4. STOCKS and BROTHS go to "pantry" even if they contain meat/vegetable names
+5. SOUP MIXES and SEASONINGS go to "pantry" even if they contain produce names
+6. STARCHES and POWDERS go to "flours-sugars" or "pantry" depending on use
 
 RANGE EXAMPLES:
-- "1 to 2 green chilies" → {range: {min: 1, max: 2}, ingredient: "green chilies"}
-- "¼ to ⅓ teaspoon salt" → {range: {min: 0.25, max: 0.33}, unit: "teaspoon", ingredient: "salt"}
-- "1½ to 2 cups flour" → {range: {min: 1.5, max: 2}, unit: "cups", ingredient: "flour"}
+- "1 to 2 fresh green chilies" → {range: {min: 1, max: 2}, ingredient: "fresh green chilies", category: "produce"}
+- "¼ to ⅓ teaspoon salt" → {range: {min: 0.25, max: 0.33}, unit: "teaspoon", ingredient: "salt", category: "herbs-spices"}
+- "1½ to 2 cups flour" → {range: {min: 1.5, max: 2}, unit: "cups", ingredient: "flour", category: "flours-sugars"}
 
 SINGLE QUANTITY EXAMPLES:
-- "½ teaspoon turmeric (haldi, optional)" → {quantity: 0.5, unit: "teaspoon", ingredient: "turmeric", notes: "optional"}
-- "⅛ teaspoon turmeric (haldi, optional)" → {quantity: 0.125, unit: "teaspoon", ingredient: "turmeric", notes: "optional"}
-- "2 inch cinnamon" → {quantity: 2, unit: "inch", ingredient: "cinnamon"}
-- "600 grams fresh tomatoes" → {quantity: 600, unit: "grams", ingredient: "fresh tomatoes"}
+- "½ teaspoon turmeric" → {quantity: 0.5, unit: "teaspoon", ingredient: "turmeric", category: "herbs-spices"}
+- "⅛ teaspoon turmeric" → {quantity: 0.125, unit: "teaspoon", ingredient: "turmeric", category: "herbs-spices"}
+- "2 inch cinnamon stick" → {quantity: 2, unit: "inch", ingredient: "cinnamon stick", category: "herbs-spices"}
+- "600 grams fresh tomatoes" → {quantity: 600, unit: "grams", ingredient: "fresh tomatoes", category: "produce"}
+- "2 lbs ground beef" → {quantity: 2, unit: "lbs", ingredient: "ground beef", category: "meat-seafood"}
+
+CRITICAL EXAMPLES (avoid these mistakes):
+- "1 can diced tomatoes" → {quantity: 1, unit: "can", ingredient: "diced tomatoes", category: "pantry"} NOT "produce"
+- "2 tbsp corn starch" → {quantity: 2, unit: "tbsp", ingredient: "corn starch", category: "flours-sugars"} NOT "produce"
+- "1 tbsp garlic paste" → {quantity: 1, unit: "tbsp", ingredient: "garlic paste", category: "pantry"} NOT "produce"
+- "2 cups beef stock" → {quantity: 2, unit: "cups", ingredient: "beef stock", category: "pantry"} NOT "meat-seafood"
+- "1 packet onion soup mix" → {quantity: 1, unit: "packet", ingredient: "onion soup mix", category: "pantry"} NOT "produce"
+- "¼ cup lemon juice" → {quantity: 0.25, unit: "cup", ingredient: "lemon juice", category: "pantry"} NOT "produce"
+- "1 cup blended tomatoes" → {quantity: 1, unit: "cup", ingredient: "blended tomatoes", category: "pantry"} NOT "produce"
+- "1 lb meat" → {quantity: 1, unit: "lb", ingredient: "meat", category: "meat-seafood"} NOT "uncategorized"
 
 PROBLEM CASES TO AVOID:
 - WRONG: "⅛ teaspoon turmeric" → {ingredient: "turmeric"} (missing quantity!)
-- RIGHT: "⅛ teaspoon turmeric" → {quantity: 0.125, unit: "teaspoon", ingredient: "turmeric"}
-- WRONG: "1/8 teaspoon turmeric" → {ingredient: "turmeric"} (missing quantity!)  
-- RIGHT: "1/8 teaspoon turmeric" → {quantity: 0.125, unit: "teaspoon", ingredient: "turmeric"}
+- RIGHT: "⅛ teaspoon turmeric" → {quantity: 0.125, unit: "teaspoon", ingredient: "turmeric", category: "herbs-spices"}
+- WRONG: "1/8 teaspoon turmeric" → {ingredient: "turmeric"} (missing quantity!)
+- RIGHT: "1/8 teaspoon turmeric" → {quantity: 0.125, unit: "teaspoon", ingredient: "turmeric", category: "herbs-spices"}
 - WRONG: "1 to 2 green chilies" → {range: {min: null, max: 2}} (missing first number!)
-- RIGHT: "1 to 2 green chilies" → {range: {min: 1, max: 2}, ingredient: "green chilies"}
+- RIGHT: "1 to 2 green chilies" → {range: {min: 1, max: 2}, ingredient: "green chilies", category: "produce"}
+
+CATEGORIZATION MISTAKES TO AVOID:
+- WRONG: "corn starch" → category: "produce" (don't focus on "corn")
+- RIGHT: "corn starch" → category: "flours-sugars" (it's a processed starch)
+- WRONG: "garlic paste" → category: "produce" (don't focus on "garlic")
+- RIGHT: "garlic paste" → category: "pantry" (it's a processed paste)
+- WRONG: "beef stock" → category: "meat-seafood" (don't focus on "beef")
+- RIGHT: "beef stock" → category: "pantry" (it's a liquid broth)
+- WRONG: "onion soup mix" → category: "produce" (don't focus on "onion")
+- RIGHT: "onion soup mix" → category: "pantry" (it's a processed seasoning mix)
+- WRONG: "lemon juice" → category: "produce" (don't focus on "lemon")
+- RIGHT: "lemon juice" → category: "pantry" (it's a processed liquid)
+- WRONG: "blended tomatoes" → category: "produce" (don't focus on "tomatoes")
+- RIGHT: "blended tomatoes" → category: "pantry" (it's processed/blended)
+- WRONG: "meat" → category: "uncategorized" (obvious category exists)
+- RIGHT: "meat" → category: "meat-seafood" (it's clearly meat)
 
 SPECIAL ATTENTION: The fraction ⅛ (one-eighth) equals 0.125 - this is a valid quantity, DO NOT ignore it!
 
 CRITICAL: Every ingredient MUST have either a quantity OR a range. Never leave both empty.
 
-Return VALID JSON only. Escape quotes in strings. Format: {"ingredients": [{"quantity": number|null, "range": {"min": number, "max": number}|null, "unit": "string"|null, "ingredient": "string", "preparation": "string"|null, "notes": "string"|null}]}`
+CATEGORIZATION PRIORITY:
+1. FORM matters more than base ingredient (paste/juice/stock = pantry, fresh = produce)
+2. PROCESSING matters (canned/blended/powdered = pantry, raw = produce)
+3. PACKAGING matters (soup mix/seasoning packet = pantry)
+4. Don't be misled by individual words - look at the COMPLETE ingredient name
+
+Return VALID JSON only. Escape quotes in strings. Format: {"ingredients": [{"quantity": number|null, "range": {"min": number, "max": number}|null, "unit": "string"|null, "ingredient": "string", "preparation": "string"|null, "notes": "string"|null, "category": "string"}]}`
         },
         {
           role: "user",
@@ -330,7 +445,8 @@ Return VALID JSON only. Escape quotes in strings. Format: {"ingredients": [{"qua
         notes: item.notes || undefined,
         original: ingredientTexts[index] || '',
         confidence: 0.9,
-        range: finalRange || undefined
+        range: finalRange || undefined,
+        category: item.category || 'uncategorized' // AI-assigned category
       };
     });
 
@@ -387,7 +503,8 @@ function fallbackParseIngredient(ingredientText: string): AINormalizedIngredient
       notes: undefined,
       original: ingredientText,
       confidence: 0.5,
-      range: { min: rangeInfo.min!, max: rangeInfo.max! }
+      range: { min: rangeInfo.min!, max: rangeInfo.max! },
+      category: 'uncategorized' // Default category for fallback
     };
   }
   
@@ -428,6 +545,7 @@ function fallbackParseIngredient(ingredientText: string): AINormalizedIngredient
     preparation: undefined,
     notes: undefined,
     original: ingredientText,
-    confidence: 0.5 // Lower confidence for fallback
+    confidence: 0.5, // Lower confidence for fallback
+    category: 'uncategorized' // Default category for fallback
   };
 }

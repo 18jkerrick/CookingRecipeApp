@@ -15,14 +15,43 @@ export function getAmazonFreshUrl(items: GroceryItem[], zipCode: string): string
 }
 
 export function getInstacartUrl(items: GroceryItem[], zipCode: string): string {
-  // Instacart supports creating lists via URL
-  // Format: https://www.instacart.com/store/items/search?list=item1,item2,item3
-  const itemList = items.map(item => {
-    const quantity = item.quantity || 1;
-    return `${quantity} ${item.unit || ''} ${item.name}`.trim();
-  }).join(',');
+  // Since Instacart doesn't have a public API for pre-populated lists,
+  // we'll use their main search page with the first few key ingredients
+  // Users can then manually add the remaining items
   
-  return `https://www.instacart.com/store/items/search?list=${encodeURIComponent(itemList)}`;
+  // Get the most important ingredients (first 3-5 items)
+  const keyIngredients = items.slice(0, 3).map(item => item.name);
+  const searchQuery = keyIngredients.join(' ');
+  
+  // Use Instacart's main search page
+  const baseUrl = 'https://www.instacart.com/store/search';
+  const params = new URLSearchParams({
+    q: searchQuery
+  });
+  
+  // Add your affiliate/partner parameters when available
+  // params.append('utm_source', 'remy');
+  // params.append('utm_medium', 'affiliate');
+  // params.append('utm_campaign', 'recipe_ingredients');
+  
+  return `${baseUrl}?${params.toString()}`;
+}
+
+// Alternative: Create a custom landing page on your domain that shows the full list
+// and then redirects to Instacart
+export function getInstacartRecipeUrl(items: GroceryItem[], recipeId?: string): string {
+  // This creates a URL to your own domain that shows the full ingredient list
+  // and provides an "Shop on Instacart" button
+  const baseUrl = window.location.origin;
+  const params = new URLSearchParams({
+    ingredients: items.map(item => `${item.quantity || 1} ${item.unit || ''} ${item.name}`.trim()).join(',')
+  });
+  
+  if (recipeId) {
+    params.append('recipe', recipeId);
+  }
+  
+  return `${baseUrl}/shop-ingredients?${params.toString()}`;
 }
 
 export function getShiptUrl(items: GroceryItem[], zipCode: string): string {
