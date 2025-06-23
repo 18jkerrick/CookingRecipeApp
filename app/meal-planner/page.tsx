@@ -302,7 +302,7 @@ export default function MealPlanner() {
 
       <div className="flex h-[calc(100vh-120px)]">
         {/* Recipe Sidebar */}
-        <div className="w-72 bg-[#1e1f26] border-r border-white/10 flex flex-col">
+        <div className="sidebar w-72 bg-[#1e1f26] border-r border-white/10 flex flex-col">
           <div className="p-4 border-b border-white/10">
             <h2 className="text-xl font-bold mb-4">Your Recipes</h2>
             
@@ -360,7 +360,7 @@ export default function MealPlanner() {
               {getFilteredAndSortedRecipes().map((recipe) => (
                 <div
                   key={recipe.id}
-                  className="bg-[#14151a] rounded-lg p-3 cursor-pointer hover:bg-[#14151a]/80 transition-colors"
+                  className="recipe-card bg-[#14151a] rounded-lg p-3 cursor-pointer hover:bg-[#14151a]/80 transition-colors"
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('application/json', JSON.stringify(recipe))
@@ -382,6 +382,9 @@ export default function MealPlanner() {
                       <h3 className="font-medium text-white text-sm leading-tight line-clamp-2">
                         {recipe.title}
                       </h3>
+                      <div className="meta text-xs text-white/60 mt-1">
+                        {recipe.ingredients?.length || 0} ingredients · {recipe.instructions?.length || 0} steps
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -434,15 +437,18 @@ export default function MealPlanner() {
                             const globalDayIndex = dayIndex
                             const meal = weekPlan[globalDayIndex]?.meals[mealIndex]
                       const flexClass = 
-                        mealType.size === 'large' ? 'flex-[3]' :
-                        mealType.size === 'medium' ? 'flex-[2]' : 'flex-[1]'
+                        mealType.type === 'breakfast' || mealType.type === 'lunch' ? 'flex-[1.5]' :
+                        mealType.type === 'dinner' ? 'flex-[2]' :
+                        mealType.type === 'dessert' ? 'flex-[1]' : 'flex-[1]'
                       
                       return (
                         <div
                           key={mealType.type}
                           className={`calendar-cell ${flexClass} bg-[#1e1f26] rounded-lg border-2 border-dashed border-white/20 relative overflow-hidden`}
                           style={{ 
-                            minHeight: mealType.size === 'large' ? '120px' : mealType.size === 'medium' ? '100px' : '80px',
+                            minHeight: mealType.type === 'breakfast' || mealType.type === 'lunch' ? '90px' :
+                                      mealType.type === 'dinner' ? '110px' :
+                                      mealType.type === 'dessert' ? '80px' : '80px',
                             boxSizing: 'border-box'
                           }}
                           onDragOver={(e) => e.preventDefault()}
