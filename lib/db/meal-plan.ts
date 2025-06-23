@@ -146,9 +146,9 @@ export interface DayPlan {
 // Meal types configuration (matching grocery-list page)
 export const MEAL_TYPES = [
   { type: 'breakfast', label: 'Breakfast', size: 'large', color: '#008FF4' },
-  { type: 'morning-snack', label: 'Morning Snack', size: 'small', color: '#a5a6ff' },
+  { type: 'morning-snack', label: 'Snack (AM)', size: 'small', color: '#a5a6ff' },
   { type: 'lunch', label: 'Lunch', size: 'large', color: '#2B966F' },
-  { type: 'afternoon-snack', label: 'Afternoon Snack', size: 'small', color: '#a5a6ff' },
+  { type: 'afternoon-snack', label: 'Snack (PM)', size: 'small', color: '#a5a6ff' },
   { type: 'dinner', label: 'Dinner', size: 'large', color: '#FF3A25' },
   { type: 'dessert', label: 'Dessert', size: 'medium', color: '#F739F6' },
 ] as const;
