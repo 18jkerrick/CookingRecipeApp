@@ -302,7 +302,7 @@ export default function MealPlanner() {
 
       <div className="flex h-[calc(100vh-120px)]">
         {/* Recipe Sidebar */}
-        <div className="w-72 bg-[#1e1f26] border-r border-white/10 flex flex-col">
+        <div className="sidebar w-72 bg-[#1e1f26] border-r border-white/10 flex flex-col">
           <div className="p-4 border-b border-white/10">
             <h2 className="text-xl font-bold mb-4">Your Recipes</h2>
             
@@ -360,7 +360,7 @@ export default function MealPlanner() {
               {getFilteredAndSortedRecipes().map((recipe) => (
                 <div
                   key={recipe.id}
-                  className="bg-[#14151a] rounded-lg p-3 cursor-pointer hover:bg-[#14151a]/80 transition-colors"
+                  className="recipe-card bg-[#14151a] rounded-lg p-3 cursor-pointer hover:bg-[#14151a]/80 transition-colors"
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('application/json', JSON.stringify(recipe))
@@ -382,6 +382,9 @@ export default function MealPlanner() {
                       <h3 className="font-medium text-white text-sm leading-tight line-clamp-2">
                         {recipe.title}
                       </h3>
+                      <div className="meta text-xs text-white/60 mt-1">
+                        {recipe.ingredients?.length || 0} ingredients · {recipe.instructions?.length || 0} steps
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -417,7 +420,6 @@ export default function MealPlanner() {
                 </button>
               </div>
             </div>
-            <p className="text-white/70 text-sm">Drag recipes from the sidebar or click + to plan your meals</p>
           </div>
 
           <div className="flex-1 overflow-auto p-4">
@@ -435,13 +437,20 @@ export default function MealPlanner() {
                             const globalDayIndex = dayIndex
                             const meal = weekPlan[globalDayIndex]?.meals[mealIndex]
                       const flexClass = 
-                        mealType.size === 'large' ? 'flex-[3]' :
-                        mealType.size === 'medium' ? 'flex-[2]' : 'flex-[1]'
+                        mealType.type === 'breakfast' || mealType.type === 'lunch' ? 'flex-[1.5]' :
+                        mealType.type === 'dinner' ? 'flex-[2]' :
+                        mealType.type === 'dessert' ? 'flex-[1]' : 'flex-[1]'
                       
                       return (
                         <div
                           key={mealType.type}
-                          className={`${flexClass} bg-[#1e1f26] rounded-lg border-2 border-dashed border-white/20 relative min-h-[60px]`}
+                          className={`calendar-cell ${flexClass} bg-[#1e1f26] rounded-lg border-2 border-dashed border-white/20 relative overflow-hidden`}
+                          style={{ 
+                            minHeight: mealType.type === 'breakfast' || mealType.type === 'lunch' ? '90px' :
+                                      mealType.type === 'dinner' ? '110px' :
+                                      mealType.type === 'dessert' ? '80px' : '80px',
+                            boxSizing: 'border-box'
+                          }}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => {
                             e.preventDefault()
@@ -455,22 +464,28 @@ export default function MealPlanner() {
                         >
                           {meal?.recipe ? (
                             <div 
-                              className="h-full p-2 rounded-lg border"
+                              className="h-full p-2 rounded-lg border box-border"
                               style={{
                                 backgroundColor: `${mealType.color}10`,
-                                borderColor: `${mealType.color}30`
+                                borderColor: `${mealType.color}30`,
+                                padding: '8px'
                               }}
                             >
-                              <div className="flex justify-between items-start h-full">
-                                <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start h-full overflow-hidden">
+                                <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+                                  <div className="recipe-title title text-xs text-white line-clamp-2 font-semibold flex-grow overflow-hidden" style={{ 
+                                    letterSpacing: '0.5px',
+                                    wordBreak: 'break-word',
+                                    hyphens: 'auto',
+                                    lineHeight: '1.2'
+                                  }}>
+                                    {meal.recipe.title}
+                                  </div>
                                   <div 
-                                    className="text-xs font-medium mb-1"
+                                    className="meal-type text-xs font-medium mt-1 flex-shrink-0"
                                     style={{ color: mealType.color }}
                                   >
                                     {mealType.label}
-                                  </div>
-                                  <div className="text-xs text-white line-clamp-2">
-                                    {meal.recipe.title}
                                   </div>
                                 </div>
                                 <button

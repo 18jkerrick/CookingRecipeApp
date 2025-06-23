@@ -146,9 +146,9 @@ export interface DayPlan {
 // Meal types configuration (matching grocery-list page)
 export const MEAL_TYPES = [
   { type: 'breakfast', label: 'Breakfast', size: 'large', color: '#008FF4' },
-  { type: 'morning-snack', label: 'Morning Snack', size: 'small', color: '#a5a6ff' },
+  { type: 'morning-snack', label: 'Snack (AM)', size: 'small', color: '#a5a6ff' },
   { type: 'lunch', label: 'Lunch', size: 'large', color: '#2B966F' },
-  { type: 'afternoon-snack', label: 'Afternoon Snack', size: 'small', color: '#a5a6ff' },
+  { type: 'afternoon-snack', label: 'Snack (PM)', size: 'small', color: '#a5a6ff' },
   { type: 'dinner', label: 'Dinner', size: 'large', color: '#FF3A25' },
   { type: 'dessert', label: 'Dessert', size: 'medium', color: '#F739F6' },
 ] as const;
@@ -181,18 +181,27 @@ export const convertMealPlansToWeekPlan = (currentWeek: Date): DayPlan[] => {
 
 // Convert grocery-list page format back to shared meal plans
 export const convertWeekPlanToMealPlans = (weekPlan: DayPlan[]): void => {
-  const mealPlans: MealPlan = {};
+  // Get existing meal plans to preserve other weeks
+  const existingMealPlans = getMealPlans();
+  const updatedMealPlans: MealPlan = { ...existingMealPlans };
   
+  // Update only the dates in the current week plan
   weekPlan.forEach(day => {
+    // Clear existing meals for this day first
+    if (updatedMealPlans[day.date]) {
+      delete updatedMealPlans[day.date];
+    }
+    
+    // Add meals that have recipes
     day.meals.forEach(meal => {
       if (meal.recipe) {
-        if (!mealPlans[day.date]) {
-          mealPlans[day.date] = {};
+        if (!updatedMealPlans[day.date]) {
+          updatedMealPlans[day.date] = {};
         }
-        mealPlans[day.date][meal.type] = meal.recipe;
+        updatedMealPlans[day.date][meal.type] = meal.recipe;
       }
     });
   });
   
-  saveMealPlans(mealPlans);
+  saveMealPlans(updatedMealPlans);
 };
