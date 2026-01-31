@@ -27,24 +27,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
-      
-      // Redirect to last visited page on successful sign in
       if (event === 'SIGNED_IN' && session?.user) {
-        const lastPage = getLastVisitedPage()
-        console.log('🔐 Auth: Redirecting to last visited page:', lastPage)
-        router.push(lastPage)
+        router.push(getLastVisitedPage())
       }
     })
 
@@ -52,8 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router])
 
   const signInWithGoogle = async () => {
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
     await supabase.auth.signInWithOAuth({
       provider: 'google',
+      options: { redirectTo },
     })
   }
 

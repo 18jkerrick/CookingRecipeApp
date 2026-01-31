@@ -486,7 +486,7 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.NEXT_PUBLIC_SUPABASE_KEY!
       );
       
       const { data: session } = await supabase.auth.getSession();
