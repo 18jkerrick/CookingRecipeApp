@@ -7,7 +7,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Use service role key for admin operations
+const supabaseKey = process.env.NEXT_PRIVATE_SUPABASE_KEY; // Use secret key for admin operations
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase environment variables');
