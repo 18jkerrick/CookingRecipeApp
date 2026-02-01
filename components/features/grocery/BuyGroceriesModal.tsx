@@ -5,7 +5,7 @@ import { ShoppingCart, ExternalLink, Loader2, Store, Clock, AlertCircle } from '
 import { Input } from '@/components/ui/input'
 import {
   getInstacartUrl
-} from '@/lib/grocery-delivery/service-urls'
+} from '@acme/integrations/grocery-delivery/service-urls'
 
 interface GroceryItem {
   id: string

@@ -22,6 +22,7 @@ const customJestConfig = {
     '^@acme/db/client$': '<rootDir>/packages/db/src/client/index.ts',
     '^@acme/db/server$': '<rootDir>/packages/db/src/server/index.ts',
     '^@acme/db/shared/(.*)$': '<rootDir>/packages/db/src/shared/$1',
+    '^@acme/integrations/grocery-delivery/(.*)$': '<rootDir>/packages/integrations/src/grocery-delivery/$1',
   },
   // Add timeout configuration for async tests
   testTimeout: 30000,

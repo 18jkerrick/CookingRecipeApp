@@ -1,0 +1,10 @@
+{
+  "name": "@acme/integrations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./grocery-delivery/*": "./src/grocery-delivery/*.ts",
+    "./index": "./src/index.ts"
+  }
+}

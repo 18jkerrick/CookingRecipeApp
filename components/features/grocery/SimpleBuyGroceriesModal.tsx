@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { 
   getInstacartUrl,
   copyGroceryListToClipboard
-} from '@/lib/grocery-delivery/service-urls'
+} from '@acme/integrations/grocery-delivery/service-urls'
 
 interface GroceryItem {
   id: string
