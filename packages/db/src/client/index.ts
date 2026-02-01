@@ -20,3 +20,4 @@ export function createSupabaseBrowserClient() {
 }
 
 export const supabase = createSupabaseBrowserClient()
+export * from './grocery'

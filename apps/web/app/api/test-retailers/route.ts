@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseShoppingListHtml } from '../../../../../lib/instacartParser';
+import { parseShoppingListHtml } from '@acme/integrations/grocery-delivery/instacart-parser';
 
 // Instacart API configuration
 const INSTACART_API_KEY = process.env.INSTACART_API_KEY;

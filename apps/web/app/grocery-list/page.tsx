@@ -23,7 +23,7 @@ import {
   deleteGroceryItem,
   addRecipeToGroceryList,
   removeRecipeFromGroceryList,
-} from '../../../../lib/db/grocery'
+} from '@acme/db/client'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 import BuyGroceriesModal from '../../components/features/grocery/BuyGroceriesModal'
 import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'

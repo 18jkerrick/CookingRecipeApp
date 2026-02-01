@@ -105,7 +105,7 @@ function parseFraction(fractionStr: string): number {
 // Extract quantity from string
 function extractQuantity(text: string): { quantity: number; remaining: string } {
   // Pattern for various quantity formats
-  const quantityPattern = /^((?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+)(?:\s*-\s*(?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+))?)\s*/;
+  const quantityPattern = /^((?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)(?:\s*-\s*(?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?))?)\s*/;
   
   const match = text.match(quantityPattern);
   if (!match) {

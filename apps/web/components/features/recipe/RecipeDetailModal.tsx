@@ -27,7 +27,7 @@ import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 import { getMealPlans, saveMealPlans, addRecipeToMealPlan, getWeekDates, getStartOfWeek, formatDateRange, formatDayName, isToday, MEAL_TYPES } from '@/lib/meal-plan';
-import { getGroceryLists, createGroceryList, addRecipeToGroceryList } from '../../../../../lib/db/grocery';
+import { getGroceryLists, createGroceryList, addRecipeToGroceryList } from '@acme/db/client';
 
 interface RecipeDetailModalProps {
   isOpen: boolean;
