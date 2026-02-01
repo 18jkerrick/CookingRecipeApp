@@ -2,11 +2,12 @@ const nextJest = require('next/jest')
 
 const createJestConfig = nextJest({
   // Provide the path to your Next.js app to load next.config.js and .env files
-  dir: './',
+  dir: './apps/web',
 })
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
+  rootDir: '.',
   testEnvironment: 'jest-environment-jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: [
@@ -18,11 +19,17 @@ const customJestConfig = {
     '<rootDir>/__tests__/', // Ignore old test directory
   ],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
+    '^@/(.*)$': '<rootDir>/apps/web/$1',
     '^@acme/db/client$': '<rootDir>/packages/db/src/client/index.ts',
     '^@acme/db/server$': '<rootDir>/packages/db/src/server/index.ts',
     '^@acme/db/shared/(.*)$': '<rootDir>/packages/db/src/shared/$1',
     '^@acme/integrations/grocery-delivery/(.*)$': '<rootDir>/packages/integrations/src/grocery-delivery/$1',
+    '^@acme/core/ai$': '<rootDir>/packages/core/src/ai/index.ts',
+    '^@acme/core/parsers$': '<rootDir>/packages/core/src/parsers/index.ts',
+    '^@acme/core/utils$': '<rootDir>/packages/core/src/utils/index.ts',
+    '^@acme/core/ai/(.*)$': '<rootDir>/packages/core/src/ai/$1',
+    '^@acme/core/parsers/(.*)$': '<rootDir>/packages/core/src/parsers/$1',
+    '^@acme/core/utils/(.*)$': '<rootDir>/packages/core/src/utils/$1',
   },
   // Add timeout configuration for async tests
   testTimeout: 30000,

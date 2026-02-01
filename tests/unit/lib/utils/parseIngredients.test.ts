@@ -1,4 +1,4 @@
-import { parseIngredients } from '@/lib/utils/parseIngredients'
+import { parseIngredients } from '@acme/core/utils/parseIngredients'
 
 describe('parseIngredients', () => {
   it('parses simple quantities', () => {

@@ -1,4 +1,4 @@
-import { mergeLists } from '@/lib/utils/mergeLists'
+import { mergeLists } from '@acme/core/utils/mergeLists'
 
 describe('mergeLists', () => {
   test('merges two lists with no duplicates', () => {

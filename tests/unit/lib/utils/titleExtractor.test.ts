@@ -2,13 +2,13 @@
  * @jest-environment node
  */
 
-import { extractVideoTitle } from '@/lib/utils/titleExtractor';
-import { getYoutubeTitle } from '@/lib/parsers/youtube';
-import { getFacebookTitle } from '@/lib/parsers/facebook';
+import { extractVideoTitle } from '@acme/core/utils/titleExtractor';
+import { getYoutubeTitle } from '@acme/core/parsers/youtube';
+import { getFacebookTitle } from '@acme/core/parsers/facebook';
 
 // Mock the parser functions
-jest.mock('@/lib/parsers/youtube');
-jest.mock('@/lib/parsers/facebook');
+jest.mock('@acme/core/parsers/youtube');
+jest.mock('@acme/core/parsers/facebook');
 
 const mockGetYoutubeTitle = getYoutubeTitle as jest.MockedFunction<typeof getYoutubeTitle>;
 const mockGetFacebookTitle = getFacebookTitle as jest.MockedFunction<typeof getFacebookTitle>;

@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { detectMusicContent } from '@/lib/ai/detectMusicContent';
+import { detectMusicContent } from '@acme/core/ai/detectMusicContent';
 import OpenAI from 'openai';
 
 // Mock OpenAI

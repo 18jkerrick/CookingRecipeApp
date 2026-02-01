@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
+import { extractRecipeFromTranscript } from '@acme/core/ai/extractFromTranscript';
 import OpenAI from 'openai';
 
 // Mock OpenAI

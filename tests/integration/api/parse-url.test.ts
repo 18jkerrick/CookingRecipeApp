@@ -6,27 +6,27 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/parse-url/route';
 
 // Mock all external dependencies
-jest.mock('@/lib/parsers/tiktok');
-jest.mock('@/lib/parsers/youtube');
-jest.mock('@/lib/parsers/cooking-website');
-jest.mock('@/lib/parsers/audio');
-jest.mock('@/lib/parsers/video');
-jest.mock('@/lib/ai/cleanCaption');
-jest.mock('@/lib/ai/extractFromCaption');
-jest.mock('@/lib/ai/extractFromTranscript');
-jest.mock('@/lib/ai/transcribeAudio');
-jest.mock('@/lib/ai/detectMusicContent');
+jest.mock('@acme/core/parsers/tiktok');
+jest.mock('@acme/core/parsers/youtube');
+jest.mock('@acme/core/parsers/cooking-website');
+jest.mock('@acme/core/parsers/audio');
+jest.mock('@acme/core/parsers/video');
+jest.mock('@acme/core/ai/cleanCaption');
+jest.mock('@acme/core/ai/extractFromCaption');
+jest.mock('@acme/core/ai/extractFromTranscript');
+jest.mock('@acme/core/ai/transcribeAudio');
+jest.mock('@acme/core/ai/detectMusicContent');
 
-import { getTiktokCaptions } from '@/lib/parsers/tiktok';
-import { getYoutubeCaptions } from '@/lib/parsers/youtube';
-import { getCookingWebsiteData } from '@/lib/parsers/cooking-website';
-import { fetchAudio } from '@/lib/parsers/audio';
-import { extractTextFromVideo } from '@/lib/parsers/video';
-import { cleanCaption } from '@/lib/ai/cleanCaption';
-import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption';
-import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
-import { transcribeAudio } from '@/lib/ai/transcribeAudio';
-import { detectMusicContent } from '@/lib/ai/detectMusicContent';
+import { getTiktokCaptions } from '@acme/core/parsers/tiktok';
+import { getYoutubeCaptions } from '@acme/core/parsers/youtube';
+import { getCookingWebsiteData } from '@acme/core/parsers/cooking-website';
+import { fetchAudio } from '@acme/core/parsers/audio';
+import { extractTextFromVideo } from '@acme/core/parsers/video';
+import { cleanCaption } from '@acme/core/ai/cleanCaption';
+import { extractRecipeFromCaption } from '@acme/core/ai/extractFromCaption';
+import { extractRecipeFromTranscript } from '@acme/core/ai/extractFromTranscript';
+import { transcribeAudio } from '@acme/core/ai/transcribeAudio';
+import { detectMusicContent } from '@acme/core/ai/detectMusicContent';
 
 const mockGetTiktokCaptions = getTiktokCaptions as jest.MockedFunction<typeof getTiktokCaptions>;
 const mockGetYoutubeCaptions = getYoutubeCaptions as jest.MockedFunction<typeof getYoutubeCaptions>;

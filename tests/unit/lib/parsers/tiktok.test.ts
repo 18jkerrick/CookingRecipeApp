@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { getTiktokCaptions } from '@/lib/parsers/tiktok';
+import { getTiktokCaptions } from '@acme/core/parsers/tiktok';
 
 // Mock fetch globally
 const mockFetch = jest.fn();

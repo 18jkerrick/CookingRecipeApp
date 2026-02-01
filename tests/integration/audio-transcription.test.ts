@@ -1,5 +1,5 @@
-import { transcribeAudio, fallbackTranscription } from '@/lib/ai/transcribeAudio';
-import { extractRecipeFromTranscript } from '@/lib/ai/extractFromTranscript';
+import { transcribeAudio, fallbackTranscription } from '@acme/core/ai/transcribeAudio';
+import { extractRecipeFromTranscript } from '@acme/core/ai/extractFromTranscript';
 
 describe('Audio Transcription and Recipe Extraction', () => {
   // Test fallback transcription

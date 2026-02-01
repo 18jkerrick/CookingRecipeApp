@@ -14,7 +14,7 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./apps/web/*"],
       "@acme/db/*": ["./packages/db/src/*"],
       "@acme/integrations/*": ["./packages/integrations/src/*"],
       "@acme/core/*": ["./packages/core/src/*"]

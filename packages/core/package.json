@@ -1,0 +1,14 @@
+{
+  "name": "@acme/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./ai": "./src/ai/index.ts",
+    "./parsers": "./src/parsers/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./ai/*": "./src/ai/*.ts",
+    "./parsers/*": "./src/parsers/*.ts",
+    "./utils/*": "./src/utils/*.ts"
+  }
+}
