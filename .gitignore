@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,6 +16,7 @@
 
 # next.js
 /.next/
+**/.next/
 /out/
 
 # production
@@ -23,9 +25,6 @@
 # misc
 .DS_Store
 *.pem
-architecture.md
-tasks.md
-screenshots/
 CLAUDE.md
 
 # debug
