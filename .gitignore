@@ -19,8 +19,8 @@
 **/.next/
 /out/
 
-# production
-/build
+# docs
+/docs/
 
 # misc
 .DS_Store
@@ -44,4 +44,5 @@ yarn-error.log*
 next-env.d.ts
 
 # cursor
-.cursor/ 
+.cursor/
+.cursor/rules/

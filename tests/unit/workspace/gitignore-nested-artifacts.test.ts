@@ -6,6 +6,9 @@ describe('.gitignore nested artifacts', () => {
     const gitignore = fs.readFileSync('.gitignore', 'utf8')
 
     expect(gitignore.includes('**/.next/')).toBe(true)
+    expect(gitignore.includes('.env*')).toBe(true)
+    expect(gitignore.includes('.cursor/ ')).toBe(true)
+    expect(gitignore.includes('.claude/ ')).toBe(true)
     expect(gitignore.includes('**/node_modules/')).toBe(true)
   })
 })
