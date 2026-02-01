@@ -3,7 +3,7 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/db/supabase'
+import { supabase } from '@acme/db/client'
 import { Search, Filter, Plus, Settings } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '../../lib/db/meal-plan'

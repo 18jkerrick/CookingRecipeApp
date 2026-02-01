@@ -3,7 +3,7 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/db/supabase'
+import { supabase } from '@acme/db/client'
 import PushNotificationPrompt from '../../components/shared/PushNotificationPrompt'
 import RecipeCard from '../../components/features/recipe/RecipeCard'
 import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'

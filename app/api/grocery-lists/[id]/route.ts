@@ -1,14 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabasePrivateKey = process.env.NEXT_PRIVATE_SUPABASE_KEY;
-
-if (!supabaseUrl || !supabasePrivateKey) {
-  throw new Error('Missing Supabase environment variables. Please check NEXT_PUBLIC_SUPABASE_URL and NEXT_PRIVATE_SUPABASE_KEY in your .env.local file.');
-}
-
-const supabase = createClient(supabaseUrl, supabasePrivateKey);
+import { supabase } from '@acme/db/server';
 
 export async function DELETE(
   request: NextRequest,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/supabase';
+import { supabase } from '@acme/db/server';
 
 // Service interfaces
 interface GroceryItem {

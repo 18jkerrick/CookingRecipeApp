@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { supabase } from '../../lib/db/supabase'
+import { supabase } from '@acme/db/client'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
 import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle, Share } from "lucide-react"
 import { Input } from "@/components/ui/input"

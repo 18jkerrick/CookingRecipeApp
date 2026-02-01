@@ -1,5 +1,5 @@
 // Database-based grocery list storage utilities
-import { supabase } from './supabase';
+import { supabase } from '@acme/db/client';
 import { convertMeasurement } from '../utils/unit-conversion';
 // Removed unused imports
 

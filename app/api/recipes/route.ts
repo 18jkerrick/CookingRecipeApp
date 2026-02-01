@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PRIVATE_SUPABASE_KEY!
-);
+import { supabase } from '@acme/db/server';
 
 // GET - List all recipes for authenticated user
 export async function GET(request: NextRequest) {

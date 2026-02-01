@@ -1,4 +1,4 @@
-import { supabase } from '@/supabase/client';
+import { supabase } from '@acme/db/server';
 
 /**
  * Adds the display_quantity column to grocery_items table if it doesn't exist
