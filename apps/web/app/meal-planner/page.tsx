@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@acme/db/client'
 import { Search, Filter, Plus, Settings } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '../../../../lib/db/meal-plan'
+import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '@/lib/meal-plan'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 // Types for meal planning (Recipe interface for local use)
