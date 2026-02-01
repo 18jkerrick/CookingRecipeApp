@@ -9,4 +9,3 @@ export * from './thumbnailExtractor';
 export * from './titleExtractor';
 export * from './titleGenerator';
 export * from './unit-conversion';
-export * from './unitConversion';
