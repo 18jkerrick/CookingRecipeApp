@@ -1,16 +1,17 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom/vitest'
+import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { server } from './tests/msw/server'
 
 // Mock Next.js router
-jest.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({
   useRouter() {
     return {
-      push: jest.fn(),
-      replace: jest.fn(),
-      prefetch: jest.fn(),
-      back: jest.fn(),
-      forward: jest.fn(),
-      refresh: jest.fn(),
+      push: vi.fn(),
+      replace: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
     }
   },
   useSearchParams() {
@@ -22,36 +23,34 @@ jest.mock('next/navigation', () => ({
 }))
 
 // Mock OpenAI
-jest.mock('openai', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: jest.fn().mockResolvedValue({
-            choices: [{
+vi.mock('openai', () => ({
+  __esModule: true,
+  default: vi.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: vi.fn().mockResolvedValue({
+          choices: [
+            {
               message: {
                 content: JSON.stringify({
                   ingredients: ['1 cup flour', '2 eggs'],
-                  instructions: ['Mix ingredients', 'Bake for 30 minutes']
-                })
-              }
-            }]
-          })
-        }
+                  instructions: ['Mix ingredients', 'Bake for 30 minutes'],
+                }),
+              },
+            },
+          ],
+        }),
       },
-      audio: {
-        transcriptions: {
-          create: jest.fn().mockResolvedValue({
-            text: 'Mocked transcription text'
-          })
-        }
-      }
-    }))
-  }
-})
-
-// Jest setup file for handling test environment and cleanup
+    },
+    audio: {
+      transcriptions: {
+        create: vi.fn().mockResolvedValue({
+          text: 'Mocked transcription text',
+        }),
+      },
+    },
+  })),
+}))
 
 // Suppress punycode deprecation warning
 const originalWarn = console.warn
@@ -76,21 +75,12 @@ beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' })
 })
 
-// Global test cleanup
 afterEach(() => {
   server.resetHandlers()
-  // Clear all mocks after each test
-  jest.clearAllMocks()
 })
 
-// Global test teardown
 afterAll(() => {
   server.close()
-  // Force cleanup of any remaining timers
-  jest.runOnlyPendingTimers()
-  jest.useRealTimers()
-  
-  // Restore console methods
   console.warn = originalWarn
   console.error = originalError
-}) 
+})
