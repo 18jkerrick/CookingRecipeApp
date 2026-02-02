@@ -1,4 +1,4 @@
-import { getCookingWebsiteContent } from '@/lib/parsers/cooking-website';
+import { getCookingWebsiteContent } from '@acme/core/parsers/cooking-website';
 
 // Mock fetch globally
 global.fetch = jest.fn();

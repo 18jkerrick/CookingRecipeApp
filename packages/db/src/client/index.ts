@@ -1,0 +1,23 @@
+import { createClient } from '@supabase/supabase-js'
+
+export function createSupabaseBrowserClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_KEY
+
+  if (!url || !anonKey) {
+    throw new Error(
+      'Missing env vars NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_KEY'
+    )
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  })
+}
+
+export const supabase = createSupabaseBrowserClient()
+export * from './grocery'

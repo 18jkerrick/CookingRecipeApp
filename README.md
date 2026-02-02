@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cooking Recipe App
 
-## Getting Started
+A Next.js recipe management application with grocery list integration, meal planning, and third-party grocery delivery service support.
 
-First, run the development server:
+
+## Quickstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Install dependencies
+pnpm install
+
+# Run development server
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This is a **pnpm workspace** monorepo:
 
-## Learn More
+```
+cooking_recipe_app/
+├── apps/
+│   └── web/              # Next.js 15 app (React 19)
+│       ├── app/          # App router pages & API routes
+│       ├── components/   # React components
+│       └── lib/          # Client utilities
+├── packages/
+│   ├── core/             # Shared business logic
+│   │   ├── ai/           # AI/LLM integrations
+│   │   ├── parsers/      # Recipe & ingredient parsing
+│   │   └── utils/        # Common utilities
+│   ├── db/               # Database client & server helpers
+│   │   ├── client/       # Supabase client-side SDK
+│   │   └── server/       # Server-side DB utilities
+│   └── integrations/     # External service integrations
+│       └── grocery-delivery/  # Instacart, Amazon Fresh, etc.
+└── scripts/
+    ├── dev/              # Development & testing scripts
+    └── maintenance/      # Database maintenance & migrations
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Available Commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+All commands run from the repository root:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Development
+pnpm dev                  # Start Next.js dev server
+pnpm build                # Build for production
+pnpm start                # Start production server
+pnpm lint                 # Run ESLint
 
-## Deploy on Vercel
+# Testing
+pnpm test                 # Run all tests
+pnpm test:watch           # Run tests in watch mode
+pnpm test:coverage        # Generate coverage report
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Utilities
+pnpm lt                   # Start localtunnel for external access
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To run commands directly in a workspace:
+
+```bash
+pnpm -C apps/web <command>
+pnpm -C packages/core <command>
+```
+
+## Environment Variables
+
+Create `apps/web/.env.local` with the following:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_KEY=your_supabase_public_key
+NEXT_PRIVATE_SUPABASE_KEY=your_supabase_private_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Google OAuth
+GOOGLE_OAUTH_SECRET=your_oauth_secret
+
+# AI Services
+OPENAI_API_KEY=your_openai_key
+
+# Intagram Rapid API Key (optional, if you want to extract from Instagram)
+INSTAGRAM_RAPID_API_KEY=...
+
+# Grocery Delivery (optional, if you want to order on instacart)
+INSTACART_CLIENT_ID=...
+AMAZON_FRESH_API_KEY=...
+```
+
+## Testing
+
+Tests are located in the `tests/` directory and use Jest with React Testing Library:
+
+```bash
+pnpm test                    # Run once
+pnpm test:watch              # Watch mode
+pnpm test:coverage           # With coverage report
+```
+
+## Scripts
+
+- **`scripts/dev/`** - Development utilities and testing scripts for individual features
+- **`scripts/maintenance/`** - Database maintenance, migrations, and data fixes
+- **`scripts/migrations/`** - SQL migration files
+
+Run scripts with Node directly:
+
+Example:
+
+```bash
+node scripts/dev/test-ingredient-format.js
+node scripts/maintenance/normalize-existing-recipes.js
+```
+
+## Tech Stack
+
+- **Frontend**: Next.js 15 (App Router), React 19, TailwindCSS
+- **Database**: Supabase (PostgreSQL)
+- **AI**: OpenAI
+- **Testing**: Jest, React Testing Library
+- **Package Manager**: pnpm (workspace mode)

@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { getFacebookCaptions, getFacebookTitle } from '@/lib/parsers/facebook';
+import { getFacebookCaptions, getFacebookTitle } from '@acme/core/parsers/facebook';
 import { spawn } from 'child_process';
 
 // Mock child_process spawn

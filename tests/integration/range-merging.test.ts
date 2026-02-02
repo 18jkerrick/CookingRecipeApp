@@ -1,4 +1,4 @@
-import { mergeLists } from '@/lib/utils/mergeLists';
+import { mergeLists } from '@acme/core/utils/mergeLists';
 
 describe('Range Merging Tests', () => {
   test('should merge two ranges correctly: 10-15 + 10-15 = 20-30', () => {

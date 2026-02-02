@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,17 +16,15 @@
 
 # next.js
 /.next/
+**/.next/
 /out/
 
-# production
-/build
+# docs
+/docs/
 
 # misc
 .DS_Store
 *.pem
-architecture.md
-tasks.md
-screenshots/
 CLAUDE.md
 
 # debug
@@ -45,4 +44,5 @@ yarn-error.log*
 next-env.d.ts
 
 # cursor
-.cursor/ 
+.cursor/
+.cursor/rules/

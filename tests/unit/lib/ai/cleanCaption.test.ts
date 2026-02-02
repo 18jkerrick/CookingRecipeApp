@@ -1,4 +1,4 @@
-import { cleanCaption } from '@/lib/ai/cleanCaption';
+import { cleanCaption } from '@acme/core/ai/cleanCaption';
 import OpenAI from 'openai';
 
 // Mock OpenAI

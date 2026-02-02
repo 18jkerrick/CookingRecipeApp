@@ -107,10 +107,10 @@ const tests = {
     console.log('\n🔍 Testing API Routes (paths only)...');
     const fs = require('fs');
     const apiRoutes = [
-      'app/api/parse-url/route.ts',
-      'app/api/recipes/route.ts',
-      'app/api/grocery-lists/route.ts',
-      'app/api/grocery-delivery/amazon-fresh/route.ts'
+      'apps/web/app/api/parse-url/route.ts',
+      'apps/web/app/api/recipes/route.ts',
+      'apps/web/app/api/grocery-lists/route.ts',
+      'apps/web/app/api/grocery-delivery/amazon-fresh/route.ts'
     ];
 
     let allExist = true;

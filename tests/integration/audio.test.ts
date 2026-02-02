@@ -1,4 +1,4 @@
-import { fetchAudio, validateAudioBlob, isYouTubeUrl } from '@/lib/parsers/audio';
+import { fetchAudio, validateAudioBlob, isYouTubeUrl } from '@acme/core/parsers/audio';
 
 describe('Audio Extraction', () => {
   // Test URL validation

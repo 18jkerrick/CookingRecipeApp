@@ -13,7 +13,7 @@ jest.mock('openai', () => {
   }
 })
 
-import { extractRecipeFromCaption } from '@/lib/ai/extractFromCaption'
+import { extractRecipeFromCaption } from '@acme/core/ai/extractFromCaption'
 
 describe('extractRecipeFromCaption', () => {
   beforeEach(() => {
