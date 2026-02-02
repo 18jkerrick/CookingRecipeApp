@@ -109,7 +109,7 @@ pnpm test:e2e:ui             # Playwright UI mode
 For authenticated E2E flows (real auth), generate a storage state file:
 
 ```bash
-PLAYWRIGHT_AUTH_INTERACTIVE=1 pnpm test:e2e --project setup --debug
+pnpm test:e2e --project setup
 ```
 
 More details: `docs/testing.md`.

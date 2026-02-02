@@ -83,11 +83,21 @@ test.describe('Recipe Extraction - Smoke', () => {
     const urlInput = page.getByPlaceholder(/paste a recipe url here/i)
     await urlInput.fill('https://not-a-recipe-site.com')
 
-    const dialogPromise = page.waitForEvent('dialog')
-    await page.getByRole('button', { name: /extract recipe/i }).click()
+    const dialogPromise = new Promise<string>((resolve) => {
+      page.once('dialog', async (dialog) => {
+        const message = dialog.message()
+        await dialog.accept()
+        resolve(message)
+      })
+    })
 
-    const dialog = await dialogPromise
-    expect(dialog.message()).toMatch(/invalid url/i)
-    await dialog.accept()
+    const [response, dialogMessage] = await Promise.all([
+      page.waitForResponse('**/api/parse-url'),
+      dialogPromise,
+      page.getByRole('button', { name: /extract recipe/i }).click(),
+    ])
+
+    expect(response.status()).toBe(400)
+    expect(dialogMessage).toMatch(/invalid url/i)
   })
 })

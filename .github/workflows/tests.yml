@@ -71,15 +71,6 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Write Playwright auth state
-        if: ${{ secrets.PLAYWRIGHT_STORAGE_STATE_JSON != '' }}
-        run: |
-          mkdir -p tests/e2e/.auth
-          echo '${{ secrets.PLAYWRIGHT_STORAGE_STATE_JSON }}' > tests/e2e/.auth/user.json
-
-      - name: Verify auth state
-        run: test -f tests/e2e/.auth/user.json
-
       - name: Build Next.js app
         run: pnpm --filter apps/web build
 
@@ -88,6 +79,15 @@ jobs:
 
       - name: Wait for app
         run: npx wait-on http://127.0.0.1:3000
+
+      - name: Generate Playwright auth state
+        run: pnpm exec playwright test --project setup
+        env:
+          BASE_URL: http://127.0.0.1:3000
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
+          SUPABASE_SERVICE_ROLE_EMAIL: ${{ secrets.SUPABASE_SERVICE_ROLE_EMAIL }}
+          SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD: ${{ secrets.SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD }}
 
       - name: Run Playwright tests
         run: pnpm exec playwright test --project chromium tests/e2e/smoke/

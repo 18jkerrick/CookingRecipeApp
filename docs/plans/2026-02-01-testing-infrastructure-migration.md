@@ -1232,7 +1232,7 @@ git commit -m "docs: add testing guide"
 
 ---
 
-### MILESTONE 2: Core Unit Tests
+### 1: Core Unit Tests
 
 #### Task 2.1: Ingredient Parsing Tests
 

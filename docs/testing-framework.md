@@ -209,24 +209,23 @@ test('page loads', async ({ page }) => {
 
 ### Authenticated E2E (storageState)
 
-Real auth is required for protected routes. We use Playwright storage state:
-
-1) Create the auth file locally (manual OAuth once):
-
-```bash
-pnpm test:e2e --project setup --debug
-```
-
-2) Log in in the opened browser, then close the inspector to save state to:
-`tests/e2e/.auth/user.json`
-
-3) Run tests normally:
+Real auth is required for protected routes. We use a non-interactive
+setup that signs in with Supabase email/password and writes storage state:
 
 ```bash
-pnpm test:e2e
+pnpm test:e2e --project setup
 ```
 
+Env vars required:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_KEY`
+- `SUPABASE_SERVICE_ROLE_EMAIL`
+- `SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD`
+
+Storage is saved to `tests/e2e/.auth/user.json`.  
 Optional: set a custom path with `PLAYWRIGHT_STORAGE_STATE`.
+
+For CI, provide the same auth env vars as secrets.
 
 ## CI guidance (defaults)
 

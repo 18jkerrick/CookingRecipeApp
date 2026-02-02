@@ -22,25 +22,32 @@ pnpm test:e2e:ui
 
 ## E2E with real auth (storageState)
 
-Protected pages require real auth. We use Playwright storage state:
+Protected pages require real auth. We use a non-interactive Playwright setup
+that signs in with Supabase email/password and writes storage state:
 
 ```bash
-PLAYWRIGHT_AUTH_INTERACTIVE=1 pnpm test:e2e --project setup --debug
+pnpm test:e2e --project setup
 ```
 
-After logging in, close the inspector to save:
-`tests/e2e/.auth/user.json`
+Env vars required (from `.env.local`):
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_KEY`
+- `SUPABASE_SERVICE_ROLE_EMAIL`
+- `SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD`
 
 To refresh the state:
 
 ```bash
-PLAYWRIGHT_AUTH_RENEW=1 PLAYWRIGHT_AUTH_INTERACTIVE=1 pnpm test:e2e --project setup --debug
+PLAYWRIGHT_AUTH_RENEW=1 pnpm test:e2e --project setup
 ```
 
 ### CI notes
 
-The CI workflow expects `PLAYWRIGHT_STORAGE_STATE_JSON` to be set
-as a GitHub Actions secret containing the JSON storage state.
+For E2E in CI, set these GitHub Actions secrets:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_KEY`
+- `SUPABASE_SERVICE_ROLE_EMAIL`
+- `SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD`
 
 ## Test locations
 

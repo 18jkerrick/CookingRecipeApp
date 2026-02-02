@@ -20,37 +20,8 @@ jest.mock('next/navigation', () => ({
   },
 }))
 
-// Mock OpenAI
-jest.mock('openai', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: jest.fn().mockResolvedValue({
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  ingredients: ['1 cup flour', '2 eggs'],
-                  instructions: ['Mix ingredients', 'Bake for 30 minutes']
-                })
-              }
-            }]
-          })
-        }
-      },
-      audio: {
-        transcriptions: {
-          create: jest.fn().mockResolvedValue({
-            text: 'Mocked transcription text'
-          })
-        }
-      }
-    }))
-  }
-})
-
 // Jest setup file for handling test environment and cleanup
+let server
 
 // Suppress punycode deprecation warning
 const originalWarn = console.warn
@@ -70,14 +41,27 @@ console.error = (...args) => {
   originalError(...args)
 }
 
+beforeAll(async () => {
+  const mswNode = await import('msw/node')
+  const mocks = await import('./tests/mocks/handlers')
+  server = mswNode.setupServer(...mocks.handlers)
+  server.listen({ onUnhandledRequest: 'warn' })
+})
+
 // Global test cleanup
 afterEach(() => {
   // Clear all mocks after each test
   jest.clearAllMocks()
+  if (server) {
+    server.resetHandlers()
+  }
 })
 
 // Global test teardown
 afterAll(() => {
+  if (server) {
+    server.close()
+  }
   // Force cleanup of any remaining timers
   jest.runOnlyPendingTimers()
   jest.useRealTimers()
