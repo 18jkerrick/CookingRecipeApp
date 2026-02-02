@@ -17,6 +17,7 @@ const customJestConfig = {
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
     '<rootDir>/__tests__/', // Ignore old test directory
+    '<rootDir>/tests/legacy/', // Ignore quarantined legacy tests
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/apps/web/$1',

@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { server } from './tests/msw/server'
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
@@ -50,35 +51,41 @@ jest.mock('openai', () => {
   }
 })
 
-// Mock fetch globally
-global.fetch = jest.fn()
-
 // Jest setup file for handling test environment and cleanup
 
 // Suppress punycode deprecation warning
 const originalWarn = console.warn
 console.warn = (...args) => {
-  if (args[0]?.includes('punycode')) return
-  if (args[0]?.includes('fake timers')) return
+  const first = args[0]
+  if (typeof first === 'string' && first.includes('punycode')) return
+  if (typeof first === 'string' && first.includes('fake timers')) return
   originalWarn(...args)
 }
 
 // Suppress React testing library deprecation warning
 const originalError = console.error
 console.error = (...args) => {
-  if (args[0]?.includes('ReactDOMTestUtils.act')) return
-  if (args[0]?.includes('act` from `react` instead')) return
+  const first = args[0]
+  if (typeof first === 'string' && first.includes('ReactDOMTestUtils.act')) return
+  if (typeof first === 'string' && first.includes('act` from `react` instead')) return
   originalError(...args)
 }
 
+// MSW lifecycle
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'error' })
+})
+
 // Global test cleanup
 afterEach(() => {
+  server.resetHandlers()
   // Clear all mocks after each test
   jest.clearAllMocks()
 })
 
 // Global test teardown
 afterAll(() => {
+  server.close()
   // Force cleanup of any remaining timers
   jest.runOnlyPendingTimers()
   jest.useRealTimers()
