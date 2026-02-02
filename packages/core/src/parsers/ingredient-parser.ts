@@ -48,6 +48,27 @@ const UNITS = [
   'drop', 'drops'
 ];
 
+// Normalize common unit abbreviations to canonical forms
+const UNIT_ALIASES: Record<string, string> = {
+  c: 'cup',
+  tbsp: 'tablespoon',
+  tbs: 'tablespoon',
+  tsp: 'teaspoon',
+  t: 'teaspoon',
+  lb: 'pound',
+  lbs: 'pound',
+  oz: 'ounce',
+  g: 'gram',
+  kg: 'kilogram',
+  ml: 'milliliter',
+  l: 'liter',
+  pt: 'pint',
+  qt: 'quart',
+  gal: 'gallon',
+  'fl oz': 'fluid ounce',
+  'fl. oz.': 'fluid ounce'
+};
+
 // Common preparation methods
 const PREPARATIONS = [
   'chopped', 'finely chopped', 'coarsely chopped', 'roughly chopped',
@@ -78,10 +99,31 @@ const NOTE_PATTERNS = [
   'see note', 'see notes', 'see recipe note'
 ];
 
+const UNICODE_FRACTIONS: Record<string, string> = {
+  '½': '1/2',
+  '¼': '1/4',
+  '¾': '3/4',
+  '⅓': '1/3',
+  '⅔': '2/3',
+  '⅛': '1/8',
+  '⅜': '3/8',
+  '⅝': '5/8',
+  '⅞': '7/8'
+};
+
+function normalizeUnicodeFractions(text: string): string {
+  if (!text) return text;
+
+  const separatedMixed = text.replace(/(\d)([½¼¾⅓⅔⅛⅜⅝⅞])/g, '$1 $2');
+  return separatedMixed.replace(/[½¼¾⅓⅔⅛⅜⅝⅞]/g, match => UNICODE_FRACTIONS[match] || match);
+}
+
 // Convert fraction strings to decimals
 function parseFraction(fractionStr: string): number {
+  const normalized = normalizeUnicodeFractions(fractionStr);
+
   // Handle mixed numbers like "1 1/2"
-  const mixedMatch = fractionStr.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  const mixedMatch = normalized.match(/^(\d+)\s+(\d+)\/(\d+)$/);
   if (mixedMatch) {
     const whole = parseInt(mixedMatch[1]);
     const num = parseInt(mixedMatch[2]);
@@ -90,7 +132,7 @@ function parseFraction(fractionStr: string): number {
   }
   
   // Handle simple fractions like "1/2"
-  const fractionMatch = fractionStr.match(/^(\d+)\/(\d+)$/);
+  const fractionMatch = normalized.match(/^(\d+)\/(\d+)$/);
   if (fractionMatch) {
     const num = parseInt(fractionMatch[1]);
     const den = parseInt(fractionMatch[2]);
@@ -98,22 +140,24 @@ function parseFraction(fractionStr: string): number {
   }
   
   // Handle decimals and whole numbers
-  const decimal = parseFloat(fractionStr);
+  const decimal = parseFloat(normalized);
   return isNaN(decimal) ? 1 : decimal;
 }
 
 // Extract quantity from string
 function extractQuantity(text: string): { quantity: number; remaining: string } {
+  const normalizedText = normalizeUnicodeFractions(text);
+
   // Pattern for various quantity formats
   const quantityPattern = /^((?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)(?:\s*-\s*(?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?))?)\s*/;
   
-  const match = text.match(quantityPattern);
+  const match = normalizedText.match(quantityPattern);
   if (!match) {
-    return { quantity: 1, remaining: text };
+    return { quantity: 1, remaining: normalizedText };
   }
   
   const quantityStr = match[1];
-  const remaining = text.substring(match[0].length);
+  const remaining = normalizedText.substring(match[0].length);
   
   // Handle ranges like "2-3" - take the average
   if (quantityStr.includes('-')) {
@@ -134,7 +178,8 @@ function extractUnit(text: string): { unit?: string; remaining: string } {
     
     if (UNITS.includes(potentialUnit)) {
       const remaining = words.slice(i + 1).join(' ');
-      return { unit: potentialUnit, remaining };
+      const unit = UNIT_ALIASES[potentialUnit] || potentialUnit;
+      return { unit, remaining };
     }
   }
   
@@ -190,7 +235,7 @@ function cleanIngredientName(text: string): string {
 // Main parsing function
 export function parseIngredient(ingredientText: string): NormalizedIngredient {
   const original = ingredientText.trim();
-  let remaining = original;
+  let remaining = normalizeUnicodeFractions(original);
   
   // Extract quantity
   const { quantity, remaining: afterQuantity } = extractQuantity(remaining);
