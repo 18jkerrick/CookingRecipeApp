@@ -13,10 +13,33 @@ if (fs.existsSync(envPath)) {
   loadEnv({ path: envPath })
 }
 
+function isStorageStateValid(filePath: string): boolean {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8')
+    const state = JSON.parse(raw)
+    const entries = state?.origins?.flatMap((origin: any) => origin.localStorage) ?? []
+    const authEntry = entries.find((entry: any) =>
+      typeof entry?.name === 'string' && entry.name.includes('sb-') && entry.name.endsWith('-auth-token')
+    )
+
+    if (!authEntry?.value) return false
+
+    const parsed = JSON.parse(authEntry.value)
+    const expiresAt = Number(parsed?.expires_at ?? 0)
+    const now = Math.floor(Date.now() / 1000)
+    const bufferSeconds = 60
+
+    return expiresAt > now + bufferSeconds
+  } catch {
+    return false
+  }
+}
+
 setup('authenticate and save storage state', async ({ page }) => {
   if (
     fs.existsSync(storageStatePath) &&
-    process.env.PLAYWRIGHT_AUTH_RENEW !== '1'
+    process.env.PLAYWRIGHT_AUTH_RENEW !== '1' &&
+    isStorageStateValid(storageStatePath)
   ) {
     setup.skip(true, 'Storage state already exists')
     return
