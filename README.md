@@ -95,13 +95,24 @@ AMAZON_FRESH_API_KEY=...
 
 ## Testing
 
-Tests are located in the `tests/` directory and use Jest with React Testing Library:
+Tests live in `tests/` and use **Vitest + React Testing Library** for unit/component/integration,
+and **Playwright** for E2E.
 
 ```bash
-pnpm test                    # Run once
-pnpm test:watch              # Watch mode
-pnpm test:coverage           # With coverage report
+pnpm test                    # Vitest (unit/integration/component)
+pnpm test:watch              # Vitest watch
+pnpm test:coverage           # Vitest coverage
+pnpm test:e2e                # Playwright E2E
+pnpm test:e2e:ui             # Playwright UI mode
 ```
+
+For authenticated E2E flows (real auth), generate a storage state file:
+
+```bash
+PLAYWRIGHT_AUTH_INTERACTIVE=1 pnpm test:e2e --project setup --debug
+```
+
+More details: `docs/testing.md`.
 
 ## Scripts
 

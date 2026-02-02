@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { afterAll, afterEach, beforeAll, vi } from 'vitest'
-import { server } from './tests/msw/server'
+import { server } from './tests/mocks/server'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -20,36 +20,6 @@ vi.mock('next/navigation', () => ({
   usePathname() {
     return '/'
   },
-}))
-
-// Mock OpenAI
-vi.mock('openai', () => ({
-  __esModule: true,
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: vi.fn().mockResolvedValue({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  ingredients: ['1 cup flour', '2 eggs'],
-                  instructions: ['Mix ingredients', 'Bake for 30 minutes'],
-                }),
-              },
-            },
-          ],
-        }),
-      },
-    },
-    audio: {
-      transcriptions: {
-        create: vi.fn().mockResolvedValue({
-          text: 'Mocked transcription text',
-        }),
-      },
-    },
-  })),
 }))
 
 // Suppress punycode deprecation warning

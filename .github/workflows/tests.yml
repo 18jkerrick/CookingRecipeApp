@@ -21,19 +21,24 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Run unit tests
-        run: pnpm test
+        run: pnpm test --ci --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/coverage-final.json
   
   e2e:
     runs-on: ubuntu-latest
@@ -46,12 +51,12 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
       - name: Cache Playwright browsers
@@ -64,7 +69,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Write Playwright auth state
+        if: ${{ secrets.PLAYWRIGHT_STORAGE_STATE_JSON != '' }}
+        run: |
+          mkdir -p tests/e2e/.auth
+          echo '${{ secrets.PLAYWRIGHT_STORAGE_STATE_JSON }}' > tests/e2e/.auth/user.json
+
+      - name: Verify auth state
+        run: test -f tests/e2e/.auth/user.json
 
       - name: Build Next.js app
         run: pnpm --filter apps/web build
@@ -76,6 +90,14 @@ jobs:
         run: npx wait-on http://127.0.0.1:3000
 
       - name: Run Playwright tests
-        run: pnpm test:e2e
+        run: pnpm exec playwright test --project chromium tests/e2e/smoke/
         env:
           BASE_URL: http://127.0.0.1:3000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

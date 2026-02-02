@@ -13,14 +13,12 @@
 
 # testing
 /coverage
+tests/e2e/.auth/
 
 # next.js
 /.next/
 **/.next/
 /out/
-
-# docs
-/docs/
 
 # misc
 .DS_Store

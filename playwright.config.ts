@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const storageStatePath =
+  process.env.PLAYWRIGHT_STORAGE_STATE ?? 'tests/e2e/.auth/user.json'
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
@@ -15,5 +18,16 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 120_000,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'chromium',
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], storageState: storageStatePath },
+    },
+  ],
 })
