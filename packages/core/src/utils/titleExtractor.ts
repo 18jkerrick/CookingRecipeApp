@@ -34,7 +34,7 @@ export async function extractVideoTitle(captions: string, platform: string, url:
 
     // Clean the captions for title extraction (fallback for YouTube/Facebook, primary for others)
     const cleanedCaptions = captions
-      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove all emojis
+      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove all emojis
       .replace(/\s+for\s+(a\s+)?(top\s+tier|great|perfect|amazing|delicious).*$/i, '') // Remove promotional endings
       .replace(/\s+on\s+(a\s+)?(sunny|rainy|cold|hot|warm|beautiful).*$/i, '') // Remove weather/time references
       .replace(/\s+(makes?\s+)?\d+\s+servings.*$/i, '') // Remove serving info
@@ -68,12 +68,24 @@ export async function extractVideoTitle(captions: string, platform: string, url:
  */
 function extractFromCaptions(text: string): string | null {
   if (!text || text.length < 10) return null;
+
+  const bestLine = selectBestCaptionLine(text);
+  if (bestLine) {
+    return cleanTitle(bestLine);
+  }
+
+  const howToTitle = extractFromHowToPhrases(text);
+  if (howToTitle) {
+    return cleanTitle(howToTitle);
+  }
+
+  const normalizedText = text;
   
   // Pattern 0: Use the first sentence if it looks like a valid title
-  const firstSentenceMatch = text.match(/^([^.!?]+[.!?]?)/);
+  const firstSentenceMatch = normalizedText.match(/^([^.!?]+[.!?]?)/);
   if (firstSentenceMatch) {
     let candidate = firstSentenceMatch[1].trim();
-    candidate = candidate.replace(/[.?]$/, '');
+    candidate = candidate.replace(/[.!?]$/, '');
     
     if (candidate.length >= 5 && candidate.length <= 100) {
       // Skip introductory sentences, instruction sentences, or metadata-heavy lines
@@ -93,7 +105,7 @@ function extractFromCaptions(text: string): string | null {
   ];
   
   for (const pattern of beginningTitlePatterns) {
-    const match = text.match(pattern);
+    const match = normalizedText.match(pattern);
     if (match && match[1]) {
       const title = match[1].trim();
       if (title.length > 5 && title.length < 100 && isValidFoodTitle(title)) {
@@ -110,7 +122,7 @@ function extractFromCaptions(text: string): string | null {
   ];
   
   for (const pattern of recipeIntroPatterns) {
-    const match = text.match(pattern);
+    const match = normalizedText.match(pattern);
     if (match && match[1]) {
       const title = match[1].trim();
       if (title.length > 5 && title.length < 100 && isValidFoodTitle(title)) {
@@ -120,6 +132,86 @@ function extractFromCaptions(text: string): string | null {
   }
   
   return null;
+}
+
+function selectBestCaptionLine(text: string): string | null {
+  const lines = text
+    .split(/\r?\n+/)
+    .flatMap(line => line.split('|'))
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  const candidates = lines
+    .map(line => stripEpisodeSuffix(stripLeadingPreamble(line)))
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (
+      candidate.length >= 5 &&
+      candidate.length <= 100 &&
+      isValidFoodTitle(candidate)
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function stripEpisodeSuffix(text: string): string {
+  return text
+    .replace(/\s*\((?:episode|ep\.?|pt\.?|part)\s*\d+[^)]*\)\s*$/i, '')
+    .replace(/\s*(?:[|–—-]\s*)?(?:episode|ep\.?|pt\.?|part)\s*\d+.*$/i, '')
+    .trim();
+}
+
+function stripLeadingPreamble(text: string): string {
+  let cleaned = text.trim();
+
+  const colonParts = cleaned.split(':');
+  if (colonParts.length > 1) {
+    const before = colonParts[0].trim();
+    const after = colonParts.slice(1).join(':').trim();
+    if (after && !isValidFoodTitle(before) && isValidFoodTitle(after)) {
+      cleaned = after;
+    }
+  }
+
+  const preamblePatterns = [
+    /^(?:today|tonight)\s+(?:we(?:'re| are)|i(?:'m| am))?\s*(?:making|cooking|cook|made)\s+/i,
+    /^(?:we(?:'re| are)|i(?:'m| am))\s*(?:making|cooking|cook|made)\s+/i,
+    /^(?:here(?:'s| is)\s+(?:how\s+)?(?:we|i)\s+(?:make|made|cook|cooked|cooking)\s+)/i,
+    /^(?:watch\s+me\s+(?:make|cook|cooking)\s+)/i,
+    /^(?:recipe\s+for)\s+/i,
+    /^(?:post[-\s]?gym|post[-\s]?workout|after[-\s]?gym|after[-\s]?workout)\s+(?:fuel|meal)?\s*[:\-–—]\s*/i,
+    /^(?:what\s+i\s+eat\s+after\s+the\s+gym)\b[:,]?\s*/i,
+  ];
+
+  for (const pattern of preamblePatterns) {
+    if (pattern.test(cleaned)) {
+      cleaned = cleaned.replace(pattern, '').trim();
+      break;
+    }
+  }
+
+  return cleaned;
+}
+
+function extractFromHowToPhrases(text: string): string | null {
+  const match =
+    text.match(/\bhow to make\s+([^.!?]+?)(?:\bthe way\b|\bwith\b|\bfor\b|[.!?])/i) ||
+    text.match(/\bmake\s+([^.!?]+?)(?:\bthe way\b|\bwith\b|\bfor\b|[.!?])/i);
+
+  if (!match || !match[1]) return null;
+
+  const candidate = match[1].trim();
+  if (candidate.length < 5 || candidate.length > 100) return null;
+  if (!isValidFoodTitle(candidate)) return null;
+
+  return candidate;
 }
 
 /**
@@ -141,7 +233,13 @@ function isValidFoodTitle(text: string): boolean {
  * Clean and format the extracted title
  */
 function cleanTitle(title: string): string {
-  return title
+  const withoutTrailingDescriptor = title
+    .replace(/\s+[-–—]\s+[^-–—]+$/, '')
+    .replace(/\s+for\s+(?:dinner|lunch|breakfast|tonight|today)\b.*$/i, '')
+
+  return withoutTrailingDescriptor
+    .replace(/\s*(?:[|–—-]\s*)?(?:episode|ep\.?|pt\.?|part)\s*\d+.*$/i, '')
+    .replace(/\s+the way (?:i|we|they) do it.*$/i, '')
     .replace(/^(a|an|the)\s+/i, '') // Remove articles at start
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim()
