@@ -11,6 +11,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # lint:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 9.15.0
+  #
+  #     - name: Setup Node
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: pnpm
+  #
+  #     - name: Install dependencies
+  #       run: pnpm install --frozen-lockfile
+  #
+  #     - name: Run lint
+  #       run: pnpm --filter @acme/web lint
+  #
   unit:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -33,7 +57,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run unit tests
-        run: pnpm test --ci --coverage
+        run: pnpm test:coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -72,13 +96,13 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build Next.js app
-        run: pnpm --filter apps/web build
+        run: pnpm --filter @acme/web build
 
       - name: Start Next.js app
-        run: pnpm --filter apps/web start -- --port 3000 &
+        run: pnpm --filter @acme/web start -- --port 3000 &
 
       - name: Wait for app
-        run: npx wait-on http://127.0.0.1:3000
+        run: npx wait-on http://127.0.0.1:3000/login
 
       - name: Generate Playwright auth state
         run: pnpm exec playwright test --project setup
