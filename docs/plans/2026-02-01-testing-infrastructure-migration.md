@@ -8,6 +8,17 @@
 
 ---
 
+## Current Status Summary (Implemented)
+
+- **Stack**: Vitest + RTL + MSW v2 + Playwright (Jest is legacy-only under `tests/legacy/**`)
+- **MSW**: handlers in `tests/mocks/handlers.ts`, server in `tests/mocks/server.ts`
+- **Playwright projects**: `setup`, `chromium`, `firefox`, `webkit` (storage state in `tests/e2e/.auth/user.json`)
+- **Primary docs**: `docs/testing.md`, `docs/testing-framework.md`, `tests/README.md`
+- **Core commands**:
+  - `pnpm test` (unit/component/integration)
+  - `pnpm test:e2e` (E2E)
+  - `pnpm test:e2e --project setup` (auth storage state)
+
 ## Acceptance Criteria (Definition of "Done")
 
 ### Must‑Have (P0) — MVP Complete
@@ -17,7 +28,7 @@
 - [ ] CI workflow runs Vitest + Playwright on every PR (`.github/workflows/tests.yml`)
 - [ ] Coverage baseline established (>40% overall)
 - [ ] Invalid legacy tests quarantined or removed
-- [ ] Documentation updated: `docs/testing-framework.md`
+- [ ] Documentation updated: `docs/testing-framework.md`, `docs/testing.md`, `tests/README.md`
 
 ### Should‑Have (P1) — Production Ready
 - [ ] Unit test coverage >60% for `@acme/core/*`
@@ -81,8 +92,8 @@
 
 **Deliverables:**
 - ~10 end‑to‑end journeys
-- Cross‑browser (Chromium + Firefox; WebKit if stable)
-- Mobile viewport smoke
+- Cross‑browser (Chromium + Firefox + WebKit)
+- Performance assertions
 
 ---
 
@@ -125,9 +136,10 @@ Legacy tests live in `tests/legacy/**`. Jest is legacy‑only and should not be 
 
 **Removal policy:** delete each legacy test group once equivalent Vitest coverage exists.
 
-# Testing Infrastructure Migration Plan
+# Legacy plan (archived)
 
-**Goal:** Rebuild testing infrastructure with Jest + React Testing Library + MSW + Playwright, ensuring main branch stays green throughout migration with frequent commits.
+**Status:** Archived. The Jest-based plan below is retained for history only.
+Do not follow it for current setup — use the Vitest/MSW/Playwright plan above.
 
 **Architecture:** Phased migration with milestone-based sequencing. Delete invalid tests, establish smoke test coverage first, then systematically rebuild unit/integration/E2E tests. Each phase delivers working, committed tests before moving to next phase.
 

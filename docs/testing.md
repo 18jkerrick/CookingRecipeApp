@@ -20,6 +20,20 @@ pnpm test:e2e
 pnpm test:e2e:ui
 ```
 
+First-time Playwright setup:
+
+```bash
+pnpm exec playwright install
+```
+
+## Playwright projects
+
+- `setup` — generates auth storage state
+- `chromium`, `firefox`, `webkit` — desktop projects, depend on `setup`
+
+Storage state path: `tests/e2e/.auth/user.json`  
+Optional envs: `PLAYWRIGHT_STORAGE_STATE`, `PLAYWRIGHT_AUTH_RENEW`, `BASE_URL`.
+
 ## E2E with real auth (storageState)
 
 Protected pages require real auth. We use a non-interactive Playwright setup
@@ -34,6 +48,9 @@ Env vars required (from `.env.local`):
 - `NEXT_PUBLIC_SUPABASE_KEY`
 - `SUPABASE_SERVICE_ROLE_EMAIL`
 - `SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD`
+
+Note: Playwright reads `.env.local` from the **repo root**.  
+The app still uses `apps/web/.env.local` for runtime.
 
 To refresh the state:
 
@@ -72,3 +89,5 @@ Browser worker: `tests/mocks/browser.ts`
 - Mock external HTTP with MSW, not manual stubs
 - Prefer `getByRole` and user-visible assertions
 - One reason to fail per test
+
+More details: `tests/README.md`.

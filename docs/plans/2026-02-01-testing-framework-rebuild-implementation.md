@@ -13,7 +13,7 @@
 ### Task 1: Quarantine the current test suite (keep history, make CI green fast)
 
 **Files:**
-- Modify: `jest.config.js`
+- Modify: `jest.legacy.config.js`
 - Move: `tests/unit/` → `tests/legacy/unit/`
 - Move: `tests/integration/` → `tests/legacy/integration/`
 
@@ -26,9 +26,9 @@ git mv tests/unit tests/legacy/unit
 git mv tests/integration tests/legacy/integration
 ```
 
-**Step 2: Update Jest to ignore legacy tests (legacy-only runner)**
+**Step 2: Ensure Jest is legacy-only**
 
-Modify `jest.config.js` by adding `'<rootDir>/tests/legacy/'` to `testPathIgnorePatterns`.
+Keep `jest.legacy.config.js` scoped to `tests/legacy/**`.
 
 Note: Jest is **legacy-only** and should not be used for new tests. It exists only to run quarantined tests until they’re rewritten.
 
@@ -45,7 +45,7 @@ Expected: PASS (likely “0 tests found” until we add new baseline tests)
 **Step 4: Commit**
 
 ```bash
-git add jest.config.js tests/legacy
+git add jest.legacy.config.js tests/legacy
 git commit -m "test: quarantine legacy test suite"
 ```
 
@@ -79,14 +79,14 @@ git commit -m "test: add vitest, msw, and playwright"
 ### Task 3: Add MSW test server + wire it into Vitest
 
 **Files:**
-- Create: `tests/msw/handlers.ts`
-- Create: `tests/msw/server.ts`
+- Create: `tests/mocks/handlers.ts`
+- Create: `tests/mocks/server.ts`
 - Create: `vitest.setup.ts`
 - Create: `vitest.config.ts`
 
 **Step 1: Create MSW handlers**
 
-Create `tests/msw/handlers.ts`:
+Create `tests/mocks/handlers.ts`:
 
 ```ts
 import { http, HttpResponse } from 'msw'
@@ -100,7 +100,7 @@ export const handlers = [
 
 **Step 2: Create MSW server**
 
-Create `tests/msw/server.ts`:
+Create `tests/mocks/server.ts`:
 
 ```ts
 import { setupServer } from 'msw/node'
@@ -119,7 +119,7 @@ Key changes:
 ```ts
 import '@testing-library/jest-dom/vitest'
 import { afterAll, afterEach, beforeAll, vi } from 'vitest'
-import { server } from './tests/msw/server'
+import { server } from './tests/mocks/server'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -139,36 +139,6 @@ vi.mock('next/navigation', () => ({
   usePathname() {
     return '/'
   },
-}))
-
-// Mock OpenAI
-vi.mock('openai', () => ({
-  __esModule: true,
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: vi.fn().mockResolvedValue({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  ingredients: ['1 cup flour', '2 eggs'],
-                  instructions: ['Mix ingredients', 'Bake for 30 minutes'],
-                }),
-              },
-            },
-          ],
-        }),
-      },
-    },
-    audio: {
-      transcriptions: {
-        create: vi.fn().mockResolvedValue({
-          text: 'Mocked transcription text',
-        }),
-      },
-    },
-  })),
 }))
 
 // Suppress punycode deprecation warning
@@ -212,12 +182,16 @@ afterAll(() => {
 
 ```ts
 import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
+  plugins: [tsconfigPaths(), react()],
   test: {
     environment: 'jsdom',
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: './vitest.setup.ts',
     include: ['tests/**/*.test.{js,jsx,ts,tsx}'],
+    exclude: ['tests/legacy/**', 'node_modules/**'],
   },
 })
 ```
@@ -247,7 +221,7 @@ Expected: PASS (still 0 tests until Task 4 adds new tests)
 **Step 7: Commit**
 
 ```bash
-git add tests/msw vitest.setup.ts vitest.config.ts package.json
+git add tests/mocks vitest.setup.ts vitest.config.ts package.json
 git commit -m "test: add vitest wiring and msw server"
 ```
 
@@ -374,6 +348,9 @@ Create `playwright.config.ts`:
 ```ts
 import { defineConfig, devices } from '@playwright/test'
 
+const storageStatePath =
+  process.env.PLAYWRIGHT_STORAGE_STATE ?? 'tests/e2e/.auth/user.json'
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
@@ -390,7 +367,26 @@ export default defineConfig({
     timeout: 120_000,
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'chromium',
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], storageState: storageStatePath },
+    },
+    {
+      name: 'firefox',
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Firefox'], storageState: storageStatePath },
+    },
+    {
+      name: 'webkit',
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Safari'], storageState: storageStatePath },
+    },
   ],
 })
 ```
@@ -466,10 +462,10 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
-      - run: pnpm install
-      - run: pnpm test
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --ci --coverage
 
   e2e:
     runs-on: ubuntu-latest
@@ -480,15 +476,23 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
-      - run: pnpm install
-      - run: pnpm exec playwright install --with-deps
-      - run: pnpm -C apps/web build
-      - run: pnpm -C apps/web start -- --port 3000 &
-      - run: pnpm test:e2e
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter apps/web build
+      - run: pnpm --filter apps/web start -- --port 3000 &
+      - run: npx wait-on http://127.0.0.1:3000
+      - run: pnpm exec playwright test --project setup
         env:
-          BASE_URL: http://localhost:3000
+          BASE_URL: http://127.0.0.1:3000
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
+          SUPABASE_SERVICE_ROLE_EMAIL: ${{ secrets.SUPABASE_SERVICE_ROLE_EMAIL }}
+          SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD: ${{ secrets.SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD }}
+      - run: pnpm exec playwright test --project chromium tests/e2e/smoke/
+        env:
+          BASE_URL: http://127.0.0.1:3000
 ```
 
 **Step 2: Commit**

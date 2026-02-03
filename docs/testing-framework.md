@@ -56,6 +56,12 @@ pnpm test:coverage # Vitest coverage
 pnpm test:e2e      # Playwright
 ```
 
+First-time Playwright setup:
+
+```bash
+pnpm exec playwright install
+```
+
 ## What to test where (decision table)
 
 | What you’re testing | Put the test in | Tooling | Notes |
@@ -84,7 +90,7 @@ MSW intercepts at the network layer, so your code uses real `fetch`/HTTP and sta
 - `tests/mocks/handlers.ts`
 - `tests/mocks/server.ts`
 - `vitest.setup.ts` should call:
-  - `server.listen()`
+  - `server.listen({ onUnhandledRequest: 'error' })`
   - `server.resetHandlers()`
   - `server.close()`
 
@@ -112,7 +118,7 @@ import '@testing-library/jest-dom/vitest'
 import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { server } from './tests/mocks/server'
 
-beforeAll(() => server.listen())
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 ```
@@ -207,6 +213,14 @@ test('page loads', async ({ page }) => {
 })
 ```
 
+### Playwright projects (current)
+
+- `setup` — generates auth storage state
+- `chromium`, `firefox`, `webkit` — desktop projects, depend on `setup`
+
+Storage state is saved to `tests/e2e/.auth/user.json`.  
+Optional envs: `PLAYWRIGHT_STORAGE_STATE`, `PLAYWRIGHT_AUTH_RENEW`, `BASE_URL`.
+
 ### Authenticated E2E (storageState)
 
 Real auth is required for protected routes. We use a non-interactive
@@ -249,3 +263,5 @@ Jest is **not** part of the new stack. It remains only to run quarantined tests 
 ## Legacy test cleanup
 
 Legacy tests are quarantined under `tests/legacy/**`. Remove them after replacement coverage exists for each area.
+
+More details: `tests/README.md`.
