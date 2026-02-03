@@ -1310,6 +1310,7 @@ export default function GroceryLists() {
                   <h3 className="text-lg font-semibold">Recipes</h3>
                   <button 
                     onClick={() => setRecipesCollapsed(!recipesCollapsed)}
+                    aria-label="Toggle recipes section"
                     className="p-1 hover:bg-white/10 rounded transition-colors"
                   >
                     <ChevronDown className={`h-4 w-4 text-white/60 transition-transform ${recipesCollapsed ? 'rotate-180' : ''}`} />
@@ -1358,6 +1359,7 @@ export default function GroceryLists() {
                     <div className="flex-shrink-0 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg overflow-hidden w-32 h-36 hover:border-[#2B966F] hover:bg-[#2B966F]/10 transition-all">
                       <button
                         onClick={() => setShowAddRecipeModal(true)}
+                        aria-label="Add recipe to list"
                         className="w-full h-full text-white/60 hover:text-white flex items-center justify-center"
                       >
                         <Plus className="h-8 w-8" />

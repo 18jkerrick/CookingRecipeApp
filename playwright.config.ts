@@ -29,5 +29,15 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: storageStatePath },
     },
+    {
+      name: 'firefox',
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Firefox'], storageState: storageStatePath },
+    },
+    {
+      name: 'webkit',
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Safari'], storageState: storageStatePath },
+    },
   ],
 })

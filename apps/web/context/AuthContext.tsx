@@ -44,7 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
       if (event === 'SIGNED_IN' && session?.user) {
-        router.push('/cookbooks')
+        const path =
+          typeof window !== 'undefined' ? window.location.pathname : null
+        if (path === '/' || path === '/login' || path === '/signup') {
+          router.push('/cookbooks')
+        }
       }
     })
 
