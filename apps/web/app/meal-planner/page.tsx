@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@acme/db/client'
-import { Search, Filter, Plus, Settings } from "lucide-react"
+import { Search, Filter, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '@/lib/meal-plan'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
+import { Navigation } from '../../components/shared/Navigation'
 
 // Types for meal planning (Recipe interface for local use)
 interface Recipe {
@@ -23,7 +24,7 @@ interface Recipe {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function MealPlanner() {
-  const { user, signOut, loading } = useAuth()
+  const { user, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const router = useRouter()
   
@@ -239,83 +240,41 @@ export default function MealPlanner() {
 
   if (!isClient || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary font-body">Loading...</div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Redirecting to sign in...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary font-body">Redirecting to sign in...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#14151a] text-white">
+    <div className="min-h-screen bg-wk-bg-primary text-wk-text-primary">
       {/* Navigation */}
-      <header className="container mx-auto px-4 py-6 flex items-center justify-between border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="bg-[#FF3A25] rounded-md p-1.5">
-            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12V15C21 18.3137 18.3137 21 15 21H3V12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="3" fill="currentColor"/>
-              <path d="M12 9C10.3431 9 9 10.3431 9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="text-2xl font-serif italic">Remy</span>
-        </div>
+      <Navigation currentPath="/meal-planner" />
 
-        <nav className="hidden md:flex items-center gap-8">
-          <button onClick={() => router.push('/cookbooks')} className="text-white/80 hover:text-white transition-colors">
-            Cookbooks
-          </button>
-          <button onClick={() => router.push('/meal-planner')} className="text-white hover:text-white transition-colors">
-            Meal Planner
-          </button>
-          <button onClick={() => router.push('/grocery-list')} className="text-white/80 hover:text-white transition-colors">
-            Grocery Lists
-          </button>
-          <button onClick={() => router.push('/discover')} className="text-white/80 hover:text-white transition-colors">
-            Discover
-          </button>
-        </nav>
-
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-white/70">Welcome back, {user.email?.split('@')[0]}!</div>
-          <button
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            onClick={() => router.push('/settings')}
-          >
-            <Settings className="h-5 w-5 text-white/70 hover:text-white" />
-          </button>
-          <button
-            className="px-6 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 text-white font-medium rounded-full transition-colors"
-            onClick={signOut}
-          >
-            Sign Out
-          </button>
-        </div>
-      </header>
-
-      <div className="flex h-[calc(100vh-120px)]">
+      <div className="flex h-[calc(100vh-73px)]">
         {/* Recipe Sidebar */}
-        <div className="sidebar w-72 bg-[#1e1f26] border-r border-white/10 flex flex-col">
-          <div className="p-4 border-b border-white/10">
-            <h2 className="text-xl font-bold mb-4">Your Recipes</h2>
+        <div className="sidebar w-72 bg-wk-bg-surface border-r border-wk-border flex flex-col shadow-wk">
+          <div className="p-4 border-b border-wk-border">
+            <h2 className="text-xl font-display font-semibold mb-4 text-wk-text-primary">Your Recipes</h2>
             
             {/* Search and Filter */}
             <div className="flex gap-2 mb-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-wk-text-muted h-4 w-4" />
                 <Input
                   type="text"
                   placeholder="Search recipes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500 text-sm h-9"
+                  className="pl-9 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary placeholder:text-wk-text-muted text-sm h-9 font-body"
                 />
               </div>
               <div className="relative">
@@ -324,27 +283,27 @@ export default function MealPlanner() {
                     e.stopPropagation()
                     setShowFilterMenu(!showFilterMenu)
                   }}
-                  className="flex items-center gap-1 px-3 py-2 bg-[#14151a] rounded-md hover:bg-[#14151a]/80 transition-colors text-sm h-9"
+                  className="flex items-center gap-1 px-3 py-2 bg-wk-bg-primary border border-wk-border rounded-md hover:bg-wk-bg-surface-hover transition-colors text-sm h-9 text-wk-text-secondary"
                 >
                   <Filter className="h-4 w-4" />
                 </button>
                 {showFilterMenu && (
-                  <div className="absolute right-0 mt-2 w-40 bg-[#14151a] rounded-md shadow-lg z-10 border border-white/10">
+                  <div className="absolute right-0 mt-2 w-40 bg-wk-bg-surface rounded-md shadow-wk z-10 border border-wk-border">
                     <button
                       onClick={() => { setFilterOption('recent'); setShowFilterMenu(false); }}
-                      className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
+                      className="block w-full text-left px-3 py-2 hover:bg-wk-bg-surface-hover transition-colors text-sm text-wk-text-secondary font-body"
                     >
                       Most Recent
                     </button>
                     <button
                       onClick={() => { setFilterOption('oldest'); setShowFilterMenu(false); }}
-                      className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
+                      className="block w-full text-left px-3 py-2 hover:bg-wk-bg-surface-hover transition-colors text-sm text-wk-text-secondary font-body"
                     >
                       Oldest
                     </button>
                     <button
                       onClick={() => { setFilterOption('alphabetical'); setShowFilterMenu(false); }}
-                      className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
+                      className="block w-full text-left px-3 py-2 hover:bg-wk-bg-surface-hover transition-colors text-sm text-wk-text-secondary font-body"
                     >
                       Alphabetical
                     </button>
@@ -360,14 +319,14 @@ export default function MealPlanner() {
               {getFilteredAndSortedRecipes().map((recipe) => (
                 <div
                   key={recipe.id}
-                  className="recipe-card bg-[#14151a] rounded-lg p-3 cursor-pointer hover:bg-[#14151a]/80 transition-colors"
+                  className="recipe-card bg-wk-bg-primary rounded-lg p-3 cursor-pointer hover:bg-wk-bg-surface-hover transition-colors border border-wk-border shadow-wk"
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('application/json', JSON.stringify(recipe))
                   }}
                 >
                   <div className="flex gap-3">
-                    <div className="w-12 h-12 bg-gray-800 rounded flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 bg-wk-bg-surface rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {recipe.imageUrl ? (
                         <img
                           src={recipe.imageUrl}
@@ -375,14 +334,14 @@ export default function MealPlanner() {
                           className="w-full h-full object-cover rounded"
                         />
                       ) : (
-                        <span className="text-gray-600 text-lg">🍽️</span>
+                        <span className="text-wk-text-muted text-lg">🍽️</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-white text-sm leading-tight line-clamp-2">
+                      <h3 className="font-medium text-wk-text-primary text-sm leading-tight line-clamp-2 font-body">
                         {recipe.title}
                       </h3>
-                      <div className="meta text-xs text-white/60 mt-1">
+                      <div className="meta text-xs text-wk-text-muted mt-1 font-body">
                         {recipe.ingredients?.length || 0} ingredients · {recipe.instructions?.length || 0} steps
                       </div>
                     </div>
@@ -395,24 +354,24 @@ export default function MealPlanner() {
 
         {/* Calendar Section */}
         <div className="flex-1 flex flex-col">
-          <div className="p-4 border-b border-white/10">
+          <div className="p-4 border-b border-wk-border">
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold">Meal Planner</h1>
+              <h1 className="text-h1 font-display text-wk-text-primary">Meal Planner</h1>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setCurrentWeek(new Date(currentWeek.getTime() - 7 * 24 * 60 * 60 * 1000))}
-                  className="p-2 text-white/70 hover:text-white transition-colors"
+                  className="p-2 text-wk-text-secondary hover:text-wk-text-primary transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <span className="text-white font-medium px-4">
+                <span className="text-wk-text-primary font-medium font-body px-4">
                   {getWeekStartDate(0).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </span>
                 <button 
                   onClick={() => setCurrentWeek(new Date(currentWeek.getTime() + 7 * 24 * 60 * 60 * 1000))}
-                  className="p-2 text-white/70 hover:text-white transition-colors"
+                  className="p-2 text-wk-text-secondary hover:text-wk-text-primary transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -426,10 +385,10 @@ export default function MealPlanner() {
             <div className="grid grid-cols-7 gap-3 h-full">
               {getWeeksArray()[0]?.map((day, dayIndex) => (
                 <div key={day.date} className="flex flex-col h-full">
-                  <h3 className="font-semibold text-center mb-3 text-white">
+                  <h3 className="font-semibold text-center mb-3 text-wk-text-secondary font-body">
                     {DAYS_OF_WEEK[dayIndex]}
                     <br />
-                    <span className="text-sm text-white/60">{new Date(day.date).getDate()}</span>
+                    <span className="text-sm text-wk-text-muted">{new Date(day.date).getDate()}</span>
                   </h3>
                   
                         <div className="flex flex-col gap-2 flex-1">
@@ -444,7 +403,7 @@ export default function MealPlanner() {
                       return (
                         <div
                           key={mealType.type}
-                          className={`calendar-cell ${flexClass} bg-[#1e1f26] rounded-lg border-2 border-dashed border-white/20 relative overflow-hidden`}
+                          className={`calendar-cell ${flexClass} bg-wk-bg-surface rounded-lg border-2 border-dashed border-wk-border relative overflow-hidden shadow-wk hover:bg-wk-bg-surface-hover transition-colors`}
                           style={{ 
                             minHeight: mealType.type === 'breakfast' || mealType.type === 'lunch' ? '90px' :
                                       mealType.type === 'dinner' ? '110px' :
@@ -473,7 +432,7 @@ export default function MealPlanner() {
                             >
                               <div className="flex justify-between items-start h-full overflow-hidden">
                                 <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-                                  <div className="recipe-title title text-xs text-white line-clamp-2 font-semibold flex-grow overflow-hidden" style={{ 
+                                  <div className="recipe-title title text-xs text-wk-text-primary line-clamp-2 font-semibold font-body flex-grow overflow-hidden" style={{ 
                                     letterSpacing: '0.5px',
                                     wordBreak: 'break-word',
                                     hyphens: 'auto',
@@ -482,7 +441,7 @@ export default function MealPlanner() {
                                     {meal.recipe.title}
                                   </div>
                                   <div 
-                                    className="meal-type text-xs font-medium mt-1 flex-shrink-0"
+                                    className="meal-type text-xs font-medium font-body mt-1 flex-shrink-0"
                                     style={{ color: mealType.color }}
                                   >
                                     {mealType.label}
@@ -490,25 +449,27 @@ export default function MealPlanner() {
                                 </div>
                                 <button
                                   onClick={() => removeRecipeFromMeal(globalDayIndex, mealIndex)}
-                                  className="text-white/60 hover:text-white text-xs ml-1"
+                                  className="text-wk-text-muted hover:text-wk-text-primary text-xs ml-1 transition-colors"
                                 >
                                   ✕
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            <div className="h-full flex flex-col items-center justify-center">
-                              <div className="text-xs text-white/40 mb-1">
+                            <button 
+                              onClick={() => handlePlusButtonClick(globalDayIndex, mealIndex)}
+                              className="h-full w-full flex flex-col items-center justify-center cursor-pointer hover:bg-wk-bg-surface-hover transition-colors rounded"
+                            >
+                              <div className="text-xs text-wk-text-muted mb-1 font-body">
                                 {mealType.label}
                               </div>
-                              <button 
-                                onClick={() => handlePlusButtonClick(globalDayIndex, mealIndex)}
-                                className="text-white/60 hover:opacity-80 transition-colors"
+                              <div 
+                                className="text-wk-text-muted hover:text-wk-accent transition-colors"
                                 style={{ color: mealType.color }}
                               >
                                 <Plus className="h-4 w-4" />
-                              </button>
-                            </div>
+                              </div>
+                            </button>
                           )}
                         </div>
                             )
@@ -523,32 +484,32 @@ export default function MealPlanner() {
 
       {/* Recipe Selection Modal */}
       {showRecipeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{zIndex: 60}}>
-          <div className="bg-[#1e1f26] border border-white/10 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4" style={{zIndex: 60}}>
+          <div className="bg-wk-bg-surface border border-wk-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-wk">
             {/* Modal Header */}
-            <div className="flex justify-between items-center p-6 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white">Select Recipe</h2>
+            <div className="flex justify-between items-center p-6 border-b border-wk-border">
+              <h2 className="text-xl font-display font-semibold text-wk-text-primary">Select Recipe</h2>
               <button 
                 onClick={() => {
                   setShowRecipeModal(false)
                   setSelectedSlot(null)
                 }}
-                className="text-[#FF3A25] font-medium text-lg"
+                className="text-wk-accent font-medium text-lg font-body hover:opacity-80 transition-opacity"
               >
                 Cancel
               </button>
             </div>
             
             {/* Search Bar */}
-            <div className="p-6 border-b border-white/10">
+            <div className="p-6 border-b border-wk-border">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-wk-text-muted h-4 w-4" />
                 <Input
                   type="text"
                   placeholder="Search recipes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
+                  className="pl-9 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary placeholder:text-wk-text-muted font-body"
                 />
               </div>
             </div>
@@ -560,10 +521,10 @@ export default function MealPlanner() {
                   <div
                     key={recipe.id}
                     onClick={() => handleRecipeSelect(recipe)}
-                    className="bg-[#14151a] rounded-lg p-4 cursor-pointer hover:bg-[#14151a]/80 transition-colors"
+                    className="bg-wk-bg-primary rounded-lg p-4 cursor-pointer hover:bg-wk-bg-surface-hover transition-colors border border-wk-border shadow-wk"
                   >
                     <div className="flex gap-3">
-                      <div className="w-16 h-16 bg-gray-800 rounded flex items-center justify-center flex-shrink-0">
+                      <div className="w-16 h-16 bg-wk-bg-surface rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {recipe.imageUrl ? (
                           <img
                             src={recipe.imageUrl}
@@ -571,14 +532,14 @@ export default function MealPlanner() {
                             className="w-full h-full object-cover rounded"
                           />
                         ) : (
-                          <span className="text-gray-600 text-xl">🍽️</span>
+                          <span className="text-wk-text-muted text-xl">🍽️</span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-white text-sm leading-tight line-clamp-2 mb-1">
+                        <h3 className="font-medium text-wk-text-primary text-sm leading-tight line-clamp-2 mb-1 font-body">
                           {recipe.title}
                         </h3>
-                        <p className="text-white/60 text-xs">
+                        <p className="text-wk-text-muted text-xs font-body">
                           {recipe.ingredients?.length || 0} ingredients
                         </p>
                       </div>
@@ -589,7 +550,7 @@ export default function MealPlanner() {
               
               {getFilteredAndSortedRecipes().length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-white/60">No recipes found. Add some recipes to your cookbook first!</p>
+                  <p className="text-wk-text-secondary font-body">No recipes found. Add some recipes to your cookbook first!</p>
                 </div>
               )}
             </div>

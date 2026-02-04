@@ -18,9 +18,9 @@ test.describe('Auth Recovery Journey', () => {
     await page.getByPlaceholder(/you@example.com/i).fill('test-user@remyapp.dev')
 
     const start = Date.now()
-    await page.getByRole('button', { name: /send reset link/i }).click()
+    await page.getByRole('button', { name: /reset password/i }).click()
     await expect(
-      page.getByText(/reset link has been sent/i)
+      page.getByRole('heading', { name: /check your email/i })
     ).toBeVisible()
     expect(Date.now() - start).toBeLessThan(5000)
 

@@ -10,9 +10,8 @@ import {
   type FormEvent,
 } from 'react'
 import { useAuth } from '../../context/AuthContext'
-
-const baseInputClass =
-  'w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
 
 const isAlreadyRegisteredError = (message: string) => {
   const lower = message.toLowerCase()
@@ -47,7 +46,7 @@ const normalizeAuthError = (message: string) => {
 type ResendMode = 'confirmation' | null
 
 export default function SignupPage() {
-  const { user, loading, signUpWithEmail, resendConfirmation } = useAuth()
+  const { user, loading, signUpWithEmail, signInWithGoogle, resendConfirmation } = useAuth()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -171,30 +170,82 @@ export default function SignupPage() {
 
   if (loading || user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary font-body">Loading...</div>
+      </div>
+    )
+  }
+
+  // Success state - email confirmation sent
+  if (resendMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary px-4 py-12">
+        <div
+          className="w-full max-w-md bg-wk-bg-surface p-8 rounded-xl shadow-wk-lg"
+          data-testid="signup-card"
+        >
+          <div className="text-center space-y-4">
+            <div className="text-6xl mb-4">📧</div>
+            <h1 className="text-2xl font-display italic text-wk-text-primary">
+              Check Your Email
+            </h1>
+            <p className="text-wk-text-secondary font-body">
+              {info || 'Check your email to verify your account before logging in.'}
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-4">
+            <Button
+              type="button"
+              onClick={handleResend}
+              disabled={isResending}
+              variant="secondary"
+              className="w-full"
+            >
+              {isResending ? 'Resending...' : 'Resend confirmation email'}
+            </Button>
+
+            <div className="text-center text-sm text-wk-text-secondary font-body">
+              Already verified?{' '}
+              <Link
+                href="/login"
+                className="text-wk-accent hover:text-wk-accent-hover transition-colors"
+              >
+                Log in
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#14151a] px-4 py-12">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary px-4 py-12">
+      <div
+        className="w-full max-w-md bg-wk-bg-surface p-8 rounded-xl shadow-wk-lg"
+        data-testid="signup-card"
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
           <div className="text-6xl mb-4">🍳</div>
-          <h1 className="text-4xl font-serif italic text-white">Create Account</h1>
-          <p className="text-white/60 mt-3">
-            Sign up with email and password
+          <h1 className="text-4xl font-display italic text-wk-text-primary">
+            Remy
+          </h1>
+          <p className="text-wk-text-secondary font-body mt-3">
+            Create your account
           </p>
         </div>
 
+        {/* Signup Form */}
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <label className="text-sm text-white/70">Email</label>
-            <input
+            <label className="text-sm text-wk-text-secondary font-body">
+              Email
+            </label>
+            <Input
               type="email"
               autoComplete="email"
-              className={baseInputClass}
               placeholder="you@example.com"
               value={email}
               onChange={handleEmailChange}
@@ -202,11 +253,12 @@ export default function SignupPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm text-white/70">Password</label>
-            <input
+            <label className="text-sm text-wk-text-secondary font-body">
+              Password
+            </label>
+            <Input
               type="password"
               autoComplete="new-password"
-              className={baseInputClass}
               placeholder="Minimum 8 characters"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -214,11 +266,12 @@ export default function SignupPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm text-white/70">Confirm Password</label>
-            <input
+            <label className="text-sm text-wk-text-secondary font-body">
+              Confirm Password
+            </label>
+            <Input
               type="password"
               autoComplete="new-password"
-              className={baseInputClass}
               placeholder="Re-enter password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
@@ -226,11 +279,14 @@ export default function SignupPage() {
           </div>
 
           {error && (
-            <div className="rounded-xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-lg border border-wk-error/40 bg-wk-error/10 px-4 py-3 text-sm text-wk-error font-body">
               <span>{error}</span>
               {errorType === 'account-exists' && (
                 <span className="block mt-2">
-                  <Link href="/forgot-password" className="underline hover:text-white">
+                  <Link
+                    href="/forgot-password"
+                    className="underline text-wk-accent hover:text-wk-accent-hover transition-colors"
+                  >
                     Reset password
                   </Link>
                 </span>
@@ -238,35 +294,42 @@ export default function SignupPage() {
             </div>
           )}
 
-          {info && (
-            <div className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-              {info}
-            </div>
-          )}
-
-          {resendMode && (
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={isResending}
-              className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-medium text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isResending ? 'Resending...' : 'Resend confirmation email'}
-            </button>
-          )}
-
-          <button
+          <Button
             type="submit"
             disabled={!isFormValid || isSubmitting}
-            className="w-full rounded-xl bg-[#8F89FA] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#7e77f4] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full"
           >
             {isSubmitting ? 'Creating account...' : 'Create Account'}
-          </button>
+          </Button>
         </form>
 
-        <div className="text-center text-sm text-white/70">
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-6">
+          <div className="h-px flex-1 bg-wk-border" />
+          <span className="text-xs uppercase tracking-[0.2em] text-wk-text-muted">
+            or
+          </span>
+          <div className="h-px flex-1 bg-wk-border" />
+        </div>
+
+        {/* Google Sign Up */}
+        <Button
+          type="button"
+          onClick={signInWithGoogle}
+          variant="secondary"
+          className="w-full gap-3"
+        >
+          <span className="text-lg">G</span>
+          Continue with Google
+        </Button>
+
+        {/* Login Link */}
+        <div className="text-center text-sm text-wk-text-secondary font-body mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="hover:text-white">
+          <Link
+            href="/login"
+            className="text-wk-accent hover:text-wk-accent-hover transition-colors"
+          >
             Log in
           </Link>
         </div>

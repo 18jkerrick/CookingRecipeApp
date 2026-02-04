@@ -63,7 +63,7 @@ test.describe('Recipe Lifecycle Journey', () => {
     await page.getByRole('heading', { name: /test recipe/i }).click()
     await expect(page.getByText(/2 cups flour/i)).toBeVisible()
 
-    await page.getByRole('button', { name: /^cookbooks$/i }).nth(1).click()
+    await page.getByRole('button', { name: /cookbooks/i }).click()
     await expect(
       page.getByRole('heading', { name: /delete recipe/i })
     ).toBeVisible()

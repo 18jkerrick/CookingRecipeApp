@@ -16,7 +16,7 @@ test.describe('Settings - Unit Preference', () => {
 
     await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible()
 
-    await page.getByRole('radio', { name: /metric/i }).check()
+    await page.getByRole('radio', { name: /metric/i }).check({ force: true })
 
     const start = Date.now()
     await page.getByRole('button', { name: /save changes/i }).click()
