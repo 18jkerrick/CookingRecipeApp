@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { supabase } from '@acme/db/client'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
-import { Filter, Plus, ChevronDown, Edit3, Trash2, Settings, ShoppingCart, Copy, CheckCircle, Share } from "lucide-react"
+import { Filter, Plus, ChevronDown, Edit3, Trash2, ShoppingCart, Share } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Navigation } from '../../components/shared/Navigation'
 import NetflixCarousel from '../../components/features/grocery/NetflixCarousel'
 import { 
   GroceryList, 
@@ -87,22 +89,22 @@ const CardImage = ({ item, recipes, sortBy }: {
     }, [recipeImages.length])
 
     if (recipeImages.length === 0) {
-      return (
-        <div className="w-full h-full rounded-t-lg bg-gray-800 flex items-center justify-center">
-          <span className="text-gray-600 text-2xl">🍽️</span>
-        </div>
-      )
-    }
-
     return (
-      <div className="w-full h-full rounded-t-lg overflow-hidden bg-gray-800">
-        <img
-          src={recipeImages[currentImageIndex]}
-          alt="Recipe"
-          className="w-full h-full object-cover"
-        />
+      <div className="w-full h-full rounded-t-lg bg-wk-bg-surface-hover flex items-center justify-center">
+        <span className="text-wk-text-muted text-2xl">🍽️</span>
       </div>
     )
+    }
+
+  return (
+    <div className="w-full h-full rounded-t-lg overflow-hidden bg-wk-bg-surface-hover">
+      <img
+        src={recipeImages[currentImageIndex]}
+        alt="Recipe"
+        className="w-full h-full object-cover"
+      />
+    </div>
+  )
   } else {
     // Show aisle category image
     const category = 'isCondensed' in item && item.isCondensed
@@ -126,15 +128,15 @@ const CardImage = ({ item, recipes, sortBy }: {
       return categoryMap[category] || '/uncategorized.png'
     }
 
-    return (
-      <div className="w-full h-full rounded-t-lg overflow-hidden bg-gray-800">
-        <img
-          src={getCategoryImage(category)}
-          alt="Category"
-          className="w-full h-full object-cover"
-        />
-      </div>
-    )
+  return (
+    <div className="w-full h-full rounded-t-lg overflow-hidden bg-wk-bg-surface-hover">
+      <img
+        src={getCategoryImage(category)}
+        alt="Category"
+        className="w-full h-full object-cover"
+      />
+    </div>
+  )
   }
 }
 
@@ -1042,76 +1044,34 @@ export default function GroceryLists() {
 
   if (!isClient || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary font-body">Loading...</div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Redirecting to sign in...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary font-body">Redirecting to sign in...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#14151a] text-white">
+    <div className="min-h-screen bg-wk-bg-primary">
       {/* Navigation */}
-      <header className="container mx-auto px-4 py-6 flex items-center justify-between border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="bg-[#FF3A25] rounded-md p-1.5">
-            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12V15C21 18.3137 18.3137 21 15 21H3V12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="3" fill="currentColor"/>
-              <path d="M12 9C10.3431 9 9 10.3431 9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="text-2xl font-serif italic">Remy</span>
-        </div>
+      <Navigation currentPath="/grocery-list" />
 
-        <nav className="hidden md:flex items-center gap-8">
-          <button onClick={() => router.push('/cookbooks')} className="text-white/80 hover:text-white transition-colors">
-            Cookbooks
-          </button>
-          <button onClick={() => router.push('/meal-planner')} className="text-white/80 hover:text-white transition-colors">
-            Meal Planner
-          </button>
-          <button onClick={() => router.push('/grocery-list')} className="text-white hover:text-white transition-colors">
-            Grocery Lists
-          </button>
-          <button onClick={() => router.push('/discover')} className="text-white/80 hover:text-white transition-colors">
-            Discover
-          </button>
-        </nav>
-
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-white/70">Welcome back, {user.email?.split('@')[0]}!</div>
-          <button
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            onClick={() => router.push('/settings')}
-          >
-            <Settings className="h-5 w-5 text-white/70 hover:text-white" />
-          </button>
-          <button
-            className="px-6 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 text-white font-medium rounded-full transition-colors"
-            onClick={signOut}
-          >
-            Sign Out
-          </button>
-        </div>
-      </header>
-
-      <div className="flex h-[calc(100vh-120px)]">
+      <div className="flex h-[calc(100vh-72px)]">
         {/* Left Sidebar - Grocery Lists */}
-        <div className="w-72 bg-[#1e1f26] border-r border-white/10 flex flex-col">
-          <div className="p-4 border-b border-white/10">
+        <div className="w-72 bg-wk-bg-surface border-r border-wk-border flex flex-col">
+          <div className="p-4 border-b border-wk-border">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Your Lists</h2>
+              <h2 className="text-h2 text-wk-text-primary font-display">Your Lists</h2>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="text-[#FF3A25] hover:text-[#FF3A25]/80 transition-colors"
+                className="text-wk-accent hover:text-wk-accent-hover transition-colors"
               >
                 <Plus className="h-5 w-5" />
               </button>
@@ -1119,14 +1079,14 @@ export default function GroceryLists() {
           </div>
 
           {/* Grocery Lists */}
-          <div className="flex-1 overflow-y-auto p-4 dark-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 themed-scrollbar">
             <div className="space-y-3">
               {groceryLists.map((list) => (
                 <div
                   key={list.id}
                   onClick={() => setSelectedList(list)}
-                  className={`rounded-lg p-4 cursor-pointer transition-all overflow-hidden relative ${
-                    selectedList?.id === list.id ? 'ring-2 ring-[#FF3A25]' : 'hover:opacity-90'
+                  className={`rounded-lg p-4 cursor-pointer transition-all overflow-hidden relative hover:shadow-wk ${
+                    selectedList?.id === list.id ? 'ring-2 ring-wk-accent' : 'hover:opacity-90'
                   }`}
                   style={{
                     background: list.visual?.type === 'gradient' && list.visual.gradient
@@ -1168,7 +1128,7 @@ export default function GroceryLists() {
 
                           {showShareDropdown === list.id && dropdownPosition && createPortal(
                             <div
-                              className="fixed w-48 bg-[#1e1f26] border border-white/10 rounded-lg shadow-xl z-[99999]"
+                              className="fixed w-48 bg-wk-bg-surface border border-wk-border rounded-lg shadow-wk-lg z-[99999]"
                               style={{
                                 top: `${dropdownPosition.top}px`,
                                 right: `${dropdownPosition.right}px`
@@ -1180,7 +1140,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'url')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -1192,7 +1152,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'clipboard')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -1204,7 +1164,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'pdf')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1216,7 +1176,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'docx')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1228,7 +1188,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'txt')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1240,7 +1200,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'excel')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -1252,7 +1212,7 @@ export default function GroceryLists() {
                                     e.stopPropagation()
                                     handleExport(list, 'html')
                                   }}
-                                  className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center space-x-2"
+                                  className="block w-full text-left px-4 py-2 text-sm text-wk-text-primary font-body hover:bg-wk-bg-surface-hover flex items-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -1284,7 +1244,7 @@ export default function GroceryLists() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-white text-sm drop-shadow-lg font-medium tracking-wide">
+                    <p className="text-white/90 text-sm drop-shadow-lg font-body font-medium tracking-wide">
                       {list.items.length} items • {list.recipeIds.length} recipes
                     </p>
                   </div>
@@ -1293,7 +1253,7 @@ export default function GroceryLists() {
               
               {groceryLists.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-white/60 text-sm">No grocery lists yet. Create your first one!</p>
+                  <p className="text-wk-text-secondary text-sm font-body">No grocery lists yet. Create your first one!</p>
                 </div>
               )}
             </div>
@@ -1305,21 +1265,21 @@ export default function GroceryLists() {
           {selectedList ? (
             <>
               {/* Top Section - Recipes in List */}
-              <div className="p-4 border-b border-white/10 bg-[#1e1f26]/50">
+              <div className="p-4 border-b border-wk-border bg-wk-bg-surface/50">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold">Recipes</h3>
+                  <h3 className="text-h3 text-wk-text-primary font-display">Recipes</h3>
                   <button 
                     onClick={() => setRecipesCollapsed(!recipesCollapsed)}
                     aria-label="Toggle recipes section"
-                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                    className="p-1 hover:bg-wk-bg-surface-hover rounded transition-colors"
                   >
-                    <ChevronDown className={`h-4 w-4 text-white/60 transition-transform ${recipesCollapsed ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-4 w-4 text-wk-text-secondary transition-transform ${recipesCollapsed ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
                 {!recipesCollapsed && (
-                  <div className="flex gap-3 overflow-x-auto pb-2">
+                  <div className="flex gap-3 overflow-x-auto pb-2 themed-scrollbar">
                     {getFilteredRecipes().map((recipe) => (
-                      <div key={recipe.id} className="flex-shrink-0 bg-[#14151a] rounded-lg overflow-hidden w-32 h-36 flex flex-col">
+                      <div key={recipe.id} className="flex-shrink-0 bg-wk-bg-surface rounded-lg overflow-hidden w-32 h-36 flex flex-col shadow-wk">
                         <div className="relative">
                           <button 
                             onClick={(e) => {
@@ -1327,7 +1287,7 @@ export default function GroceryLists() {
                               e.stopPropagation()
                               handleRemoveRecipeFromList(recipe.id)
                             }}
-                            className="absolute top-2 right-2 w-6 h-6 bg-black/50 hover:bg-red-600/80 rounded-full flex items-center justify-center text-white text-xs transition-colors"
+                            className="absolute top-2 right-2 w-6 h-6 bg-black/50 hover:bg-wk-error/80 rounded-full flex items-center justify-center text-white text-xs transition-colors"
                           >
                             ✕
                           </button>
@@ -1338,16 +1298,16 @@ export default function GroceryLists() {
                               className="w-full h-20 object-cover"
                             />
                           ) : (
-                            <div className="w-full h-20 bg-gray-800 flex items-center justify-center">
-                              <span className="text-gray-600 text-lg">🍽️</span>
+                            <div className="w-full h-20 bg-wk-bg-surface-hover flex items-center justify-center">
+                              <span className="text-wk-text-muted text-lg">🍽️</span>
                             </div>
                           )}
                         </div>
                         <div className="p-2 flex-1 flex flex-col justify-between">
-                          <h4 className="text-xs font-medium text-white line-clamp-2 h-8 overflow-hidden">{recipe.title}</h4>
+                          <h4 className="text-xs font-medium text-wk-text-primary font-body line-clamp-2 h-8 overflow-hidden">{recipe.title}</h4>
                           <button 
                             onClick={() => handleViewRecipe(recipe)}
-                            className="text-xs text-white/60 hover:text-white transition-colors cursor-pointer text-left"
+                            className="text-xs text-wk-text-secondary hover:text-wk-accent transition-colors cursor-pointer text-left font-body"
                           >
                             View recipe →
                           </button>
@@ -1356,11 +1316,11 @@ export default function GroceryLists() {
                     ))}
                     
                     {/* Add Recipe Button */}
-                    <div className="flex-shrink-0 bg-[#14151a] border-2 border-dashed border-white/20 rounded-lg overflow-hidden w-32 h-36 hover:border-[#2B966F] hover:bg-[#2B966F]/10 transition-all">
+                    <div className="flex-shrink-0 bg-wk-bg-surface border-2 border-dashed border-wk-border rounded-lg overflow-hidden w-32 h-36 hover:border-wk-accent hover:bg-wk-accent-muted transition-all">
                       <button
                         onClick={() => setShowAddRecipeModal(true)}
                         aria-label="Add recipe to list"
-                        className="w-full h-full text-white/60 hover:text-white flex items-center justify-center"
+                        className="w-full h-full text-wk-text-secondary hover:text-wk-accent flex items-center justify-center"
                       >
                         <Plus className="h-8 w-8" />
                       </button>
@@ -1370,41 +1330,42 @@ export default function GroceryLists() {
               </div>
 
               {/* Main Ingredients Section */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden dark-scrollbar">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden themed-scrollbar">
                 <div className="p-4 max-w-full">
                   <div className="flex items-center justify-between mb-4">
-                    <button
+                    <Button
                       onClick={() => setShowBuyGroceriesModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#2B966F] hover:bg-[#2B966F]/90 text-white rounded-md transition-colors text-sm font-medium"
+                      variant="default"
                       disabled={!selectedList || selectedList.items.filter(item => !item.checked).length === 0}
                     >
-                      <ShoppingCart className="h-4 w-4" />
+                      <ShoppingCart className="h-4 w-4 mr-2" />
                       Buy Groceries
-                    </button>
+                    </Button>
                     
                     <div className="flex items-center gap-2">
                       <div className="relative">
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
                             setShowSortMenu(!showSortMenu)
                           }}
-                          className="flex items-center gap-1 px-3 py-2 bg-[#1e1f26] rounded-md hover:bg-[#1e1f26]/80 transition-colors text-sm"
                         >
-                          <Filter className="h-4 w-4" />
+                          <Filter className="h-4 w-4 mr-1" />
                           Sort by {sortBy === 'aisle' ? 'Aisle' : 'Recipe'}
-                        </button>
+                        </Button>
                         {showSortMenu && (
-                          <div className="absolute right-0 mt-2 w-40 bg-[#1e1f26] rounded-md shadow-lg z-10 border border-white/10">
+                          <div className="absolute right-0 mt-2 w-40 bg-wk-bg-surface rounded-md shadow-wk-lg z-10 border border-wk-border">
                             <button
                               onClick={() => { setSortBy('aisle'); setShowSortMenu(false); }}
-                              className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
+                              className="block w-full text-left px-3 py-2 hover:bg-wk-bg-surface-hover transition-colors text-sm text-wk-text-primary font-body"
                             >
                               By Aisle
                             </button>
                             <button
                               onClick={() => { setSortBy('recipe'); setShowSortMenu(false); }}
-                              className="block w-full text-left px-3 py-2 hover:bg-white/10 transition-colors text-sm"
+                              className="block w-full text-left px-3 py-2 hover:bg-wk-bg-surface-hover transition-colors text-sm text-wk-text-primary font-body"
                             >
                               By Recipe
                             </button>
@@ -1419,7 +1380,7 @@ export default function GroceryLists() {
                     {Object.entries(getGroupedItems()).map(([groupName, items], groupIndex) => (
                       <div key={`${groupName}-${sortBy}`} className="w-full overflow-hidden">
                         {(sortBy === 'aisle' || sortBy === 'recipe') && (
-                          <h3 className="text-2xl font-bold mb-4 text-white tracking-wide capitalize">{groupName}</h3>
+                          <h3 className="text-h3 text-wk-text-primary font-display mb-4 capitalize">{groupName}</h3>
                         )}
                         <NetflixCarousel
                           key={`carousel-${groupName}-${sortBy}-${selectedList?.id || 'none'}`}
@@ -1443,7 +1404,7 @@ export default function GroceryLists() {
                                 return [
                                   <div
                                     key={`${condensedItem.id}-editing`}
-                                    className="flex-shrink-0 w-72 h-64 bg-[#1e1f26] rounded-lg overflow-hidden flex flex-col"
+                                    className="flex-shrink-0 w-72 h-64 bg-wk-bg-surface rounded-lg overflow-hidden flex flex-col shadow-wk"
                                   >
                                     {/* Compressed image area when editing */}
                                     <div className="h-16 overflow-hidden">
@@ -1457,7 +1418,7 @@ export default function GroceryLists() {
                                         type="text"
                                         value={tempChanges[condensedItem.originalItems[0].id]?.name || condensedItem.sort_name}
                                         onChange={(e) => handleNameChange(condensedItem.originalItems[0].id, e.target.value)}
-                                        className="w-full h-8 mb-2 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm font-semibold"
+                                        className="w-full h-8 mb-2 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary text-sm font-semibold font-body"
                                         placeholder="Item name"
                                       />
 
@@ -1486,8 +1447,8 @@ export default function GroceryLists() {
                                                       handleStartEdit(origItem)
                                                     }
                                                   }}
-                                                  className={`flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs ${
-                                                    isCurrentlyEditing && quantityError ? 'ring-1 ring-red-500' : ''
+                                                  className={`flex-1 h-6 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary text-xs font-body ${
+                                                    isCurrentlyEditing && quantityError ? 'ring-1 ring-wk-error' : ''
                                                   }`}
                                                   placeholder="4 or 4-5"
                                                 />
@@ -1502,7 +1463,7 @@ export default function GroceryLists() {
                                                       handleStartEdit(origItem)
                                                     }
                                                   }}
-                                                  className="flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs"
+                                                  className="flex-1 h-6 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary text-xs font-body"
                                                   placeholder="Unit"
                                                 />
                                               </div>
@@ -1511,7 +1472,7 @@ export default function GroceryLists() {
                                                 {index > 0 ? (
                                                   <button
                                                     onClick={() => handleDeleteItem(origItem.id)}
-                                                    className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                                    className="p-1 text-wk-text-muted hover:text-wk-error hover:bg-wk-error/10 rounded transition-all"
                                                   >
                                                     <Trash2 className="h-3 w-3" />
                                                   </button>
@@ -1527,24 +1488,28 @@ export default function GroceryLists() {
 
                                       {/* Error message */}
                                       {quantityError && (
-                                        <span className="text-red-400 text-xs mt-1">{quantityError}</span>
+                                        <span className="text-wk-error text-xs mt-1 font-body">{quantityError}</span>
                                       )}
 
                                       {/* Action buttons - positioned right after content */}
                                       <div className="flex gap-1 mt-3">
-                                        <button
+                                        <Button
                                           onClick={handleSaveEdit}
                                           disabled={!!quantityError || Object.keys(tempChanges).length === 0}
-                                          className="flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+                                          variant="default"
+                                          size="sm"
+                                          className="flex-1 text-xs"
                                         >
                                           Save
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                           onClick={handleCancelEdit}
-                                          className="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                          variant="destructive"
+                                          size="sm"
+                                          className="flex-1 text-xs"
                                         >
                                           Cancel
-                                        </button>
+                                        </Button>
                                       </div>
                                     </div>
                                   </div>
@@ -1556,7 +1521,7 @@ export default function GroceryLists() {
                                 <div
                                   key={condensedItem.id}
                                   onClick={() => handleToggleCondensedItem(condensedItem)}
-                                  className={`flex-shrink-0 w-72 h-64 bg-[#1e1f26] rounded-lg overflow-hidden hover:bg-[#1e1f26]/80 transition-colors cursor-pointer ${
+                                  className={`flex-shrink-0 w-72 h-64 bg-wk-bg-surface rounded-lg overflow-hidden hover:bg-wk-bg-surface-hover transition-colors cursor-pointer shadow-wk ${
                                     condensedItem.checked ? 'opacity-60' : ''
                                   }`}
                                 >
@@ -1567,13 +1532,13 @@ export default function GroceryLists() {
                                     <div className="flex items-start justify-between h-full">
                                       <div className="flex-1 pr-2 flex flex-col">
                                         {/* Dynamic ingredient name - 1 or 2 lines */}
-                                        <div className={`text-lg font-bold tracking-normal line-clamp-2 leading-6 mb-1 ${
-                                          condensedItem.checked ? 'line-through text-white/60' : 'text-white'
+                                        <div className={`text-lg font-bold tracking-normal line-clamp-2 leading-6 mb-1 font-body ${
+                                          condensedItem.checked ? 'line-through text-wk-text-muted' : 'text-wk-text-primary'
                                         }`}>
                                           {condensedItem.sort_name}
                                         </div>
                                         {/* Quantity appears right below ingredient name */}
-                                        <div className="text-sm text-gray-400 font-normal">
+                                        <div className="text-sm text-wk-text-secondary font-body font-normal">
                                           {condensedItem.quantities.join(' + ')}
                                         </div>
                                       </div>
@@ -1584,7 +1549,7 @@ export default function GroceryLists() {
                                               e.stopPropagation()
                                               handleStartEdit(condensedItem.originalItems[0])
                                             }}
-                                            className="p-1 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
+                                            className="p-1 text-wk-text-muted hover:text-wk-accent hover:bg-wk-accent-muted rounded transition-all"
                                           >
                                             <Edit3 className="h-4 w-4" />
                                           </button>
@@ -1594,7 +1559,7 @@ export default function GroceryLists() {
                                               // Delete all original items in the condensed group
                                               condensedItem.originalItems.forEach(item => handleDeleteItem(item.id))
                                             }}
-                                            className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                            className="p-1 text-wk-text-muted hover:text-wk-error hover:bg-wk-error/10 rounded transition-all"
                                           >
                                             <Trash2 className="h-4 w-4" />
                                           </button>
@@ -1611,7 +1576,7 @@ export default function GroceryLists() {
                                 <div
                                   key={regularItem.id}
                                   onClick={() => editingItem !== regularItem.id && handleToggleItem(regularItem.id)}
-                                  className={`flex-shrink-0 w-72 h-64 bg-[#1e1f26] rounded-lg overflow-hidden hover:bg-[#1e1f26]/80 transition-colors ${
+                                  className={`flex-shrink-0 w-72 h-64 bg-wk-bg-surface rounded-lg overflow-hidden hover:bg-wk-bg-surface-hover transition-colors shadow-wk ${
                                     regularItem.checked ? 'opacity-60' : ''
                                   } ${editingItem !== regularItem.id ? 'cursor-pointer' : ''}`}
                                 >
@@ -1630,7 +1595,7 @@ export default function GroceryLists() {
                                           type="text"
                                           value={tempChanges[regularItem.id]?.name || regularItem.sort_name}
                                           onChange={(e) => handleNameChange(regularItem.id, e.target.value)}
-                                          className="w-full h-8 mb-2 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-sm font-semibold"
+                                          className="w-full h-8 mb-2 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary text-sm font-semibold font-body"
                                           placeholder="Item name"
                                         />
 
@@ -1644,8 +1609,8 @@ export default function GroceryLists() {
                                                   ? `${regularItem.original_quantity_min}-${regularItem.original_quantity_max}`
                                                   : regularItem.original_quantity_min?.toString() || '')}
                                               onChange={(e) => handleQuantityChange(regularItem.id, e.target.value)}
-                                              className={`flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs ${
-                                                quantityError ? 'ring-1 ring-red-500' : ''
+                                              className={`flex-1 h-6 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary text-xs font-body ${
+                                                quantityError ? 'ring-1 ring-wk-error' : ''
                                               }`}
                                               placeholder="4 or 4-5"
                                             />
@@ -1653,7 +1618,7 @@ export default function GroceryLists() {
                                               type="text"
                                               value={tempChanges[regularItem.id]?.unit ?? (regularItem.original_unit || '')}
                                               onChange={(e) => handleUnitChange(regularItem.id, e.target.value)}
-                                              className="flex-1 h-6 bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white text-xs"
+                                              className="flex-1 h-6 bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary text-xs font-body"
                                               placeholder="Unit"
                                             />
                                           </div>
@@ -1663,24 +1628,28 @@ export default function GroceryLists() {
 
                                         {/* Error message */}
                                         {quantityError && (
-                                          <span className="text-red-400 text-xs mb-2">{quantityError}</span>
+                                          <span className="text-wk-error text-xs mb-2 font-body">{quantityError}</span>
                                         )}
 
                                         {/* Action buttons - positioned right after content */}
                                         <div className="flex gap-1 mt-3">
-                                          <button
+                                          <Button
                                             onClick={handleSaveEdit}
                                             disabled={!!quantityError || Object.keys(tempChanges).length === 0}
-                                            className="flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+                                            variant="default"
+                                            size="sm"
+                                            className="flex-1 text-xs"
                                           >
                                             Save
-                                          </button>
-                                          <button
+                                          </Button>
+                                          <Button
                                             onClick={handleCancelEdit}
-                                            className="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                            variant="destructive"
+                                            size="sm"
+                                            className="flex-1 text-xs"
                                           >
                                             Cancel
-                                          </button>
+                                          </Button>
                                         </div>
                                       </div>
                                     </>
@@ -1694,13 +1663,13 @@ export default function GroceryLists() {
                                         <div className="flex items-start justify-between h-full">
                                           <div className="flex-1 pr-2 flex flex-col">
                                             {/* Dynamic ingredient name - 1 or 2 lines */}
-                                            <div className={`text-lg font-bold tracking-normal line-clamp-2 leading-6 mb-1 ${
-                                              regularItem.checked ? 'line-through text-white/60' : 'text-white'
+                                            <div className={`text-lg font-bold tracking-normal line-clamp-2 leading-6 mb-1 font-body ${
+                                              regularItem.checked ? 'line-through text-wk-text-muted' : 'text-wk-text-primary'
                                             }`}>
                                               {regularItem.sort_name}
                                             </div>
                                             {/* Quantity appears right below ingredient name */}
-                                            <div className="text-sm text-gray-400 font-normal">
+                                            <div className="text-sm text-wk-text-secondary font-body font-normal">
                                               {formatMeasurement(
                                                 regularItem.original_quantity_min,
                                                 regularItem.original_quantity_max,
@@ -1722,7 +1691,7 @@ export default function GroceryLists() {
                                                   e.stopPropagation()
                                                   handleStartEdit(regularItem)
                                                 }}
-                                                className="p-1 text-white/40 hover:text-[#2B966F] hover:bg-[#2B966F]/10 rounded transition-all"
+                                                className="p-1 text-wk-text-muted hover:text-wk-accent hover:bg-wk-accent-muted rounded transition-all"
                                               >
                                                 <Edit3 className="h-4 w-4" />
                                               </button>
@@ -1731,7 +1700,7 @@ export default function GroceryLists() {
                                                   e.stopPropagation()
                                                   handleDeleteItem(regularItem.id)
                                                 }}
-                                                className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                                                className="p-1 text-wk-text-muted hover:text-wk-error hover:bg-wk-error/10 rounded transition-all"
                                               >
                                                 <Trash2 className="h-4 w-4" />
                                               </button>
@@ -1755,14 +1724,14 @@ export default function GroceryLists() {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <h2 className="text-2xl font-bold mb-2">No Grocery List Selected</h2>
-                <p className="text-white/60 mb-4">Create or select a grocery list to get started</p>
-                <button
+                <h2 className="text-h2 text-wk-text-primary font-display mb-2">No Grocery List Selected</h2>
+                <p className="text-wk-text-secondary font-body mb-4">Create or select a grocery list to get started</p>
+                <Button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-6 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 text-white font-medium rounded-full transition-colors"
+                  variant="default"
                 >
                   Create Grocery List
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1773,17 +1742,17 @@ export default function GroceryLists() {
 
       {/* Create List Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{zIndex: 60}}>
-          <div className="bg-[#1e1f26] border border-white/10 rounded-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white">Create Grocery List</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{zIndex: 60}}>
+          <div className="bg-wk-bg-surface border border-wk-border rounded-xl w-full max-w-md shadow-wk-lg">
+            <div className="flex justify-between items-center p-6 border-b border-wk-border">
+              <h2 className="text-h3 text-wk-text-primary font-display">Create Grocery List</h2>
               <button 
                 onClick={() => {
                   setShowCreateModal(false)
                   setNewListName('')
                   setSelectedRecipes([])
                 }}
-                className="text-[#FF3A25] font-medium text-lg"
+                className="text-wk-accent hover:text-wk-accent-hover font-medium text-lg font-body"
               >
                 Cancel
               </button>
@@ -1791,19 +1760,19 @@ export default function GroceryLists() {
             
             <div className="p-6">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-white mb-2">List Name</label>
+                <label className="block text-sm font-medium text-wk-text-primary mb-2 font-body">List Name</label>
                 <Input
                   type="text"
                   placeholder="Enter list name..."
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
-                  className="bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
+                  className="bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary placeholder:text-wk-text-muted font-body"
                 />
               </div>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium text-white mb-2">Select Recipes</label>
-                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2 dark-scrollbar">
+                <label className="block text-sm font-medium text-wk-text-primary mb-2 font-body">Select Recipes</label>
+                <div className="max-h-60 overflow-y-auto border border-wk-border rounded-lg p-2 themed-scrollbar">
                   {recipes.map((recipe) => (
                     <div
                       key={recipe.id}
@@ -1816,12 +1785,12 @@ export default function GroceryLists() {
                       }}
                       className={`p-2 rounded cursor-pointer transition-colors ${
                         selectedRecipes.find(r => r.id === recipe.id) 
-                          ? 'bg-[#FF3A25]/20 border border-[#FF3A25]/50' 
-                          : 'hover:bg-[#14151a]'
+                          ? 'bg-wk-accent-muted border border-wk-accent' 
+                          : 'hover:bg-wk-bg-surface-hover'
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 bg-wk-bg-surface-hover rounded flex items-center justify-center flex-shrink-0">
                           {recipe.imageUrl ? (
                             <img
                               src={recipe.imageUrl}
@@ -1829,23 +1798,24 @@ export default function GroceryLists() {
                               className="w-full h-full object-cover rounded"
                             />
                           ) : (
-                            <span className="text-gray-600 text-sm">🍽️</span>
+                            <span className="text-wk-text-muted text-sm">🍽️</span>
                           )}
                         </div>
-                        <span className="text-sm text-white">{recipe.title}</span>
+                        <span className="text-sm text-wk-text-primary font-body">{recipe.title}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
               
-              <button
+              <Button
                 onClick={handleCreateList}
                 disabled={!newListName || selectedRecipes.length === 0}
-                className="w-full px-4 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                variant="default"
+                className="w-full"
               >
                 Create List
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1856,48 +1826,48 @@ export default function GroceryLists() {
       {/* Add Recipe Modal */}
       {showAddRecipeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1e1f26] rounded-lg max-w-md w-full max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white">Add Recipe to List</h2>
+          <div className="bg-wk-bg-surface rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden shadow-wk-lg border border-wk-border">
+            <div className="flex items-center justify-between p-5 border-b border-wk-border">
+              <h2 className="text-xl text-wk-text-primary font-display font-semibold">Add Recipe to List</h2>
               <button 
                 onClick={() => setShowAddRecipeModal(false)}
-                className="text-[#FF3A25] font-medium text-lg"
+                className="text-wk-accent hover:text-wk-accent-hover font-medium text-base font-body"
               >
                 Cancel
               </button>
             </div>
             
-            <div className="p-4">
+            <div className="p-5">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-white mb-2">Available Recipes</label>
-                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-lg p-2 dark-scrollbar">
+                <label className="block text-base font-medium text-wk-text-primary mb-3 font-body">Available Recipes</label>
+                <div className="max-h-72 overflow-y-auto border border-wk-border rounded-lg p-3 themed-scrollbar">
                   {recipes
                     .filter(recipe => !selectedList?.recipeIds.includes(recipe.id))
                     .map((recipe) => (
                     <div
                       key={recipe.id}
                       onClick={() => handleAddRecipeToList(recipe)}
-                      className="p-2 rounded cursor-pointer transition-colors hover:bg-[#14151a]"
+                      className="p-3 rounded-lg cursor-pointer transition-colors hover:bg-wk-bg-surface-hover"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-wk-bg-surface-hover rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {recipe.imageUrl ? (
                             <img
                               src={recipe.imageUrl}
                               alt={recipe.title}
-                              className="w-full h-full object-cover rounded"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
-                            <span className="text-gray-600 text-sm">🍽️</span>
+                            <span className="text-wk-text-muted text-lg">🍽️</span>
                           )}
                         </div>
-                        <span className="text-white text-sm">{recipe.title}</span>
+                        <span className="text-wk-text-primary text-base font-body">{recipe.title}</span>
                       </div>
                     </div>
                   ))}
                   
                   {recipes.filter(recipe => !selectedList?.recipeIds.includes(recipe.id)).length === 0 && (
-                    <div className="text-center text-white/60 py-4">
+                    <div className="text-center text-wk-text-secondary py-6 font-body text-base">
                       All recipes are already in this list
                     </div>
                   )}
@@ -1927,16 +1897,16 @@ export default function GroceryLists() {
 
       {/* Edit List Modal */}
       {showEditVisualModal && editingVisualList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{zIndex: 60}}>
-          <div className="bg-[#1e1f26] border border-white/10 rounded-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b border-white/10">
-              <h2 className="text-xl font-semibold text-white">Edit Grocery List</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{zIndex: 60}}>
+          <div className="bg-wk-bg-surface border border-wk-border rounded-xl w-full max-w-md shadow-wk-lg">
+            <div className="flex justify-between items-center p-6 border-b border-wk-border">
+              <h2 className="text-h3 text-wk-text-primary font-display">Edit Grocery List</h2>
               <button
                 onClick={() => {
                   setShowEditVisualModal(false)
                   setEditingVisualList(null)
                 }}
-                className="text-[#FF3A25] font-medium text-lg"
+                className="text-wk-accent hover:text-wk-accent-hover font-medium text-lg font-body"
               >
                 Cancel
               </button>
@@ -1944,35 +1914,35 @@ export default function GroceryLists() {
 
             <div className="p-6">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-white mb-2">List Name</label>
+                <label className="block text-sm font-medium text-wk-text-primary mb-2 font-body">List Name</label>
                 <Input
                   type="text"
                   placeholder="Enter list name..."
                   value={editListName}
                   onChange={(e) => setEditListName(e.target.value)}
-                  className="bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
+                  className="bg-wk-bg-primary border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary placeholder:text-wk-text-muted font-body"
                 />
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-white mb-2">Gradient Colors</label>
+                <label className="block text-sm font-medium text-wk-text-primary mb-2 font-body">Gradient Colors</label>
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-xs text-white/70 mb-1">From</label>
+                    <label className="block text-xs text-wk-text-secondary mb-1 font-body">From</label>
                     <input
                       type="color"
                       value={gradientFrom}
                       onChange={(e) => setGradientFrom(e.target.value)}
-                      className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
+                      className="w-full h-10 rounded border-wk-border bg-wk-bg-primary cursor-pointer"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-xs text-white/70 mb-1">To</label>
+                    <label className="block text-xs text-wk-text-secondary mb-1 font-body">To</label>
                     <input
                       type="color"
                       value={gradientTo}
                       onChange={(e) => setGradientTo(e.target.value)}
-                      className="w-full h-10 rounded border-none bg-[#14151a] cursor-pointer"
+                      className="w-full h-10 rounded border-wk-border bg-wk-bg-primary cursor-pointer"
                     />
                   </div>
                 </div>
@@ -1984,13 +1954,14 @@ export default function GroceryLists() {
                 </div>
               </div>
 
-              <button
+              <Button
                 onClick={handleSaveVisual}
                 disabled={!editListName.trim()}
-                className="w-full px-4 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                variant="default"
+                className="w-full"
               >
                 Save Changes
-              </button>
+              </Button>
             </div>
           </div>
         </div>

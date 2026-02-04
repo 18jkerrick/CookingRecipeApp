@@ -4,9 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../../context/AuthContext'
-
-const baseInputClass =
-  'w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
 
 const normalizeAuthError = (message: string) => {
   const lower = message.toLowerCase()
@@ -59,83 +58,102 @@ export default function LoginPage() {
 
   if (loading || user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary font-body">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#14151a] px-4 py-12">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🍳</div>
-          <h1 className="text-4xl font-serif italic text-white">Remy</h1>
-          <p className="text-white/60 mt-3">Log in to your cookbooks</p>
-        </div>
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <label className="text-sm text-white/70">Email</label>
-            <input
-              type="email"
-              autoComplete="email"
-              className={baseInputClass}
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm text-white/70">Password</label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              className={baseInputClass}
-              placeholder="••••••••"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-200">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={!isFormValid || isSubmitting}
-            className="w-full rounded-xl bg-[#8F89FA] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#7e77f4] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSubmitting ? 'Logging in...' : 'Log In'}
-          </button>
-        </form>
-
-        <div className="flex items-center justify-between text-sm text-white/70">
-          <Link href="/forgot-password" className="hover:text-white">
-            Forgot password?
-          </Link>
-          <Link href="/signup" className="hover:text-white">
-            Create an account
-          </Link>
-        </div>
-
-        <div className="flex items-center gap-4 text-white/30">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-xs uppercase tracking-[0.2em]">or</span>
-          <div className="h-px flex-1 bg-white/10" />
-        </div>
-
-        <button
-          onClick={signInWithGoogle}
-          className="w-full flex items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-medium text-white transition hover:bg-[#8F89FA]/80"
+    <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary px-4 py-12">
+      <div className="w-full max-w-md">
+        <div
+          data-testid="login-card"
+          className="bg-wk-bg-surface p-8 rounded-xl shadow-wk-lg space-y-8"
         >
-          <span className="text-lg">G</span>
-          Continue with Google
-        </button>
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-wk-accent rounded-full p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src="/chefs-hat-logo.svg" 
+                  alt="Remy Logo" 
+                  className="h-24 w-24"
+                />
+              </div>
+            </div>
+            <h1 className="text-4xl font-display italic text-wk-text-primary">Remy</h1>
+            <p className="text-wk-text-secondary font-body mt-3">Log in to your cookbooks</p>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <label className="text-sm text-wk-text-secondary font-body">Email</label>
+              <Input
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-wk-text-secondary font-body">Password</label>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-wk-error/40 bg-wk-error/10 px-4 py-3 text-sm text-wk-error font-body">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={!isFormValid || isSubmitting}
+              className="w-full"
+            >
+              {isSubmitting ? 'Logging in...' : 'Log In'}
+            </Button>
+          </form>
+
+          <div className="flex items-center justify-between text-sm">
+            <Link
+              href="/forgot-password"
+              className="text-wk-text-secondary hover:text-wk-accent transition-colors"
+            >
+              Forgot password?
+            </Link>
+            <Link
+              href="/signup"
+              className="text-wk-text-secondary hover:text-wk-accent transition-colors"
+            >
+              Create an account
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-wk-border" />
+            <span className="text-xs uppercase tracking-[0.2em] text-wk-text-muted">or</span>
+            <div className="h-px flex-1 bg-wk-border" />
+          </div>
+
+          <Button
+            variant="secondary"
+            onClick={signInWithGoogle}
+            className="w-full"
+          >
+            <span className="text-lg mr-2">G</span>
+            Continue with Google
+          </Button>
+        </div>
       </div>
     </div>
   )

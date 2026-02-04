@@ -7,13 +7,14 @@ import { supabase } from '@acme/db/client'
 import PushNotificationPrompt from '../../components/shared/PushNotificationPrompt'
 import RecipeCard from '../../components/features/recipe/RecipeCard'
 import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'
-import { BookOpen, Search, Filter, Settings } from "lucide-react"
+import { Navigation } from '../../components/shared/Navigation'
+import { Search, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 
 export default function Cookbooks() {
-  const { user, signOut, loading } = useAuth()
+  const { user, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
   const router = useRouter()
@@ -376,8 +377,8 @@ export default function Cookbooks() {
   // Show loading until client-side hydration is complete
   if (!isClient || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary">Loading...</div>
       </div>
     )
   }
@@ -385,102 +386,36 @@ export default function Cookbooks() {
   // This should rarely be seen since we redirect above, but just in case
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#14151a]">
-        <div className="text-lg text-white">Redirecting to sign in...</div>
+      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
+        <div className="text-lg text-wk-text-primary">Redirecting to sign in...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#14151a] text-white">
+    <div className="min-h-screen bg-wk-bg-primary text-wk-text-primary">
       {/* Navigation */}
-      <header className="container mx-auto px-4 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="bg-[#FF3A25] rounded-md p-1.5">
-            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12V15C21 18.3137 18.3137 21 15 21H3V12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="3" fill="currentColor"/>
-              <path d="M12 9C10.3431 9 9 10.3431 9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="text-2xl font-serif italic">Remy</span>
-        </div>
-
-        <nav className="hidden md:flex items-center gap-8">
-          <button onClick={() => router.push('/cookbooks')} className="text-white hover:text-white transition-colors">
-            Cookbooks
-          </button>
-          <button onClick={() => router.push('/meal-planner')} className="text-white/80 hover:text-white transition-colors">
-            Meal Planner
-          </button>
-          <button onClick={() => router.push('/grocery-list')} className="text-white/80 hover:text-white transition-colors">
-            Grocery Lists
-          </button>
-          <button onClick={() => router.push('/discover')} className="text-white/80 hover:text-white transition-colors">
-            Discover
-          </button>
-        </nav>
-
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-white/70">Welcome back, {user.email?.split('@')[0]}!</div>
-          <button
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            onClick={() => router.push('/settings')}
-          >
-            <Settings className="h-5 w-5 text-white/70 hover:text-white" />
-          </button>
-          <button
-            className="px-6 py-2 bg-[#FF3A25] hover:bg-[#FF3A25]/90 text-white font-medium rounded-full transition-colors"
-            onClick={signOut}
-          >
-            Sign Out
-          </button>
-        </div>
-      </header>
+      <Navigation currentPath="/cookbooks" />
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-8 md:py-12 text-center">
-        <div className="relative inline-block">
-          <h1 className="text-7xl md:text-9xl font-bold italic text-[#a5a6ff] tracking-tight font-serif relative z-20">
-            RECIPES
-          </h1>
-          {/* Star decoration overlapping text on the left */}
-          <svg className="absolute -left-12 -top-4 md:-left-16 md:-top-8 w-32 md:w-40 h-32 md:h-40 text-[#FF3A25]" viewBox="0 0 100 100" fill="none">
-            <path 
-              d="M50 5 L61 35 L95 35 L70 55 L81 85 L50 65 L19 85 L30 55 L5 35 L39 35 Z" 
-              stroke="currentColor" 
-              strokeWidth="6"
-              fill="none"
-              transform="rotate(15 50 50)"
-            />
-          </svg>
-          {/* Books icon */}
-          <div className="absolute -right-12 -bottom-8 md:-right-20 md:-bottom-8 w-24 md:w-32 z-0">
-            <div className="relative w-full h-full">
-              <div className="absolute transform rotate-12">
-                <BookOpen className="h-24 md:h-32 w-24 md:w-32 text-[#FF3A25]" strokeWidth={1.5} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-2xl mx-auto mt-8 md:mt-12 p-6 md:p-8 rounded-xl bg-[#1e1f26]">
-          <h2 className="text-2xl md:text-3xl font-bold mb-2">Your Cookbooks</h2>
-          <p className="text-white/70 mb-6 relative z-20">
-            Extract recipes from any website and organize them in your personal cookbooks
+      <section className="container mx-auto px-4 py-8 md:py-10 text-center">
+        <div className="max-w-2xl mx-auto p-6 md:p-8 rounded-xl bg-wk-bg-surface shadow-wk">
+          <h1 className="text-h1 text-wk-text-primary mb-2 font-display">Cookbook</h1>
+          <p className="text-wk-text-secondary font-body mb-6">
+            Extract recipes from any website and organize them here
           </p>
 
           <div className="flex gap-2">
             <Input
               placeholder="Paste a recipe URL here..."
-              className="bg-[#14151a] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0"
+              className="bg-wk-bg-surface border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={handleKeyPress}
               disabled={isExtracting}
             />
             <Button 
-              className="bg-[#FF3A25] hover:bg-[#FF3A25]/90 text-white"
+              variant="default"
               onClick={handleSubmit}
               disabled={!url.trim() || isExtracting}
             >
@@ -495,40 +430,40 @@ export default function Cookbooks() {
         {/* Search and Filter Bar */}
         <div className="flex gap-4 mb-6">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-wk-text-secondary h-5 w-5" />
             <Input
               type="text"
               placeholder="Search recipes by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-[#1e1f26] border-none focus-visible:ring-[#FF3A25] focus-visible:ring-offset-0 text-white placeholder:text-gray-500"
+              className="pl-10 bg-wk-bg-surface border-wk-border focus-visible:ring-wk-accent focus-visible:ring-offset-0 text-wk-text-primary placeholder:text-wk-text-secondary"
             />
           </div>
           <div className="relative">
             <button
               onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1e1f26] rounded-md hover:bg-[#1e1f26]/80 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-wk-bg-surface border border-wk-border rounded-md hover:bg-wk-bg-surface-hover transition-colors text-wk-text-primary"
             >
               <Filter className="h-5 w-5" />
               <span className="capitalize">{filterOption}</span>
             </button>
             {showFilterMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-[#1e1f26] rounded-md shadow-lg z-10 border border-white/10">
+              <div className="absolute right-0 mt-2 w-48 bg-wk-bg-surface rounded-md shadow-wk z-10 border border-wk-border">
                 <button
                   onClick={() => { setFilterOption('recent'); setShowFilterMenu(false); }}
-                  className="block w-full text-left px-4 py-2 hover:bg-white/10 transition-colors"
+                  className="block w-full text-left px-4 py-2 hover:bg-wk-bg-surface-hover transition-colors text-wk-text-primary"
                 >
                   Most Recent
                 </button>
                 <button
                   onClick={() => { setFilterOption('oldest'); setShowFilterMenu(false); }}
-                  className="block w-full text-left px-4 py-2 hover:bg-white/10 transition-colors"
+                  className="block w-full text-left px-4 py-2 hover:bg-wk-bg-surface-hover transition-colors text-wk-text-primary"
                 >
                   Oldest
                 </button>
                 <button
                   onClick={() => { setFilterOption('alphabetical'); setShowFilterMenu(false); }}
-                  className="block w-full text-left px-4 py-2 hover:bg-white/10 transition-colors"
+                  className="block w-full text-left px-4 py-2 hover:bg-wk-bg-surface-hover transition-colors text-wk-text-primary"
                 >
                   Alphabetical
                 </button>

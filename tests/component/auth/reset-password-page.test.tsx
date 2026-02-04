@@ -60,11 +60,12 @@ describe('Reset password page', () => {
     authState.user = { id: 'user-1' }
     render(<ResetPasswordPage />)
 
+    // The heading says "New Password"
     expect(
-      await screen.findByText(/set your new password/i)
+      await screen.findByRole('heading', { name: /new password/i })
     ).toBeInTheDocument()
     expect(
-      screen.getByPlaceholderText(/minimum 8 characters/i)
+      screen.getByPlaceholderText(/enter your new password/i)
     ).toBeInTheDocument()
   })
 
@@ -74,35 +75,36 @@ describe('Reset password page', () => {
     render(<ResetPasswordPage />)
 
     await user.type(
-      screen.getByPlaceholderText(/minimum 8 characters/i),
+      screen.getByPlaceholderText(/enter your new password/i),
       'Password1'
     )
     await user.type(
-      screen.getByPlaceholderText(/re-enter password/i),
+      screen.getByPlaceholderText(/re-enter your password/i),
       'Password2'
     )
-    await user.click(screen.getByRole('button', { name: /update password/i }))
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
 
     expect(await screen.findByText(/do not match/i)).toBeInTheDocument()
     expect(authState.updatePassword).not.toHaveBeenCalled()
   })
 
-  it('updates password and redirects on success', async () => {
+  it('updates password and shows success state', async () => {
     const user = userEvent.setup()
     authState.user = { id: 'user-1' }
     render(<ResetPasswordPage />)
 
     await user.type(
-      screen.getByPlaceholderText(/minimum 8 characters/i),
+      screen.getByPlaceholderText(/enter your new password/i),
       'Password1'
     )
     await user.type(
-      screen.getByPlaceholderText(/re-enter password/i),
+      screen.getByPlaceholderText(/re-enter your password/i),
       'Password1'
     )
-    await user.click(screen.getByRole('button', { name: /update password/i }))
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
 
     expect(authState.updatePassword).toHaveBeenCalledWith('Password1')
-    expect(replace).toHaveBeenCalledWith('/cookbooks')
+    // New implementation shows success state instead of immediate redirect
+    expect(await screen.findByText(/password updated/i)).toBeInTheDocument()
   })
 })
