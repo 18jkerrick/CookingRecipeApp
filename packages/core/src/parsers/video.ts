@@ -559,7 +559,7 @@ async function tryConstructTikTokPhotoUrls(originalUrl: string): Promise<string[
 async function convertImageFormat(buffer: Buffer): Promise<Buffer | null> {
   try {
     // Try to import sharp for image conversion
-    const sharp = await import('sharp');
+    const sharp = await import(/* webpackIgnore: true */ 'sharp');
     
     // Detect current format
     const metadata = await sharp.default(buffer).metadata();

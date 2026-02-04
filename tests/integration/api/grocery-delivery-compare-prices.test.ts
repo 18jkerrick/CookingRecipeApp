@@ -58,7 +58,6 @@ describe('/api/grocery-delivery/compare-prices', () => {
 
     expect(response.status).toBe(200)
     expect(data.comparison).toBeTruthy()
-    expect(data.comparison.amazonFresh).toBeTruthy()
     expect(data.comparison.instacart).toBeTruthy()
   })
 })

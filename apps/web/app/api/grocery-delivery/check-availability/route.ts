@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 // Simple availability check based on ZIP code prefixes
 // This is a simplified version - in reality, you'd check against actual service areas
 const serviceAvailability: { [service: string]: string[] } = {
-  amazonFresh: ['100', '111', '900', '941', '981', '606', '773', '917', '212', '310', '415', '206', '020', '021', '022'],
-  instacart: [], // Available almost everywhere
-  shipt: [], // Wide availability  
-  gopuff: ['100', '111', '900', '941', '191', '606', '773', '212', '718', '347', '020', '021', '022', '191', '192'],
-  walmartPlus: [] // Wide availability
+  // amazonFresh: ['100', '111', '900', '941', '981', '606', '773', '917', '212', '310', '415', '206', '020', '021', '022'],
+  instacart: [] // Available almost everywhere
+  // shipt: [], // Wide availability  
+  // gopuff: ['100', '111', '900', '941', '191', '606', '773', '212', '718', '347', '020', '021', '022', '191', '192'],
+  // walmartPlus: [] // Wide availability
 };
 
 export async function POST(request: NextRequest) {
@@ -19,11 +19,11 @@ export async function POST(request: NextRequest) {
     }
 
     const availability = {
-      amazonFresh: checkServiceAvailability('amazonFresh', zipCode),
+      // amazonFresh: checkServiceAvailability('amazonFresh', zipCode),
       instacart: checkServiceAvailability('instacart', zipCode),
-      shipt: checkServiceAvailability('shipt', zipCode),
-      gopuff: checkServiceAvailability('gopuff', zipCode),
-      walmartPlus: checkServiceAvailability('walmartPlus', zipCode)
+      // shipt: checkServiceAvailability('shipt', zipCode),
+      // gopuff: checkServiceAvailability('gopuff', zipCode),
+      // walmartPlus: checkServiceAvailability('walmartPlus', zipCode)
     };
 
     return NextResponse.json({ availability });

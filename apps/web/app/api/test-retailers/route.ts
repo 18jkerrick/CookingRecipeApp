@@ -87,7 +87,7 @@ async function testRetailerWithHtml(retailer: any): Promise<any> {
       retailer: retailer.name,
       retailerKey: retailer.retailer_key || retailer.key,
       url: `https://customers.dev.instacart.tools/store/recipes/7289260?retailer_key=${retailer.retailer_key || retailer.key}`,
-      error: error.toString(),
+      error: error instanceof Error ? error.message : String(error),
       htmlSample: null
     };
   }

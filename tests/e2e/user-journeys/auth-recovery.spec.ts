@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Auth Recovery Journey', () => {
   test.use({ storageState: { cookies: [], origins: [] } })
   test.beforeEach(async ({ page }) => {
-    await page.route('**/auth/v1/recover', async (route) => {
+    await page.route('**/auth/v1/recover**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

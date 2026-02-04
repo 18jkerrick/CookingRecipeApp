@@ -7,12 +7,12 @@ interface GroceryItem {
   unit?: string;
 }
 
-export function getAmazonFreshUrl(items: GroceryItem[], zipCode: string): string {
-  // Amazon Fresh uses the main Amazon site with Fresh filter
-  // We can create a search query with the items
-  const searchQuery = items.map(item => item.name).join(' ');
-  return `https://www.amazon.com/alm/storefront?almBrandId=QW1hem9uIEZyZXNo`;
-}
+// export function getAmazonFreshUrl(items: GroceryItem[], zipCode: string): string {
+//   // Amazon Fresh uses the main Amazon site with Fresh filter
+//   // We can create a search query with the items
+//   const searchQuery = items.map(item => item.name).join(' ');
+//   return `https://www.amazon.com/alm/storefront?almBrandId=QW1hem9uIEZyZXNo`;
+// }
 
 export function getInstacartUrl(items: GroceryItem[], zipCode: string): string {
   // Since Instacart doesn't have a public API for pre-populated lists,
@@ -54,23 +54,23 @@ export function getInstacartRecipeUrl(items: GroceryItem[], recipeId?: string): 
   return `${baseUrl}/shop-ingredients?${params.toString()}`;
 }
 
-export function getShiptUrl(items: GroceryItem[], zipCode: string): string {
-  // Shipt doesn't support deep linking with items
-  // Redirect to main site where they can create a list after login
-  return `https://www.shipt.com/`;
-}
+// export function getShiptUrl(items: GroceryItem[], zipCode: string): string {
+//   // Shipt doesn't support deep linking with items
+//   // Redirect to main site where they can create a list after login
+//   return `https://www.shipt.com/`;
+// }
 
-export function getGoPuffUrl(items: GroceryItem[], zipCode: string): string {
-  // GoPuff has limited deep linking
-  // Best to redirect to their main site
-  return `https://gopuff.com/`;
-}
+// export function getGoPuffUrl(items: GroceryItem[], zipCode: string): string {
+//   // GoPuff has limited deep linking
+//   // Best to redirect to their main site
+//   return `https://gopuff.com/`;
+// }
 
-export function getWalmartUrl(items: GroceryItem[], zipCode: string): string {
-  // Walmart supports search queries
-  const searchQuery = items.map(item => item.name).join(' ');
-  return `https://www.walmart.com/grocery/search?query=${encodeURIComponent(searchQuery)}`;
-}
+// export function getWalmartUrl(items: GroceryItem[], zipCode: string): string {
+//   // Walmart supports search queries
+//   const searchQuery = items.map(item => item.name).join(' ');
+//   return `https://www.walmart.com/grocery/search?query=${encodeURIComponent(searchQuery)}`;
+// }
 
 // Helper to check basic availability by ZIP code
 export function checkServiceAvailability(service: string, zipCode: string): boolean {
@@ -78,11 +78,11 @@ export function checkServiceAvailability(service: string, zipCode: string): bool
   // actual service areas or use their availability APIs
   
   const serviceAreas: { [key: string]: string[] } = {
-    amazonFresh: ['100', '111', '900', '941', '981', '606', '773', '917', '212', '310', '415', '206'],
-    instacart: [], // Available almost everywhere
-    shipt: [], // Wide availability
-    gopuff: ['100', '111', '900', '941', '191', '606', '773', '212', '718', '347'],
-    walmartPlus: [] // Wide availability
+    // amazonFresh: ['100', '111', '900', '941', '981', '606', '773', '917', '212', '310', '415', '206'],
+    instacart: [] // Available almost everywhere
+    // shipt: [], // Wide availability
+    // gopuff: ['100', '111', '900', '941', '191', '606', '773', '212', '718', '347'],
+    // walmartPlus: [] // Wide availability
   };
   
   const prefixes = serviceAreas[service];

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getIngredientInfo } from '@acme/core/utils';
 
 // Instacart Partner API configuration
 const INSTACART_API_KEY = process.env.INSTACART_API_KEY;
@@ -7,6 +8,18 @@ const INSTACART_DEV_BASE = 'https://connect.dev.instacart.tools/idp/v1';
 
 // Use development environment for testing
 const API_BASE = process.env.NODE_ENV === 'production' ? INSTACART_API_BASE : INSTACART_DEV_BASE;
+
+interface InstacartProduct {
+  id: string;
+  name: string;
+  brand?: string;
+  size?: string;
+  price?: number;
+  image_url?: string;
+  available: boolean;
+  retailer: string;
+  aisle?: string;
+}
 
 
 
@@ -607,7 +620,7 @@ async function extractRetailersFromRecipePage(recipeUrl: string): Promise<any[]>
     const retailers: any[] = [];
     
     // Method 1: Look for store selector data in script tags
-    const scriptMatches = html.match(/<script[^>]*>(.*?)<\/script>/gs);
+    const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/g);
     if (scriptMatches) {
       for (const script of scriptMatches) {
         // Look for store/retailer data - try different patterns

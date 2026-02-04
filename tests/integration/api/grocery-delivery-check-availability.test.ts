@@ -26,6 +26,6 @@ describe('/api/grocery-delivery/check-availability', () => {
 
     expect(response.status).toBe(200)
     expect(data.availability).toBeTruthy()
-    expect(typeof data.availability.amazonFresh).toBe('boolean')
+    expect(typeof data.availability.instacart).toBe('boolean')
   })
 })

@@ -339,10 +339,21 @@ async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
       }
     });
     
+    const normalizedIngredients: NormalizedIngredient[] = validNormalized.map(
+      (ingredient) => ({
+        quantity: ingredient.quantity ?? ingredient.range?.min ?? 0,
+        unit: ingredient.unit,
+        ingredient: ingredient.ingredient,
+        preparation: ingredient.preparation,
+        notes: ingredient.notes,
+        original: ingredient.original,
+      })
+    );
+
     return {
       ...recipe,
       ingredients: cleanIngredients,
-      normalizedIngredients: validNormalized
+      normalizedIngredients,
     };
     
   } catch (error) {

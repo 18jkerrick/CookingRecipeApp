@@ -93,7 +93,9 @@ export default function BuyGroceriesModal({ isOpen, onClose, items, groceryListT
     // Capitalize ingredient name properly
     cleanName = cleanName
       .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .map((word: string) =>
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      )
       .join(' ')
 
     return { name: cleanName, quantity, unit }

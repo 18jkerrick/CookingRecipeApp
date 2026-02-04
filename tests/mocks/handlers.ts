@@ -42,14 +42,6 @@ export const handlers = [
       </body></html>`
     )
   }),
-  http.post('https://api.amazon.com/auth/o2/token', () => {
-    return HttpResponse.json({
-      access_token: 'test-access-token',
-      token_type: 'bearer',
-      expires_in: 3600,
-      refresh_token: 'test-refresh-token',
-    })
-  }),
   http.post('https://api.openai.com/v1/chat/completions', () => {
     return HttpResponse.json({
       choices: [
