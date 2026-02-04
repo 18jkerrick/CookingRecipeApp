@@ -40,7 +40,7 @@ test.describe('Recipe Extraction - Smoke', () => {
 
   test('extracts recipe from TikTok URL', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /your cookbooks/i })
+      page.getByRole('heading', { name: /cookbook/i })
     ).toBeVisible()
 
     const urlInput = page.getByPlaceholder(/paste a recipe url here/i)

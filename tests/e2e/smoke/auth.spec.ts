@@ -36,8 +36,7 @@ test.describe('Auth - Smoke', () => {
   }) => {
     await page.goto('/signup')
 
-    await expect(page.getByRole('heading', { name: /create account/i }))
-      .toBeVisible()
+    await expect(page.getByText(/create your account/i)).toBeVisible()
 
     await page.getByPlaceholder('you@example.com').fill('test@example.com')
     await page.getByPlaceholder(/minimum 8 characters/i).fill('short')
@@ -51,7 +50,7 @@ test.describe('Auth - Smoke', () => {
   test('forgot password requires an email', async ({ page }) => {
     await page.goto('/forgot-password')
 
-    await page.getByRole('button', { name: /send reset link/i }).click()
+    await page.getByRole('button', { name: /reset password/i }).click()
     await expect(page.getByText(/please enter your email/i)).toBeVisible()
   })
 

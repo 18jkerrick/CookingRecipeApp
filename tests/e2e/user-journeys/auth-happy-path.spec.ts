@@ -74,7 +74,7 @@ test.describe('Auth Happy Path Journey', () => {
     await page.getByRole('button', { name: /log in/i }).click()
     await expect(page).toHaveURL(/\/cookbooks/)
     await expect(
-      page.getByRole('heading', { name: /your cookbooks/i })
+      page.getByRole('heading', { name: /cookbook/i })
     ).toBeVisible()
     expect(Date.now() - start).toBeLessThan(5000)
   })

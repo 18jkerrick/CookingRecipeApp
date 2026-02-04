@@ -175,7 +175,7 @@ test.describe('Grocery List Merge Journey', () => {
 
   test('adds another recipe to an existing list', async ({ page }) => {
     await page.goto('/cookbooks')
-    await page.getByRole('button', { name: /grocery lists/i }).click()
+    await page.getByRole('link', { name: /grocery lists/i }).click()
     await expect(page).toHaveURL(/\/grocery-list/)
 
     await expect(page.getByText(/weeknight dinner/i)).toBeVisible()

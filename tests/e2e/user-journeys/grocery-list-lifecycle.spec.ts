@@ -169,7 +169,7 @@ test.describe('Grocery List Lifecycle Journey', () => {
     if (await dismissPrompt.isVisible()) {
       await dismissPrompt.click()
     }
-    await page.getByRole('button', { name: /grocery lists/i }).click()
+    await page.getByRole('link', { name: /grocery lists/i }).click()
     await expect(page).toHaveURL(/\/grocery-list/)
 
     await expect(

@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:all": "pnpm test:coverage && pnpm test:e2e",
     "lt": "pnpm -C apps/web lt"
   },
   "dependencies": {
