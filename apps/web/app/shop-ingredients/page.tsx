@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Copy, CheckCircle } from 'lucide-react'
 
 interface Ingredient {
@@ -9,7 +9,7 @@ interface Ingredient {
   quantity: string
 }
 
-export default function ShopIngredientsPage() {
+function ShopIngredientsContent() {
   const searchParams = useSearchParams()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
@@ -131,5 +131,19 @@ export default function ShopIngredientsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ShopIngredientsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#14151a] text-white">
+          <div className="text-lg">Loading...</div>
+        </div>
+      }
+    >
+      <ShopIngredientsContent />
+    </Suspense>
   )
 }

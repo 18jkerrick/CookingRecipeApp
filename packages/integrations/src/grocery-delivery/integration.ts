@@ -4,7 +4,7 @@
 import { GroceryItem, GroceryList } from './groceryStorage';
 
 // Delivery service types
-export type DeliveryService = 'instacart' | 'amazon-fresh' | 'walmart' | 'gopuff' | 'shipt';
+export type DeliveryService = 'instacart';
 
 // Service configuration
 export interface ServiceConfig {
@@ -36,59 +36,60 @@ export const DELIVERY_SERVICES: Record<DeliveryService, ServiceConfig> = {
       deliveryScheduling: true,
       substituteOptions: true
     }
-  },
-  'amazon-fresh': {
-    name: 'Amazon Fresh',
-    icon: '📦',
-    color: '#FF9900',
-    deepLinkBase: 'https://www.amazon.com/fresh/cart',
-    requiresAuth: true,
-    features: {
-      realTimeInventory: true,
-      priceEstimates: true,
-      deliveryScheduling: true,
-      substituteOptions: false
-    }
-  },
-  'walmart': {
-    name: 'Walmart Grocery',
-    icon: '⭐',
-    color: '#0071CE',
-    deepLinkBase: 'https://www.walmart.com/grocery/cart',
-    requiresAuth: true,
-    features: {
-      realTimeInventory: true,
-      priceEstimates: true,
-      deliveryScheduling: true,
-      substituteOptions: true
-    }
-  },
-  'gopuff': {
-    name: 'Gopuff',
-    icon: '🚀',
-    color: '#5C2D91',
-    deepLinkBase: 'https://gopuff.com/cart',
-    requiresAuth: true,
-    features: {
-      realTimeInventory: true,
-      priceEstimates: true,
-      deliveryScheduling: false,
-      substituteOptions: false
-    }
-  },
-  'shipt': {
-    name: 'Shipt',
-    icon: '🛒',
-    color: '#36C95F',
-    deepLinkBase: 'https://www.shipt.com/app/cart',
-    requiresAuth: true,
-    features: {
-      realTimeInventory: true,
-      priceEstimates: true,
-      deliveryScheduling: true,
-      substituteOptions: true
-    }
   }
+  // TODO: add amazonfresh, walmart, gopuff, shipt
+  // 'amazon-fresh': {
+  //   name: 'Amazon Fresh',
+  //   icon: '📦',
+  //   color: '#FF9900',
+  //   deepLinkBase: 'https://www.amazon.com/fresh/cart',
+  //   requiresAuth: true,
+  //   features: {
+  //     realTimeInventory: true,
+  //     priceEstimates: true,
+  //     deliveryScheduling: true,
+  //     substituteOptions: false
+  //   }
+  // },
+  // 'walmart': {
+  //   name: 'Walmart Grocery',
+  //   icon: '⭐',
+  //   color: '#0071CE',
+  //   deepLinkBase: 'https://www.walmart.com/grocery/cart',
+  //   requiresAuth: true,
+  //   features: {
+  //     realTimeInventory: true,
+  //     priceEstimates: true,
+  //     deliveryScheduling: true,
+  //     substituteOptions: true
+  //   }
+  // },
+  // 'gopuff': {
+  //   name: 'Gopuff',
+  //   icon: '🚀',
+  //   color: '#5C2D91',
+  //   deepLinkBase: 'https://gopuff.com/cart',
+  //   requiresAuth: true,
+  //   features: {
+  //     realTimeInventory: true,
+  //     priceEstimates: true,
+  //     deliveryScheduling: false,
+  //     substituteOptions: false
+  //   }
+  // },
+  // 'shipt': {
+  //   name: 'Shipt',
+  //   icon: '🛒',
+  //   color: '#36C95F',
+  //   deepLinkBase: 'https://www.shipt.com/app/cart',
+  //   requiresAuth: true,
+  //   features: {
+  //     realTimeInventory: true,
+  //     priceEstimates: true,
+  //     deliveryScheduling: true,
+  //     substituteOptions: true
+  //   }
+  // }
 };
 
 // Universal cart format for cross-platform compatibility
@@ -121,7 +122,7 @@ export interface ProductMapping {
   serviceName: DeliveryService;
   internalName: string;
   serviceProductId: string;
-  serviceName: string;
+  serviceItemName: string;
   confidence: number; // 0-1 confidence score
 }
 
@@ -137,7 +138,7 @@ export const searchProductInService = async (
       serviceName: service,
       internalName: item.name,
       serviceProductId: `${service}-${Date.now()}`,
-      serviceName: item.name,
+      serviceItemName: item.name,
       confidence: 0.95
     }
   ];
@@ -163,32 +164,33 @@ export const generateDeepLink = (
       }));
       return `${baseUrl}?items=${encodeURIComponent(JSON.stringify(instacartItems))}&zip=${zipCode || ''}`;
       
-    case 'amazon-fresh':
-      // Amazon Fresh uses ASIN-based cart additions
-      const amazonParams = cartItems
-        .map(item => `add=${encodeURIComponent(item.name)},${item.quantity}`)
-        .join('&');
-      return `${baseUrl}?${amazonParams}`;
+    // TODO: add amazonfresh, walmart, gopuff, shipt
+    // case 'amazon-fresh':
+    //   // Amazon Fresh uses ASIN-based cart additions
+    //   const amazonParams = cartItems
+    //     .map(item => `add=${encodeURIComponent(item.name)},${item.quantity}`)
+    //     .join('&');
+    //   return `${baseUrl}?${amazonParams}`;
       
-    case 'walmart':
-      // Walmart uses item IDs and quantities
-      const walmartParams = cartItems
-        .map(item => `item=${encodeURIComponent(item.name)}&qty=${item.quantity}`)
-        .join('&');
-      return `${baseUrl}?${walmartParams}&zip=${zipCode || ''}`;
+    // case 'walmart':
+    //   // Walmart uses item IDs and quantities
+    //   const walmartParams = cartItems
+    //     .map(item => `item=${encodeURIComponent(item.name)}&qty=${item.quantity}`)
+    //     .join('&');
+    //   return `${baseUrl}?${walmartParams}&zip=${zipCode || ''}`;
       
-    case 'gopuff':
-      // Gopuff uses a simple item list
-      const gopuffItems = cartItems.map(item => item.name).join(',');
-      return `${baseUrl}?items=${encodeURIComponent(gopuffItems)}`;
+    // case 'gopuff':
+    //   // Gopuff uses a simple item list
+    //   const gopuffItems = cartItems.map(item => item.name).join(',');
+    //   return `${baseUrl}?items=${encodeURIComponent(gopuffItems)}`;
       
-    case 'shipt':
-      // Shipt uses a cart ID system
-      const shiptItems = cartItems.map(item => ({
-        product: item.name,
-        quantity: item.quantity
-      }));
-      return `${baseUrl}?cart=${encodeURIComponent(JSON.stringify(shiptItems))}`;
+    // case 'shipt':
+    //   // Shipt uses a cart ID system
+    //   const shiptItems = cartItems.map(item => ({
+    //     product: item.name,
+    //     quantity: item.quantity
+    //   }));
+    //   return `${baseUrl}?cart=${encodeURIComponent(JSON.stringify(shiptItems))}`;
       
     default:
       return baseUrl;

@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { X, ExternalLink, Clock, DollarSign, Check } from 'lucide-react'
-import { 
-  DeliveryService, 
-  DELIVERY_SERVICES, 
-  UniversalCartItem,
+import {
+  DeliveryService,
+  DELIVERY_SERVICES,
   PriceEstimate,
   generateDeepLink,
   estimatePrices,
-  convertToUniversalCart
-} from '../../../../../lib/deliveryIntegration'
-import { GroceryList } from '../../../../../lib/groceryStorage'
+  convertToUniversalCart,
+} from '@acme/integrations/grocery-delivery/integration'
+import { GroceryList } from '@acme/integrations/grocery-delivery/groceryStorage'
 
 interface DeliveryServiceModalProps {
   isOpen: boolean

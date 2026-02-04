@@ -330,7 +330,9 @@ export const parseIngredientForGrocery = (ingredient: string, normalizedData?: a
     // Capitalize each word for better display
     cleanIngredientName = cleanIngredientName
       .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .map((word: string) =>
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      )
       .join(' ');
 
     console.log(`🧹 Cleaned ingredient name: "${normalizedData.ingredient}" → "${cleanIngredientName}"`);

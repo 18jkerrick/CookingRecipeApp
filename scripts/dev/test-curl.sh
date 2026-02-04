@@ -9,7 +9,7 @@ echo "Testing Instacart Partner API"
 echo "API Key: ${API_KEY:0:20}..."
 echo "Base URL: $BASE_URL"
 
-# Test 1: Retailers API
+# Test 1: Instacart Retailers API
 echo -e "\n=== Testing Retailers API ==="
 curl -v --request GET \
   --url "${BASE_URL}/retailers?postal_code=94105&country_code=US" \
@@ -17,7 +17,7 @@ curl -v --request GET \
   --header "Authorization: Bearer ${API_KEY}"
 
 echo -e "\n\n=== Testing Recipe API ==="
-# Test 2: Recipe API
+# Test 2: Instacart Recipe API
 curl -v --request POST \
   --url "${BASE_URL}/products/recipe" \
   --header "Accept: application/json" \

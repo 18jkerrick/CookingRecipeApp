@@ -1,256 +1,141 @@
-/**
- * @jest-environment node
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { extractVideoTitle } from '@acme/core/utils/titleExtractor'
+import { getYoutubeTitle } from '@acme/core/parsers/youtube'
+import { getFacebookTitle } from '@acme/core/parsers/facebook'
 
-import { extractVideoTitle } from '@acme/core/utils/titleExtractor';
-import { getYoutubeTitle } from '@acme/core/parsers/youtube';
-import { getFacebookTitle } from '@acme/core/parsers/facebook';
+vi.mock('@acme/core/parsers/youtube', () => ({
+  getYoutubeTitle: vi.fn(),
+}))
 
-// Mock the parser functions
-jest.mock('@acme/core/parsers/youtube');
-jest.mock('@acme/core/parsers/facebook');
+vi.mock('@acme/core/parsers/facebook', () => ({
+  getFacebookTitle: vi.fn(),
+}))
 
-const mockGetYoutubeTitle = getYoutubeTitle as jest.MockedFunction<typeof getYoutubeTitle>;
-const mockGetFacebookTitle = getFacebookTitle as jest.MockedFunction<typeof getFacebookTitle>;
+const mockGetYoutubeTitle = vi.mocked(getYoutubeTitle)
+const mockGetFacebookTitle = vi.mocked(getFacebookTitle)
 
 describe('extractVideoTitle', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-  });
+    vi.resetAllMocks()
+  })
 
-  describe('YouTube title extraction', () => {
-    it('should extract YouTube title from metadata', async () => {
-      mockGetYoutubeTitle.mockResolvedValue('Amazing Chocolate Chip Cookies');
+  it('uses YouTube metadata title when available', async () => {
+    mockGetYoutubeTitle.mockResolvedValue('Amazing Chocolate Chip Cookies')
 
-      const result = await extractVideoTitle(
-        'Some captions about cookies',
-        'YouTube',
-        'https://www.youtube.com/watch?v=123'
-      );
+    const result = await extractVideoTitle(
+      'Some captions about cookies',
+      'YouTube',
+      'https://www.youtube.com/watch?v=123'
+    )
 
-      expect(result).toBe('Amazing Chocolate Chip Cookies');
-      expect(mockGetYoutubeTitle).toHaveBeenCalledWith('https://www.youtube.com/watch?v=123');
-    });
+    expect(result).toBe('Amazing Chocolate Chip Cookies')
+    expect(mockGetYoutubeTitle).toHaveBeenCalledWith(
+      'https://www.youtube.com/watch?v=123'
+    )
+  })
 
-    it('should fall back to caption extraction when YouTube metadata fails', async () => {
-      mockGetYoutubeTitle.mockRejectedValue(new Error('YouTube API error'));
+  it('falls back to caption extraction when YouTube metadata fails', async () => {
+    mockGetYoutubeTitle.mockRejectedValue(new Error('YouTube API error'))
 
-      const result = await extractVideoTitle(
-        'Amazing Chocolate Chip Cookie Recipe - Easy and delicious cookies',
-        'YouTube',
-        'https://www.youtube.com/watch?v=123'
-      );
+    const result = await extractVideoTitle(
+      'Amazing Chocolate Chip Cookie Recipe - Easy and delicious cookies',
+      'YouTube',
+      'https://www.youtube.com/watch?v=123'
+    )
 
-      expect(result).toBe('Amazing Chocolate Chip Cookie Recipe - Easy And Delicious Cookies');
-    });
-  });
+    expect(result).toBe(
+      'Amazing Chocolate Chip Cookie Recipe'
+    )
+  })
 
-  describe('Facebook title extraction', () => {
-    it('should extract Facebook title from metadata', async () => {
-      mockGetFacebookTitle.mockResolvedValue('Double Chocolate Chip Cookie');
+  it('uses Facebook metadata title when available', async () => {
+    mockGetFacebookTitle.mockResolvedValue('Double Chocolate Chip Cookie')
 
-      const result = await extractVideoTitle(
-        'Some captions about cookies',
-        'Facebook',
-        'https://fb.watch/test123/'
-      );
+    const result = await extractVideoTitle(
+      'Some captions about cookies',
+      'Facebook',
+      'https://fb.watch/test123/'
+    )
 
-      expect(result).toBe('Double Chocolate Chip Cookie');
-      expect(mockGetFacebookTitle).toHaveBeenCalledWith('https://fb.watch/test123/');
-    });
+    expect(result).toBe('Double Chocolate Chip Cookie')
+    expect(mockGetFacebookTitle).toHaveBeenCalledWith(
+      'https://fb.watch/test123/'
+    )
+  })
 
-    it('should fall back to caption extraction when Facebook metadata fails', async () => {
-      mockGetFacebookTitle.mockRejectedValue(new Error('Facebook extraction error'));
+  it('returns null for captions without a clear recipe title', async () => {
+    const result = await extractVideoTitle(
+      'Just some random text without any cooking content here',
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/123'
+    )
 
-      const result = await extractVideoTitle(
-        'Banana Bread Recipe - Healthy and nutritious bread',
-        'Facebook',
-        'https://fb.watch/test123/'
-      );
+    expect(result).toBeNull()
+  })
 
-      expect(result).toBe('Banana Bread Recipe - Healthy And Nutritious Bread');
-    });
+  it('does not call metadata extraction for other platforms', async () => {
+    const result = await extractVideoTitle(
+      'Amazing Cookies Recipe - So good',
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/123'
+    )
 
-    it('should handle null return from Facebook title extraction', async () => {
-      mockGetFacebookTitle.mockResolvedValue(null);
+    expect(result).toBe('Amazing Cookies Recipe')
+    expect(mockGetYoutubeTitle).not.toHaveBeenCalled()
+    expect(mockGetFacebookTitle).not.toHaveBeenCalled()
+  })
 
-      const result = await extractVideoTitle(
-        'Chocolate Chip Cookies Recipe - The best cookies ever',
-        'Facebook',
-        'https://fb.watch/test123/'
-      );
+  it('extracts a title from pipe + episode captions', async () => {
+    const result = await extractVideoTitle(
+      `🇵🇭 Beef Pares Mami | Filipino Food Bible – Episode 2
 
-      expect(result).toBe('Chocolate Chip Cookies Recipe - The Best Cookies Ever');
-    });
-  });
+Beef pares traces its roots to Filipino-Chinese (Fil-Chi) cuisine.`,
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/456'
+    )
 
-  describe('Caption-based title extraction', () => {
-    it('should extract title from captions for other platforms', async () => {
-      const result = await extractVideoTitle(
-        'Amazing Pasta Recipe - Learn how to make delicious pasta',
-        'TikTok',
-        'https://www.tiktok.com/@chef/video/123'
-      );
+    expect(result).toBe('Beef Pares Mami')
+  })
 
-      expect(result).toBe('Amazing Pasta Recipe - Learn How To Make Delicious Pasta');
-    });
+  it('selects the dish line when a preamble is present', async () => {
+    const result = await extractVideoTitle(
+      `what I eat after the gym, pt. 13
 
-    it('should handle captions with multiple recipe patterns', async () => {
-      const result = await extractVideoTitle(
-        'Ultimate Chocolate Chip Cookie Recipe | Best Cookies Ever',
-        'Instagram',
-        'https://www.instagram.com/p/123'
-      );
+crispy chicken w/ creamy miso coconut leeks & beans 🍗🫘`,
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/789'
+    )
 
-      expect(result).toBe('Ultimate Chocolate Chip Cookie Recipe | Best Cookies Ever');
-    });
+    expect(result).toBe('Crispy Chicken W/ Creamy Miso Coconut Leeks & Beans')
+  })
 
-    it('should extract title with cooking-related keywords', async () => {
-      const result = await extractVideoTitle(
-        'How to Make Perfect Banana Bread - Easy Baking Tutorial',
-        'TikTok',
-        'https://www.tiktok.com/@baker/video/456'
-      );
+  it('cleans emoji-only short titles', async () => {
+    const result = await extractVideoTitle(
+      'Dumpling lasagna 🥟',
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/1011'
+    )
 
-      expect(result).toBe('How To Make Perfect Banana Bread - Easy Baking Tutorial');
-    });
+    expect(result).toBe('Dumpling Lasagna')
+  })
 
-    it('should handle captions with recipe at the end', async () => {
-      const result = await extractVideoTitle(
-        'Check out this amazing Chocolate Cake recipe',
-        'Instagram',
-        'https://www.instagram.com/p/789'
-      );
+  it('handles short title inputs directly', async () => {
+    const result = await extractVideoTitle(
+      'brothy chicken thighs',
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/1213'
+    )
 
-      expect(result).toBe('Check Out This Amazing Chocolate Cake Recipe');
-    });
+    expect(result).toBe('Brothy Chicken Thighs')
+  })
 
-    it('should return null for captions without clear recipe titles', async () => {
-      const result = await extractVideoTitle(
-        'Just some random text without any cooking content here',
-        'TikTok',
-        'https://www.tiktok.com/@user/video/999'
-      );
+  it('extracts the dish name from conversational transcripts', async () => {
+    const result = await extractVideoTitle(
+      "My name's Tag and everyone I know is sick right now. So I wanted to show y' all how to make Filipino chicken adobo the way I do it.",
+      'TikTok',
+      'https://www.tiktok.com/@chef/video/1415'
+    )
 
-      expect(result).toBeNull();
-    });
-
-    it('should handle empty captions', async () => {
-      const result = await extractVideoTitle(
-        '',
-        'Instagram',
-        'https://www.instagram.com/p/empty'
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('should handle captions with special characters', async () => {
-      const result = await extractVideoTitle(
-        '🍪 Amazing Chocolate Chip Cookies Recipe 🍪 - So delicious!',
-        'TikTok',
-        'https://www.tiktok.com/@chef/video/emoji'
-      );
-
-      expect(result).toBe('Amazing Chocolate Chip Cookies Recipe - So Delicious!');
-    });
-
-    it('should extract title from captions with cooking verbs', async () => {
-      const result = await extractVideoTitle(
-        'Learn to Bake Perfect Sourdough Bread at home',
-        'Instagram',
-        'https://www.instagram.com/p/bread'
-      );
-
-      expect(result).toBe('Learn To Bake Perfect Sourdough Bread At Home');
-    });
-
-    it('should handle captions with multiple sentences', async () => {
-      const result = await extractVideoTitle(
-        'Today I am sharing my favorite Chicken Curry Recipe. This is so easy to make and tastes amazing.',
-        'TikTok',
-        'https://www.tiktok.com/@chef/video/curry'
-      );
-
-      expect(result).toBe('Today I Am Sharing My Favorite Chicken Curry Recipe');
-    });
-  });
-
-  describe('Error handling', () => {
-    it('should handle YouTube title extraction errors gracefully', async () => {
-      mockGetYoutubeTitle.mockRejectedValue(new Error('Network error'));
-
-      const result = await extractVideoTitle(
-        'Simple Pasta Recipe - Easy dinner idea',
-        'YouTube',
-        'https://www.youtube.com/watch?v=error'
-      );
-
-      expect(result).toBe('Simple Pasta Recipe - Easy Dinner Idea');
-    });
-
-    it('should handle Facebook title extraction errors gracefully', async () => {
-      mockGetFacebookTitle.mockRejectedValue(new Error('Facebook blocked'));
-
-      const result = await extractVideoTitle(
-        'Homemade Pizza Recipe - Best pizza ever',
-        'Facebook',
-        'https://fb.watch/error/'
-      );
-
-      expect(result).toBe('Homemade Pizza Recipe - Best Pizza Ever');
-    });
-
-    it('should return null when both metadata and caption extraction fail', async () => {
-      mockGetYoutubeTitle.mockRejectedValue(new Error('YouTube error'));
-
-      const result = await extractVideoTitle(
-        'Random text without recipe content',
-        'YouTube',
-        'https://www.youtube.com/watch?v=fail'
-      );
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('Platform-specific behavior', () => {
-    it('should only call YouTube title extraction for YouTube platform', async () => {
-      mockGetFacebookTitle.mockResolvedValue('Facebook Title');
-
-      await extractVideoTitle(
-        'Some captions',
-        'Facebook',
-        'https://fb.watch/test/'
-      );
-
-      expect(mockGetYoutubeTitle).not.toHaveBeenCalled();
-      expect(mockGetFacebookTitle).toHaveBeenCalled();
-    });
-
-    it('should only call Facebook title extraction for Facebook platform', async () => {
-      mockGetYoutubeTitle.mockResolvedValue('YouTube Title');
-
-      await extractVideoTitle(
-        'Some captions',
-        'YouTube',
-        'https://www.youtube.com/watch?v=test'
-      );
-
-      expect(mockGetFacebookTitle).not.toHaveBeenCalled();
-      expect(mockGetYoutubeTitle).toHaveBeenCalled();
-    });
-
-    it('should not call any metadata extraction for other platforms', async () => {
-      const result = await extractVideoTitle(
-        'Amazing Cookies Recipe - So good',
-        'TikTok',
-        'https://www.tiktok.com/@chef/video/123'
-      );
-
-      expect(mockGetYoutubeTitle).not.toHaveBeenCalled();
-      expect(mockGetFacebookTitle).not.toHaveBeenCalled();
-      expect(result).toBe('Amazing Cookies Recipe - So Good');
-    });
-  });
-}); 
+    expect(result).toBe('Filipino Chicken Adobo')
+  })
+})

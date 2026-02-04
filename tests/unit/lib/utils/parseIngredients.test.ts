@@ -1,17 +1,39 @@
+import { describe, expect, it } from 'vitest'
 import { parseIngredients } from '@acme/core/parsers/ingredient-parser'
 
-describe('ingredient-parser parseIngredients', () => {
-  test('parses a simple fraction like 1/2', () => {
-    const [one] = parseIngredients(['1/2 cup flour'])
-    expect(one.quantity).toBeCloseTo(0.5, 5)
-    expect(one.unit).toBe('cup')
-    expect(one.ingredient).toBe('flour')
-  })
+describe('parseIngredients', () => {
+  it.each([
+    {
+      input: '1/2 cup flour',
+      expected: { quantity: 0.5, unit: 'cup', ingredient: 'flour' },
+    },
+    {
+      input: '1 1/2 cups milk',
+      expected: { quantity: 1.5, unit: 'cups', ingredient: 'milk' },
+    },
+    {
+      input: '1½ cups sugar',
+      expected: { quantity: 1.5, unit: 'cups', ingredient: 'sugar' },
+    },
+    {
+      input: '¼ tsp salt',
+      expected: { quantity: 0.25, unit: 'teaspoon', ingredient: 'salt' },
+    },
+    {
+      input: '2-3 cloves garlic',
+      expected: { quantity: 2.5, unit: 'cloves', ingredient: 'garlic' },
+    },
+    {
+      input: '1-2 tbsp olive oil',
+      expected: { quantity: 1.5, unit: 'tablespoon', ingredient: 'olive oil' },
+    },
+    {
+      input: '2 c flour',
+      expected: { quantity: 2, unit: 'cup', ingredient: 'flour' },
+    },
+  ])('parses "$input"', ({ input, expected }) => {
+    const [result] = parseIngredients([input])
 
-  test('parses a mixed number like 1 1/2', () => {
-    const [one] = parseIngredients(['1 1/2 cups milk'])
-    expect(one.quantity).toBeCloseTo(1.5, 5)
-    expect(one.unit).toBe('cups')
-    expect(one.ingredient).toBe('milk')
+    expect(result).toMatchObject(expected)
   })
 })

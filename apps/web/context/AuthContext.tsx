@@ -1,15 +1,21 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User } from '@supabase/supabase-js'
+import { AuthError, User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@acme/db/client'
-import { getLastVisitedPage } from '../hooks/useNavigationPersistence'
+
+type SignUpResult = Awaited<ReturnType<typeof supabase.auth.signUp>>
 
 interface AuthContextType {
   user: User | null
   signInWithGoogle: () => Promise<void>
   signInWithApple: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<AuthError | null>
+  signUpWithEmail: (email: string, password: string) => Promise<SignUpResult>
+  sendPasswordReset: (email: string) => Promise<AuthError | null>
+  resendConfirmation: (email: string) => Promise<AuthError | null>
+  updatePassword: (password: string) => Promise<AuthError | null>
   signOut: () => Promise<void>
   loading: boolean
 }
@@ -38,15 +44,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
       if (event === 'SIGNED_IN' && session?.user) {
-        router.push(getLastVisitedPage())
+        const path =
+          typeof window !== 'undefined' ? window.location.pathname : null
+        if (path === '/' || path === '/login' || path === '/signup') {
+          router.push('/cookbooks')
+        }
       }
     })
 
     return () => subscription.unsubscribe()
   }, [router])
 
+  const getRedirectUrl = (path: string) =>
+    typeof window !== 'undefined' ? `${window.location.origin}${path}` : undefined
+
   const signInWithGoogle = async () => {
-    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+    const redirectTo = getRedirectUrl('/login')
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
@@ -59,6 +72,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  const signInWithEmail = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return error
+  }
+
+  const signUpWithEmail = async (email: string, password: string) => {
+    const emailRedirectTo = getRedirectUrl('/login')
+    return await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo },
+    })
+  }
+
+  const sendPasswordReset = async (email: string) => {
+    const redirectTo = getRedirectUrl('/reset-password')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    })
+    return error
+  }
+
+  const resendConfirmation = async (email: string) => {
+    const emailRedirectTo = getRedirectUrl('/login')
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo },
+    })
+    return error
+  }
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    return error
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
@@ -67,6 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     signInWithGoogle,
     signInWithApple,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
+    resendConfirmation,
+    updatePassword,
     signOut,
     loading: loading || !isClient,
   }

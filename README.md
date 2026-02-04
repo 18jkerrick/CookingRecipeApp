@@ -9,6 +9,9 @@ A Next.js recipe management application with grocery list integration, meal plan
 # Install dependencies
 pnpm install
 
+# Install Playwright browsers (for E2E)
+pnpm exec playwright install
+
 # Run development server
 pnpm dev
 ```
@@ -56,6 +59,8 @@ pnpm lint                 # Run ESLint
 pnpm test                 # Run all tests
 pnpm test:watch           # Run tests in watch mode
 pnpm test:coverage        # Generate coverage report
+pnpm test:e2e             # Playwright E2E
+pnpm test:e2e:ui          # Playwright UI mode
 
 # Utilities
 pnpm lt                   # Start localtunnel for external access
@@ -90,18 +95,43 @@ INSTAGRAM_RAPID_API_KEY=...
 
 # Grocery Delivery (optional, if you want to order on instacart)
 INSTACART_CLIENT_ID=...
-AMAZON_FRESH_API_KEY=...
+```
+
+For Playwright auth setup, create a repo-root `.env.local` with:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_KEY=your_supabase_public_key
+SUPABASE_SERVICE_ROLE_EMAIL=your_service_role_email
+SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD=your_service_role_password
 ```
 
 ## Testing
 
-Tests are located in the `tests/` directory and use Jest with React Testing Library:
+Tests live in `tests/` and use **Vitest + React Testing Library** for unit/component/integration,
+**MSW v2** for HTTP mocking, and **Playwright** for E2E. Jest is legacy-only in `tests/legacy/**`.
 
 ```bash
-pnpm test                    # Run once
-pnpm test:watch              # Watch mode
-pnpm test:coverage           # With coverage report
+pnpm test                    # Vitest (unit/integration/component)
+pnpm test:watch              # Vitest watch
+pnpm test:coverage           # Vitest coverage
+pnpm test:e2e                # Playwright E2E
+pnpm test:e2e:ui             # Playwright UI mode
 ```
+
+First-time Playwright setup:
+
+```bash
+pnpm exec playwright install
+```
+
+For authenticated E2E flows (real auth), generate a storage state file:
+
+```bash
+pnpm test:e2e --project setup
+```
+
+More details: `docs/testing.md` and `tests/README.md`.
 
 ## Scripts
 
@@ -123,5 +153,5 @@ node scripts/maintenance/normalize-existing-recipes.js
 - **Frontend**: Next.js 15 (App Router), React 19, TailwindCSS
 - **Database**: Supabase (PostgreSQL)
 - **AI**: OpenAI
-- **Testing**: Jest, React Testing Library
+- **Testing**: Vitest, React Testing Library, MSW v2, Playwright (Jest legacy-only)
 - **Package Manager**: pnpm (workspace mode)

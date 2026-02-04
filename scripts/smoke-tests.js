@@ -109,8 +109,7 @@ const tests = {
     const apiRoutes = [
       'apps/web/app/api/parse-url/route.ts',
       'apps/web/app/api/recipes/route.ts',
-      'apps/web/app/api/grocery-lists/route.ts',
-      'apps/web/app/api/grocery-delivery/amazon-fresh/route.ts'
+      'apps/web/app/api/grocery-lists/route.ts'
     ];
 
     let allExist = true;

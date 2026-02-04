@@ -1,52 +1,69 @@
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import RecipeCard from '@/components/features/recipe/RecipeCard'
 
+vi.mock('lottie-react', () => ({
+  default: () => <div data-testid="lottie" />,
+}))
+
 describe('RecipeCard', () => {
-  const mockIngredients = [
-    '2 cups flour',
-    '3 eggs',
-    '1 cup milk'
-  ]
-
-  const mockInstructions = [
-    'Mix dry ingredients',
-    'Add wet ingredients',
-    'Bake at 350°F for 30 minutes'
-  ]
-
-  it('renders the recipe title', () => {
-    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
-    
-    expect(screen.getByText('Extracted Recipe')).toBeInTheDocument()
+  afterEach(() => {
+    cleanup()
   })
 
-  it('renders all ingredients', () => {
-    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
-    
-    expect(screen.getByText('Ingredients')).toBeInTheDocument()
-    expect(screen.getByText('2 cups flour')).toBeInTheDocument()
-    expect(screen.getByText('3 eggs')).toBeInTheDocument()
-    expect(screen.getByText('1 cup milk')).toBeInTheDocument()
+  it('renders default title when none is provided', () => {
+    render(<RecipeCard />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Extracted Recipe' })
+    ).toBeInTheDocument()
   })
 
-  it('renders all instructions', () => {
-    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
-    
-    expect(screen.getByText('Instructions')).toBeInTheDocument()
-    expect(screen.getByText('Mix dry ingredients')).toBeInTheDocument()
-    expect(screen.getByText('Add wet ingredients')).toBeInTheDocument()
-    expect(screen.getByText('Bake at 350°F for 30 minutes')).toBeInTheDocument()
+  it('renders provided title', () => {
+    render(<RecipeCard title="Brothy Chicken Thighs" />)
+
+    expect(
+      screen.getByRole('heading', { name: 'Brothy Chicken Thighs' })
+    ).toBeInTheDocument()
   })
 
-  it('renders proper layout structure', () => {
-    render(<RecipeCard ingredients={mockIngredients} instructions={mockInstructions} />)
-    
-    // Check for ingredients section
-    const ingredientsSection = screen.getByText('Ingredients').closest('div')
-    expect(ingredientsSection).toBeInTheDocument()
-    
-    // Check for instructions section
-    const instructionsSection = screen.getByText('Instructions').closest('div')
-    expect(instructionsSection).toBeInTheDocument()
+  it('renders image when imageUrl is provided', () => {
+    render(
+      <RecipeCard title="Adobo" imageUrl="https://example.com/adobo.jpg" />
+    )
+
+    expect(screen.getByAltText('Adobo')).toBeInTheDocument()
+  })
+
+  it('shows placeholder when no imageUrl is provided', () => {
+    render(<RecipeCard title="Adobo" />)
+
+    expect(screen.getByText('🍽️')).toBeInTheDocument()
+  })
+
+  it('shows processing state messages for text extraction', () => {
+    render(<RecipeCard processing />)
+
+    expect(
+      screen.getByText('Getting Recipe from Text')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+  })
+
+  it('shows processing state messages for audio extraction', () => {
+    render(<RecipeCard processing extractionPhase="audio" />)
+
+    expect(screen.getByText('Listening to the Audio')).toBeInTheDocument()
+  })
+
+  it('shows processing state messages for video extraction', () => {
+    render(<RecipeCard processing extractionPhase="video" />)
+
+    expect(
+      screen.getByText('Analyzing Video & Images')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('This may take several minutes')
+    ).toBeInTheDocument()
   })
 })

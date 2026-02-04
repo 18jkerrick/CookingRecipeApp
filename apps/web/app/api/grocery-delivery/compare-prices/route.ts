@@ -22,35 +22,35 @@ interface PriceResult {
 }
 
 interface PriceComparison {
-  amazonFresh: PriceResult;
+  // amazonFresh: PriceResult;
   instacart: PriceResult;
-  shipt: PriceResult;
-  gopuff: PriceResult;
-  walmartPlus: PriceResult;
+  // shipt: PriceResult;
+  // gopuff: PriceResult;
+  // walmartPlus: PriceResult;
 }
 
-// Service-specific price fetchers
-async function getAmazonFreshPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
-  // TODO: Implement Amazon Fresh API integration
-  // This will require:
-  // 1. Amazon SP-API credentials
-  // 2. Product search for each item
-  // 3. Availability check for ZIP code
-  // 4. Calculate total with delivery fees
+// // Service-specific price fetchers
+// async function getAmazonFreshPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
+//   // TODO: Implement Amazon Fresh API integration
+//   // This will require:
+//   // 1. Amazon SP-API credentials
+//   // 2. Product search for each item
+//   // 3. Availability check for ZIP code
+//   // 4. Calculate total with delivery fees
   
-  // Mock implementation for now
-  return {
-    available: true,
-    total: 45.99,
-    delivery: 9.99,
-    fees: 2.50,
-    items: items.map(item => ({
-      name: item.name,
-      found: true,
-      price: Math.random() * 10 + 1
-    }))
-  };
-}
+//   // Mock implementation for now
+//   return {
+//     available: true,
+//     total: 45.99,
+//     delivery: 9.99,
+//     fees: 2.50,
+//     items: items.map(item => ({
+//       name: item.name,
+//       found: true,
+//       price: Math.random() * 10 + 1
+//     }))
+//   };
+// }
 
 async function getInstacartPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
   // TODO: Implement Instacart API integration
@@ -74,82 +74,82 @@ async function getInstacartPrices(items: GroceryItem[], zipCode: string): Promis
   };
 }
 
-async function getShiptPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
-  // TODO: Implement Shipt API integration
-  // This will require:
-  // 1. Shipt API credentials
-  // 2. Store availability in ZIP
-  // 3. Product catalog search
-  // 4. Membership vs non-membership pricing
+// async function getShiptPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
+//   // TODO: Implement Shipt API integration
+//   // This will require:
+//   // 1. Shipt API credentials
+//   // 2. Store availability in ZIP
+//   // 3. Product catalog search
+//   // 4. Membership vs non-membership pricing
   
-  // Mock implementation for now
-  return {
-    available: true,
-    total: 49.99,
-    delivery: 7.00,
-    fees: 5.00,
-    items: items.map(item => ({
-      name: item.name,
-      found: true,
-      price: Math.random() * 11 + 1
-    }))
-  };
-}
+//   // Mock implementation for now
+//   return {
+//     available: true,
+//     total: 49.99,
+//     delivery: 7.00,
+//     fees: 5.00,
+//     items: items.map(item => ({
+//       name: item.name,
+//       found: true,
+//       price: Math.random() * 11 + 1
+//     }))
+//   };
+// }
 
-async function getGoPuffPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
-  // TODO: Implement GoPuff API integration
-  // This will require:
-  // 1. GoPuff API access
-  // 2. Warehouse availability check
-  // 3. Limited catalog search
-  // 4. Delivery fee calculation
+// async function getGoPuffPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
+//   // TODO: Implement GoPuff API integration
+//   // This will require:
+//   // 1. GoPuff API access
+//   // 2. Warehouse availability check
+//   // 3. Limited catalog search
+//   // 4. Delivery fee calculation
   
-  // Mock implementation - GoPuff has limited availability
-  const available = ['10001', '10002', '10003', '94102', '94103'].includes(zipCode);
+//   // Mock implementation - GoPuff has limited availability
+//   const available = ['10001', '10002', '10003', '94102', '94103'].includes(zipCode);
   
-  if (!available) {
-    return {
-      available: false,
-      total: null,
-      delivery: null,
-      fees: null
-    };
-  }
+//   if (!available) {
+//     return {
+//       available: false,
+//       total: null,
+//       delivery: null,
+//       fees: null
+//     };
+//   }
   
-  return {
-    available: true,
-    total: 38.99,
-    delivery: 1.95,
-    fees: 0,
-    items: items.map(item => ({
-      name: item.name,
-      found: Math.random() > 0.3, // GoPuff has limited inventory
-      price: Math.random() * 8 + 1
-    }))
-  };
-}
+//   return {
+//     available: true,
+//     total: 38.99,
+//     delivery: 1.95,
+//     fees: 0,
+//     items: items.map(item => ({
+//       name: item.name,
+//       found: Math.random() > 0.3, // GoPuff has limited inventory
+//       price: Math.random() * 8 + 1
+//     }))
+//   };
+// }
 
-async function getWalmartPlusPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
-  // TODO: Implement Walmart API integration
-  // This will require:
-  // 1. Walmart Open API credentials
-  // 2. Store locator for ZIP
-  // 3. Product search with Walmart item IDs
-  // 4. Walmart+ membership benefits
+// async function getWalmartPlusPrices(items: GroceryItem[], zipCode: string): Promise<PriceResult> {
+//   // TODO: Implement Walmart API integration
+//   // This will require:
+//   // 1. Walmart Open API credentials
+//   // 2. Store locator for ZIP
+//   // 3. Product search with Walmart item IDs
+//   // 4. Walmart+ membership benefits
   
-  // Mock implementation for now
-  return {
-    available: true,
-    total: 41.25,
-    delivery: 0, // Free with Walmart+
-    fees: 0,
-    items: items.map(item => ({
-      name: item.name,
-      found: true,
-      price: Math.random() * 9 + 0.5
-    }))
-  };
-}
+//   // Mock implementation for now
+//   return {
+//     available: true,
+//     total: 41.25,
+//     delivery: 0, // Free with Walmart+
+//     fees: 0,
+//     items: items.map(item => ({
+//       name: item.name,
+//       found: true,
+//       price: Math.random() * 9 + 0.5
+//     }))
+//   };
+// }
 
 export async function POST(request: NextRequest) {
   try {
@@ -173,21 +173,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch prices from all services in parallel
-    const [amazonFresh, instacart, shipt, gopuff, walmartPlus] = await Promise.all([
-      getAmazonFreshPrices(items, zipCode),
-      getInstacartPrices(items, zipCode),
-      getShiptPrices(items, zipCode),
-      getGoPuffPrices(items, zipCode),
-      getWalmartPlusPrices(items, zipCode)
+    const [instacart] = await Promise.all([
+      // getAmazonFreshPrices(items, zipCode),
+      getInstacartPrices(items, zipCode)
+      // getShiptPrices(items, zipCode),
+      // getGoPuffPrices(items, zipCode),
+      // getWalmartPlusPrices(items, zipCode)
     ]);
 
     const comparison: PriceComparison = {
-      amazonFresh,
-      instacart,
-      shipt,
-      gopuff,
-      walmartPlus
+      instacart: instacart!
+      // Add other providers here as implemented
+      // shipt: shipt!,
+      // gopuff: gopuff!,
+      // walmartPlus: walmartPlus!
     };
+
 
     return NextResponse.json({ comparison });
     
