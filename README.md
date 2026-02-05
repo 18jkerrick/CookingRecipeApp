@@ -131,6 +131,24 @@ For authenticated E2E flows (real auth), generate a storage state file:
 pnpm test:e2e --project setup
 ```
 
+### Performance Tests
+
+Performance regression tests run when `TEST_API_URL` or `TEST_BASE_URL` are set. Thresholds:
+
+| Metric | Threshold | Description |
+|--------|-----------|-------------|
+| API first batch | **1600 ms** | Initial 20 recipes load |
+| API subsequent batch | **1000 ms** | Next page with cursor |
+| Time to skeleton | **500 ms** | Skeleton loading state |
+| Time to first content | **3000 ms** | First real content visible |
+
+Run performance tests:
+
+```bash
+TEST_API_URL=http://localhost:3000 pnpm test -- tests/performance/recipes-api
+TEST_BASE_URL=http://localhost:3000 pnpm test -- tests/performance/page-load
+```
+
 More details: `docs/testing.md` and `tests/README.md`.
 
 ## Scripts

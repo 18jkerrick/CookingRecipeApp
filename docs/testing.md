@@ -83,6 +83,33 @@ Browser worker: `tests/mocks/browser.ts`
 
 `vitest.setup.ts` wires MSW into Vitest lifecycle.
 
+## Performance tests
+
+Performance regression tests measure API response times and page load times. They only run when environment variables are set:
+
+```bash
+# API performance tests
+TEST_API_URL=http://localhost:3000 pnpm test -- tests/performance/recipes-api
+
+# Page load performance tests
+TEST_BASE_URL=http://localhost:3000 pnpm test -- tests/performance/page-load
+```
+
+### Performance thresholds
+
+Tests fail if these limits are exceeded:
+
+| Metric | Threshold | Test File |
+|--------|-----------|-----------|
+| **API first batch** | **1600 ms** | `recipes-api.perf.test.ts` |
+| **API subsequent batch** | **1000 ms** | `recipes-api.perf.test.ts` |
+| **Time to skeleton** | **500 ms** | `page-load.perf.test.ts` |
+| **Time to first content** | **3000 ms** | `page-load.perf.test.ts` |
+
+Thresholds are defined in `tests/performance/thresholds.ts`.
+
+**Note:** These are "relaxed" thresholds (2x social media app standards like TikTok/Instagram) to account for Supabase latency and development environments. Production targets should be tighter.
+
 ## Best practices
 
 - Keep tests deterministic and fast
