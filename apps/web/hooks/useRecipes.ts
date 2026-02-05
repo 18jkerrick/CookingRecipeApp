@@ -95,7 +95,13 @@ export function useRecipes(token: string | null, options?: UseRecipesOptions) {
         token: token!,
       }),
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    getNextPageParam: (lastPage) => {
+      // Only return cursor if hasMore is true AND there's a valid cursor
+      if (lastPage.hasMore && lastPage.nextCursor) {
+        return lastPage.nextCursor
+      }
+      return undefined // No more pages
+    },
     enabled: enabled && !!token,
     staleTime: DEFAULT_STALE_TIME_MS,
     gcTime: DEFAULT_GC_TIME_MS,
@@ -106,12 +112,16 @@ export function useRecipes(token: string | null, options?: UseRecipesOptions) {
   // Flatten all pages into a single array
   const recipes = query.data?.pages.flatMap(page => page.recipes) ?? []
   
+  // Explicitly check hasMore from the last page
+  const lastPage = query.data?.pages[query.data.pages.length - 1]
+  const hasMoreData = lastPage?.hasMore ?? false
+  
   return {
     recipes,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
-    hasNextPage: query.hasNextPage,
+    hasNextPage: hasMoreData && !!lastPage?.nextCursor,
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     refetch: query.refetch,
