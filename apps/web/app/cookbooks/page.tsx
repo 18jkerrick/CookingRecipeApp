@@ -492,12 +492,8 @@ export default function Cookbooks() {
         isSaved={selectedRecipe?.saved_id ? savedRecipeIds.has(selectedRecipe.saved_id) : false}
         onSave={() => {/* Already saved automatically */}}
         onUpdate={(updatedRecipe) => {
-          // Update the recipe in the recipes list
-          setRecipes(prev => prev.map(recipe => 
-            recipe.saved_id === updatedRecipe.saved_id 
-              ? { ...recipe, ...updatedRecipe, imageUrl: updatedRecipe.thumbnail || recipe.imageUrl }
-              : recipe
-          ));
+          // Refetch recipes to get updated data from server
+          refetchRecipes()
           // Update the selected recipe for the modal
           setSelectedRecipe(updatedRecipe);
         }}

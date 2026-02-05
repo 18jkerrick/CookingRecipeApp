@@ -1,42 +1,15 @@
 import { test, expect } from '@playwright/test'
 import { mockRecipe, testRecipes } from '../fixtures/test-data'
+import { createRecipesApiMock } from '../helpers/mock-recipes-api'
 
 test.describe('Recipe Lifecycle Journey', () => {
+  let recipesMock: ReturnType<typeof createRecipesApiMock>
+
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/recipes', async (route) => {
-      const method = route.request().method()
-      if (method === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ recipes: [] }),
-        })
-        return
-      }
-
-      if (method === 'POST') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ recipe: { id: 'recipe-1' } }),
-        })
-        return
-      }
-
-      await route.fulfill({ status: 204, body: '' })
-    })
-
-    await page.route('**/api/recipes/recipe-1', async (route) => {
-      if (route.request().method() === 'DELETE') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
-        })
-        return
-      }
-      await route.fulfill({ status: 204, body: '' })
-    })
+    // Create a fresh mock for each test
+    recipesMock = createRecipesApiMock()
+    await recipesMock.setup(page)
+    await recipesMock.setupDelete(page)
 
     await page.route('**/api/parse-url', async (route) => {
       await route.fulfill({

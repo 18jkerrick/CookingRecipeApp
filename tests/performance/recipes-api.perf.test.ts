@@ -1,29 +1,39 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PERF_THRESHOLDS } from './thresholds'
+import { server } from '../mocks/server'
+import { getTestAuthToken } from '../helpers/get-test-auth-token'
 
 /**
  * Performance regression tests for the recipes API.
  * 
  * These tests measure actual response times and fail if thresholds are exceeded.
- * Run against a real (or realistic mock) backend to get meaningful results.
+ * Run against a real backend with the dev server running.
  * 
- * Note: These tests require authentication. Set up test user credentials
- * in your test environment.
+ * Authentication is handled automatically using test user credentials from .env.local:
+ * - SUPABASE_SERVICE_ROLE_EMAIL
+ * - SUPABASE_AUTH_SERVICE_ACCOUNT_PASSWORD
  * 
- * Run with: TEST_API_URL=http://localhost:3000 TEST_AUTH_TOKEN=<token> pnpm test tests/performance
+ * Run with: TEST_API_URL=http://localhost:3000 pnpm test tests/performance
  */
 describe.skipIf(!process.env.TEST_API_URL)('Recipes API Performance', () => {
   let authHeaders: HeadersInit
   const baseUrl = process.env.TEST_API_URL || 'http://localhost:3000'
   
   beforeAll(async () => {
-    // Get auth token for test user
-    // This should be set up in your test environment
-    const token = process.env.TEST_AUTH_TOKEN || 'test-token'
+    // Close MSW to allow real HTTP requests for performance testing
+    server.close()
+    
+    // Get real auth token from test user credentials in .env.local
+    const token = await getTestAuthToken()
     authHeaders = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     }
+  })
+  
+  afterAll(() => {
+    // Restart MSW for other tests
+    server.listen({ onUnhandledRequest: 'error' })
   })
 
   it('returns first batch within threshold', async () => {
@@ -35,6 +45,11 @@ describe.skipIf(!process.env.TEST_API_URL)('Recipes API Performance', () => {
     )
     
     const elapsed = performance.now() - start
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`API Error (${response.status}): ${errorText}`)
+    }
     
     expect(response.ok).toBe(true)
     expect(elapsed).toBeLessThan(PERF_THRESHOLDS.API_FIRST_BATCH_MS)

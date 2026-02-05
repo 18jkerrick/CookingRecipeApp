@@ -105,7 +105,8 @@ export async function GET(request: NextRequest) {
     });
 
     // Add cache headers for better performance
-    response.headers.set('Cache-Control', 'private, max-age=0, stale-while-revalidate=60');
+    // Note: no stale-while-revalidate to ensure refetch() gets fresh data after mutations
+    response.headers.set('Cache-Control', 'private, no-cache, must-revalidate');
 
     return response;
   } catch (error) {
