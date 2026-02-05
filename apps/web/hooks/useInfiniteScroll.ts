@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 
 // Default threshold in pixels for prefetching
 const DEFAULT_PREFETCH_THRESHOLD_PX = 200
@@ -14,7 +14,7 @@ interface UseInfiniteScrollOptions {
  * @param hasMore - Whether there are more items to load
  * @param isLoading - Whether currently loading (optional, prevents multiple calls)
  * @param options - Configuration options
- * @returns Ref to attach to the sentinel element
+ * @returns Callback ref to attach to the sentinel element
  */
 export function useInfiniteScroll(
   onLoadMore: () => void,
@@ -22,7 +22,8 @@ export function useInfiniteScroll(
   isLoading?: boolean,
   options?: UseInfiniteScrollOptions
 ) {
-  const observerRef = useRef<HTMLDivElement>(null)
+  // Use state to track the element so we can trigger re-renders when it changes
+  const [element, setElement] = useState<HTMLDivElement | null>(null)
   const callbackRef = useRef(onLoadMore)
   
   // Keep callback ref updated
@@ -38,7 +39,6 @@ export function useInfiniteScroll(
   }, [hasMore, isLoading])
 
   useEffect(() => {
-    const element = observerRef.current
     if (!element) return
 
     const threshold = options?.threshold ?? DEFAULT_PREFETCH_THRESHOLD_PX
@@ -51,10 +51,23 @@ export function useInfiniteScroll(
 
     observer.observe(element)
 
+    // Check immediately if element is already visible
+    // This handles the case where user navigates back and sentinel is already in view
+    const rect = element.getBoundingClientRect()
+    const isVisible = rect.top < window.innerHeight + threshold
+    if (isVisible && hasMore && !isLoading) {
+      callbackRef.current()
+    }
+
     return () => {
       observer.disconnect()
     }
-  }, [handleIntersect, options?.threshold])
+  }, [element, handleIntersect, options?.threshold, hasMore, isLoading])
 
-  return observerRef
+  // Return a callback ref that updates our state when the element is attached
+  const refCallback = useCallback((node: HTMLDivElement | null) => {
+    setElement(node)
+  }, [])
+
+  return refCallback
 }

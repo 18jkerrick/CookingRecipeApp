@@ -208,6 +208,8 @@ export default function GroceryLists() {
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null)
   const [showShareDropdown, setShowShareDropdown] = useState<string | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null)
+  const [isAddingRecipe, setIsAddingRecipe] = useState(false)
+  const [removingRecipeId, setRemovingRecipeId] = useState<string | null>(null)
 
   // Scroll position preservation
   const scrollPositions = useRef<{ [key: string]: number }>({})
@@ -623,24 +625,30 @@ export default function GroceryLists() {
   const handleAddRecipeToList = async (recipe: Recipe) => {
     if (!selectedList) return
     
+    setIsAddingRecipe(true)
     console.log('Adding recipe to list:', recipe.title, 'to list:', selectedList.name)
-    const success = await addRecipeToGroceryList(selectedList.id, recipe)
-    console.log('Add recipe result:', success)
-    if (success) {
-      // Reload to get updated items from database
-      await loadGroceryLists()
-      
-      // Update selectedList to reflect the changes
-      const updatedLists = await getGroceryLists()
-      const updatedList = updatedLists.find(list => list.id === selectedList.id)
-      if (updatedList) {
-        setSelectedList(updatedList)
-        setGroceryLists(updatedLists)
+    
+    try {
+      const success = await addRecipeToGroceryList(selectedList.id, recipe)
+      console.log('Add recipe result:', success)
+      if (success) {
+        // Reload to get updated items from database
+        await loadGroceryLists()
+        
+        // Update selectedList to reflect the changes
+        const updatedLists = await getGroceryLists()
+        const updatedList = updatedLists.find(list => list.id === selectedList.id)
+        if (updatedList) {
+          setSelectedList(updatedList)
+          setGroceryLists(updatedLists)
+        }
+        
+        setShowAddRecipeModal(false)
+      } else {
+        console.error('Failed to add recipe to list')
       }
-      
-      setShowAddRecipeModal(false)
-    } else {
-      console.error('Failed to add recipe to list')
+    } finally {
+      setIsAddingRecipe(false)
     }
   }
 
@@ -896,22 +904,28 @@ export default function GroceryLists() {
   const handleRemoveRecipeFromList = async (recipeId: string) => {
     if (!selectedList) return
     
+    setRemovingRecipeId(recipeId)
     console.log('Removing recipe from list:', recipeId, 'from list:', selectedList.name)
-    const success = await removeRecipeFromGroceryList(selectedList.id, recipeId)
-    console.log('Remove recipe result:', success)
-    if (success) {
-      // Reload to get updated items and recipes from database
-      await loadGroceryLists()
-      
-      // Update selectedList to reflect the changes
-      const updatedLists = await getGroceryLists()
-      const updatedList = updatedLists.find(list => list.id === selectedList.id)
-      if (updatedList) {
-        setSelectedList(updatedList)
-        setGroceryLists(updatedLists)
+    
+    try {
+      const success = await removeRecipeFromGroceryList(selectedList.id, recipeId)
+      console.log('Remove recipe result:', success)
+      if (success) {
+        // Reload to get updated items and recipes from database
+        await loadGroceryLists()
+        
+        // Update selectedList to reflect the changes
+        const updatedLists = await getGroceryLists()
+        const updatedList = updatedLists.find(list => list.id === selectedList.id)
+        if (updatedList) {
+          setSelectedList(updatedList)
+          setGroceryLists(updatedLists)
+        }
+      } else {
+        console.error('Failed to remove recipe from list')
       }
-    } else {
-      console.error('Failed to remove recipe from list')
+    } finally {
+      setRemovingRecipeId(null)
     }
   }
 
@@ -1271,9 +1285,15 @@ export default function GroceryLists() {
                               e.stopPropagation()
                               handleRemoveRecipeFromList(recipe.id)
                             }}
-                            className="absolute top-2 right-2 w-6 h-6 bg-black/50 hover:bg-wk-error/80 rounded-full flex items-center justify-center text-white text-xs transition-colors"
+                            disabled={removingRecipeId === recipe.id}
+                            className="absolute top-2 right-2 w-6 h-6 bg-black/50 hover:bg-wk-error/80 rounded-full flex items-center justify-center text-white text-xs transition-colors disabled:opacity-50"
                           >
-                            ✕
+                            {removingRecipeId === recipe.id ? (
+                              <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            ) : '✕'}
                           </button>
                           {recipe.imageUrl ? (
                             <img
@@ -1815,7 +1835,8 @@ export default function GroceryLists() {
               <h2 className="text-xl text-wk-text-primary font-display font-semibold">Add Recipe to List</h2>
               <button 
                 onClick={() => setShowAddRecipeModal(false)}
-                className="text-wk-accent hover:text-wk-accent-hover font-medium text-base font-body"
+                disabled={isAddingRecipe}
+                className="text-wk-accent hover:text-wk-accent-hover font-medium text-base font-body disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
@@ -1830,8 +1851,8 @@ export default function GroceryLists() {
                     .map((recipe) => (
                     <div
                       key={recipe.id}
-                      onClick={() => handleAddRecipeToList(recipe)}
-                      className="p-3 rounded-lg cursor-pointer transition-colors hover:bg-wk-bg-surface-hover"
+                      onClick={() => !isAddingRecipe && handleAddRecipeToList(recipe)}
+                      className={`p-3 rounded-lg transition-colors ${isAddingRecipe ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-wk-bg-surface-hover'}`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-wk-bg-surface-hover rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -1845,7 +1866,13 @@ export default function GroceryLists() {
                             <span className="text-wk-text-muted text-lg">🍽️</span>
                           )}
                         </div>
-                        <span className="text-wk-text-primary text-base font-body">{recipe.title}</span>
+                        <span className="text-wk-text-primary text-base font-body flex-1">{recipe.title}</span>
+                        {isAddingRecipe && (
+                          <svg className="animate-spin h-5 w-5 text-wk-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        )}
                       </div>
                     </div>
                   ))}

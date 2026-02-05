@@ -36,11 +36,11 @@ export default function RecipeCard({
       <div className="bg-[#1e1f26] rounded-xl overflow-hidden">
         {/* Shimmer background with Lottie Loading Animation */}
         <div className="aspect-square relative overflow-hidden">
-          {/* Shimmer background */}
+          {/* Shimmer background - theme aware */}
           <div 
             className="absolute inset-0 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite]"
             style={{
-              background: 'linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%)',
+              background: 'linear-gradient(90deg, var(--bg-surface-hover) 25%, var(--bg-surface) 50%, var(--bg-surface-hover) 75%)',
               backgroundSize: '200% 100%'
             }}
           ></div>
@@ -73,14 +73,14 @@ export default function RecipeCard({
   }
 
   return (
-    <div className="bg-[#1e1f26] rounded-xl overflow-hidden hover:ring-2 hover:ring-[#FF3A25]/50 transition-all cursor-pointer group">
+    <div className="bg-wk-bg-surface rounded-xl overflow-hidden hover:ring-2 hover:ring-wk-accent/50 transition-all cursor-pointer group shadow-wk card-hover">
       {/* Recipe image */}
-      <div className="aspect-square bg-gray-800 flex items-center justify-center overflow-hidden">
+      <div className="aspect-square bg-wk-bg-surface-hover flex items-center justify-center overflow-hidden">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={title || 'Recipe'}
-            className="w-full h-full object-cover border-0 group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover border-0 group-hover:scale-105 transition-transform duration-300 card-image"
             style={{ backgroundColor: 'transparent' }}
           />
         ) : (
@@ -90,8 +90,9 @@ export default function RecipeCard({
       
       {/* Recipe content */}
       <div className="p-4 h-20 flex flex-col justify-start">
+      <div className="p-4 h-20 flex flex-col justify-start">
         {/* Recipe title */}
-        <h3 className="font-medium text-white leading-tight text-center line-clamp-2">
+        <h3 className="font-medium text-wk-text-primary leading-tight text-center line-clamp-2 font-body">
           {title}
         </h3>
       </div>

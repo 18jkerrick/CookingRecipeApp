@@ -115,13 +115,14 @@ export function useRecipes(token: string | null, options?: UseRecipesOptions) {
   // Explicitly check hasMore from the last page
   const lastPage = query.data?.pages[query.data.pages.length - 1]
   const hasMoreData = lastPage?.hasMore ?? false
+  const hasNextPage = hasMoreData && !!lastPage?.nextCursor
   
   return {
     recipes,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
-    hasNextPage: hasMoreData && !!lastPage?.nextCursor,
+    hasNextPage,
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     refetch: query.refetch,

@@ -7,12 +7,12 @@ describe('useInfiniteScroll', () => {
     cleanup()
   })
 
-  it('returns a ref object', () => {
+  it('returns a callback ref function', () => {
     const onLoadMore = vi.fn()
     const { result } = renderHook(() => useInfiniteScroll(onLoadMore, true))
     
-    expect(result.current).toHaveProperty('current')
-    expect(result.current.current).toBeNull()
+    // Now returns a callback ref (function) instead of a ref object
+    expect(typeof result.current).toBe('function')
   })
 
   it('accepts hasMore parameter', () => {
@@ -20,16 +20,16 @@ describe('useInfiniteScroll', () => {
     const { result: resultTrue } = renderHook(() => useInfiniteScroll(onLoadMore, true))
     const { result: resultFalse } = renderHook(() => useInfiniteScroll(onLoadMore, false))
     
-    // Both should return refs
-    expect(resultTrue.current).toHaveProperty('current')
-    expect(resultFalse.current).toHaveProperty('current')
+    // Both should return callback refs
+    expect(typeof resultTrue.current).toBe('function')
+    expect(typeof resultFalse.current).toBe('function')
   })
 
   it('accepts isLoading parameter', () => {
     const onLoadMore = vi.fn()
     const { result } = renderHook(() => useInfiniteScroll(onLoadMore, true, true))
     
-    expect(result.current).toHaveProperty('current')
+    expect(typeof result.current).toBe('function')
   })
 
   it('accepts custom threshold option', () => {
@@ -38,6 +38,6 @@ describe('useInfiniteScroll', () => {
       useInfiniteScroll(onLoadMore, true, false, { threshold: 500 })
     )
     
-    expect(result.current).toHaveProperty('current')
+    expect(typeof result.current).toBe('function')
   })
 })

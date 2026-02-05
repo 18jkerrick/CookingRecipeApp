@@ -141,6 +141,17 @@ export default function NetflixCarousel({ children, itemWidth, gap, resetKey, ca
 
   // Calculate item visibility and effects
   const getItemStyle = useCallback((index: number) => {
+    // Don't apply any effects until container width is measured
+    // This prevents the gray overlay bug on initial render
+    if (containerWidth === 0) {
+      return {
+        opacity: 1,
+        transform: 'scale(1)',
+        filter: 'brightness(1)',
+        transition: 'all 0.3s ease-out'
+      }
+    }
+
     const itemX = index * (itemWidth + gap)
     const relativeX = itemX - validScrollPosition
 
@@ -155,17 +166,12 @@ export default function NetflixCarousel({ children, itemWidth, gap, resetKey, ca
       }
     }
 
-    // Progressive effects based on position
-    const progress = Math.max(0, Math.min(1, relativeX / containerWidth))
-
-    const scale = 1 - progress * 0.05
-    const brightness = 1 - progress * 0.2
-    const opacity = 1 - progress * 0.1
-
+    // All visible items should have full brightness - no progressive dimming
+    // The edge gradients already indicate scrollability
     return {
-      opacity,
-      transform: `scale(${scale})`,
-      filter: `brightness(${brightness})`,
+      opacity: 1,
+      transform: 'scale(1)',
+      filter: 'brightness(1)',
       transition: 'all 0.3s ease-out'
     }
   }, [itemWidth, gap, validScrollPosition, containerWidth])
@@ -220,11 +226,12 @@ export default function NetflixCarousel({ children, itemWidth, gap, resetKey, ca
       </div>
 
       {/* Smart gradient overlays - only show when there are more items */}
+      {/* Uses CSS custom property for theme-aware gradient color */}
       {showLeftGradient && (
         <div
           className="absolute inset-y-0 left-0 w-20 pointer-events-none z-10"
           style={{
-            background: 'linear-gradient(to right, rgba(20, 21, 26, 0.8), transparent)'
+            background: 'linear-gradient(to right, var(--bg-primary), transparent)'
           }}
         />
       )}
@@ -232,7 +239,7 @@ export default function NetflixCarousel({ children, itemWidth, gap, resetKey, ca
         <div
           className="absolute inset-y-0 right-0 w-20 pointer-events-none z-10"
           style={{
-            background: 'linear-gradient(to left, rgba(20, 21, 26, 0.8), transparent)'
+            background: 'linear-gradient(to left, var(--bg-primary), transparent)'
           }}
         />
       )}
