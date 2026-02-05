@@ -263,6 +263,7 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const [editableRecipe, setEditableRecipe] = useState<EditableRecipe | null>(null);
   const [ingredientIds, setIngredientIds] = useState<string[]>([]);
   const [instructionIds, setInstructionIds] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   
   // @dnd-kit sensors
   const sensors = useSensors(
@@ -529,37 +530,43 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const saveEditedRecipe = async () => {
     if (editableRecipe && recipe) {
       console.log('Saving edited recipe:', editableRecipe);
+      setIsSaving(true);
       
-      // Try to update in database first
-      const dbUpdateSuccess = await updateRecipeInDatabase(editableRecipe);
-      
-      if (dbUpdateSuccess || !recipe.saved_id) {
-        // Update the original recipe data with the edited values
-        const updatedRecipe = {
-          ...recipe,
-          title: editableRecipe.title,
-          ingredients: [...editableRecipe.ingredients],
-          instructions: [...editableRecipe.instructions],
-          thumbnail: editableRecipe.thumbnail
-        };
+      try {
+        // Try to update in database first
+        const dbUpdateSuccess = await updateRecipeInDatabase(editableRecipe);
         
-        // Update the recipe object in memory
-        Object.assign(recipe, updatedRecipe);
-        
-        // Notify parent component of the update
-        if (onUpdate) {
-          onUpdate(updatedRecipe);
+        if (dbUpdateSuccess || !recipe.saved_id) {
+          // Update the original recipe data with the edited values
+          const updatedRecipe = {
+            ...recipe,
+            title: editableRecipe.title,
+            ingredients: [...editableRecipe.ingredients],
+            instructions: [...editableRecipe.instructions],
+            thumbnail: editableRecipe.thumbnail
+          };
+          
+          // Update the recipe object in memory
+          Object.assign(recipe, updatedRecipe);
+          
+          // Notify parent component of the update
+          if (onUpdate) {
+            onUpdate(updatedRecipe);
+          }
+          
+          console.log('Recipe updated successfully');
+        } else {
+          alert('Failed to save changes to database. Please try again.');
+          setIsSaving(false);
+          return; // Don't exit edit mode if save failed
         }
         
-        console.log('Recipe updated successfully');
-      } else {
-        alert('Failed to save changes to database. Please try again.');
-        return; // Don't exit edit mode if save failed
-      }
-      
-      // Call the optional onSave callback if provided
-      if (onSave) {
-        onSave();
+        // Call the optional onSave callback if provided
+        if (onSave) {
+          onSave();
+        }
+      } finally {
+        setIsSaving(false);
       }
     }
     
@@ -1482,11 +1489,21 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
               <div className="flex space-x-2">
                 {isEditMode ? (
                   <>
-                    <Button variant="ghost" onClick={exitEditMode}>
+                    <Button variant="ghost" onClick={exitEditMode} disabled={isSaving}>
                       Cancel
                     </Button>
-                    <Button variant="default" onClick={saveEditedRecipe}>
-                      Save Changes
+                    <Button variant="default" onClick={saveEditedRecipe} disabled={isSaving}>
+                      {isSaving ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Saving...
+                        </span>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </Button>
                   </>
                 ) : (

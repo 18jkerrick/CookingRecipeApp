@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@acme/db/server';
+import { compressRecipeThumbnails } from '../../../lib/image-compression';
 
 // Cursor format: "2026-02-04T10:30:00.000000+00:00_abc123" (created_at + id)
 // Supabase returns timestamps with +00:00 timezone and microseconds
@@ -58,7 +59,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch recipes' }, { status: 500 });
       }
 
-      return NextResponse.json({ recipes });
+      // Compress thumbnails for list view performance
+      const compressedRecipes = await compressRecipeThumbnails(recipes || []);
+
+      return NextResponse.json({ recipes: compressedRecipes });
     }
 
     // Paginated request
@@ -98,8 +102,11 @@ export async function GET(request: NextRequest) {
       ? createCursor(resultRecipes[resultRecipes.length - 1])
       : null;
 
+    // Compress thumbnails for list view performance
+    const compressedRecipes = await compressRecipeThumbnails(resultRecipes);
+
     const response = NextResponse.json({
-      recipes: resultRecipes,
+      recipes: compressedRecipes,
       nextCursor,
       hasMore,
     });
