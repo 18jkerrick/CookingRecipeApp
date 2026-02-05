@@ -3,6 +3,12 @@ import { mockRecipe, testRecipes } from '../fixtures/test-data'
 
 test.describe('Recipe Extraction - Smoke', () => {
   test.beforeEach(async ({ page }) => {
+    // Suppress notification prompt
+    await page.addInitScript(() => {
+      localStorage.setItem('notificationPermissionRequested', 'true')
+      localStorage.setItem('notificationPermission', 'denied')
+    })
+
     // Stateful mock that persists saved recipes
     const savedRecipes: any[] = []
 
