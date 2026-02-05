@@ -53,12 +53,17 @@ test.describe('Grocery List Merge Journey', () => {
       },
     ]
 
-    await page.route('**/api/recipes', async (route) => {
+    // Use regex to match /api/recipes with or without query params
+    await page.route(/\/api\/recipes(\?.*)?$/, async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ recipes }),
+          body: JSON.stringify({
+            recipes,
+            nextCursor: null,
+            hasMore: false,
+          }),
         })
         return
       }

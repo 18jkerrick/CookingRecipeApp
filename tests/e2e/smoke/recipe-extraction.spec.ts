@@ -3,23 +3,45 @@ import { mockRecipe, testRecipes } from '../fixtures/test-data'
 
 test.describe('Recipe Extraction - Smoke', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/recipes', async (route) => {
+    // Stateful mock that persists saved recipes
+    const savedRecipes: any[] = []
+
+    await page.route('**/api/recipes*', async (route) => {
       const method = route.request().method()
 
       if (method === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ recipes: [] }),
+          body: JSON.stringify({
+            recipes: savedRecipes,
+            nextCursor: null,
+            hasMore: false,
+          }),
         })
         return
       }
 
       if (method === 'POST') {
+        const body = route.request().postDataJSON()
+        const savedRecipe = {
+          id: `recipe-${Date.now()}`,
+          title: body.title,
+          thumbnail: body.thumbnail,
+          ingredients: body.ingredients,
+          instructions: body.instructions,
+          platform: body.platform || 'web',
+          source: body.source || 'test',
+          original_url: body.original_url || null,
+          created_at: new Date().toISOString(),
+          user_id: 'test-user',
+          normalized_ingredients: body.normalizedIngredients || [],
+        }
+        savedRecipes.unshift(savedRecipe)
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ recipe: { id: 'recipe-1' } }),
+          body: JSON.stringify({ recipe: savedRecipe }),
         })
         return
       }

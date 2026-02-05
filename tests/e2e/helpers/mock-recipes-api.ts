@@ -14,7 +14,9 @@ export function createRecipesApiMock() {
      * Setup route handler for /api/recipes
      */
     async setup(page: Page) {
-      await page.route('**/api/recipes', async (route: Route) => {
+      // Use regex to match /api/recipes with or without query params
+      // but not /api/recipes/[id] (which is handled by setupDelete)
+      await page.route(/\/api\/recipes(\?.*)?$/, async (route: Route) => {
         const method = route.request().method()
         const url = new URL(route.request().url())
 

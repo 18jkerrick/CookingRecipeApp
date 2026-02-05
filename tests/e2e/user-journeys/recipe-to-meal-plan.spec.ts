@@ -17,14 +17,19 @@ test.describe('Recipe to Meal Plan Journey', () => {
       }
     })
 
-    await page.route('**/api/recipes', async (route) => {
+    // Use regex to match /api/recipes with or without query params
+    await page.route(/\/api\/recipes(\?.*)?$/, async (route) => {
       const method = route.request().method()
 
       if (method === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ recipes: [savedRecipe] }),
+          body: JSON.stringify({
+            recipes: [savedRecipe],
+            nextCursor: null,
+            hasMore: false,
+          }),
         })
         return
       }
