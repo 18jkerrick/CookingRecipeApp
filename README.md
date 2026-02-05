@@ -134,13 +134,13 @@ pnpm test:e2e --project setup
 
 ### Performance Tests
 
-Performance regression tests run when `TEST_API_URL` or `TEST_BASE_URL` are set. Authentication is automatic using test user credentials from `.env.local`.
+Performance regression tests measure API response times and page load times. Authentication is automatic using test user credentials from `.env.local`.
 
 | Metric | Threshold | Description |
 |--------|-----------|-------------|
 | API first batch | **2000 ms** | Initial 20 recipes load |
 | API subsequent batch | **1000 ms** | Next page with cursor |
-| Time to skeleton | **500 ms** | Skeleton loading state |
+| Time to loading state | **1000 ms** | Loading indicator visible |
 | Time to first content | **3000 ms** | First real content visible |
 
 Run performance tests (requires dev server running):
@@ -149,9 +149,11 @@ Run performance tests (requires dev server running):
 # Start dev server first
 pnpm dev
 
-# In another terminal, run performance tests
-TEST_API_URL=http://localhost:3000 pnpm test -- tests/performance/recipes-api
-TEST_BASE_URL=http://localhost:3000 pnpm test -- tests/performance/page-load
+# API performance tests (Vitest)
+pnpm test:perf
+
+# Page load performance tests (Playwright)
+pnpm test:perf:e2e
 ```
 
 More details: `docs/testing.md` and `tests/README.md`.

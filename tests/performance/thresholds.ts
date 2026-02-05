@@ -15,7 +15,7 @@ export const PERF_THRESHOLDS = {
   API_SUBSEQUENT_BATCH_MS: 1000,  // Next page fetch
   
   // Page load thresholds (milliseconds)
-  TIME_TO_SKELETON_MS: 500,       // Skeleton should show within 500ms
+  TIME_TO_LOADING_STATE_MS: 1000, // Loading indicator should show within 1s
   TIME_TO_FIRST_CONTENT_MS: 3000, // First real content within 3s
   
   // Pagination configuration

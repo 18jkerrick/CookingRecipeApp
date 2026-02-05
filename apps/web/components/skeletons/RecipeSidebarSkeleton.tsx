@@ -4,7 +4,7 @@ interface RecipeSidebarSkeletonProps {
 
 export function RecipeSidebarSkeleton({ count = 6 }: RecipeSidebarSkeletonProps) {
   return (
-    <div className="space-y-3">
+    <div data-testid="recipe-sidebar-skeleton" className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
         <div 
           key={i}

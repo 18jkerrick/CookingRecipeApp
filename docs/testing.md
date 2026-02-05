@@ -101,10 +101,10 @@ Tests fail if these limits are exceeded:
 
 | Metric | Threshold | Test File |
 |--------|-----------|-----------|
-| **API first batch** | **2000 ms** | `recipes-api.perf.test.ts` |
-| **API subsequent batch** | **1000 ms** | `recipes-api.perf.test.ts` |
-| **Time to skeleton** | **500 ms** | `page-load.perf.test.ts` |
-| **Time to first content** | **3000 ms** | `page-load.perf.test.ts` |
+| **API first batch** | **2000 ms** | `tests/performance/recipes-api.perf.test.ts` |
+| **API subsequent batch** | **1000 ms** | `tests/performance/recipes-api.perf.test.ts` |
+| **Time to loading state** | **1000 ms** | `tests/e2e/performance/page-load.perf.spec.ts` |
+| **Time to first content** | **3000 ms** | `tests/e2e/performance/page-load.perf.spec.ts` |
 
 Thresholds are defined in `tests/performance/thresholds.ts`.
 
