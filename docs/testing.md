@@ -101,7 +101,7 @@ Tests fail if these limits are exceeded:
 
 | Metric | Threshold | Test File |
 |--------|-----------|-----------|
-| **API first batch** | **1600 ms** | `recipes-api.perf.test.ts` |
+| **API first batch** | **2000 ms** | `recipes-api.perf.test.ts` |
 | **API subsequent batch** | **1000 ms** | `recipes-api.perf.test.ts` |
 | **Time to skeleton** | **500 ms** | `page-load.perf.test.ts` |
 | **Time to first content** | **3000 ms** | `page-load.perf.test.ts` |

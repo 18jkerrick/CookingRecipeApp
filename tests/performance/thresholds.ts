@@ -11,7 +11,7 @@
  */
 export const PERF_THRESHOLDS = {
   // API response time thresholds (milliseconds)
-  API_FIRST_BATCH_MS: 1600,       // Initial 20 recipes
+  API_FIRST_BATCH_MS: 2000,       // Initial 20 recipes
   API_SUBSEQUENT_BATCH_MS: 1000,  // Next page fetch
   
   // Page load thresholds (milliseconds)

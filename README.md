@@ -115,6 +115,7 @@ Tests live in `tests/` and use **Vitest + React Testing Library** for unit/compo
 pnpm test                    # Vitest (unit/integration/component)
 pnpm test:watch              # Vitest watch
 pnpm test:coverage           # Vitest coverage
+pnpm test:perf               # Vitest perf
 pnpm test:e2e                # Playwright E2E
 pnpm test:e2e:ui             # Playwright UI mode
 ```
@@ -137,7 +138,7 @@ Performance regression tests run when `TEST_API_URL` or `TEST_BASE_URL` are set.
 
 | Metric | Threshold | Description |
 |--------|-----------|-------------|
-| API first batch | **1600 ms** | Initial 20 recipes load |
+| API first batch | **2000 ms** | Initial 20 recipes load |
 | API subsequent batch | **1000 ms** | Next page with cursor |
 | Time to skeleton | **500 ms** | Skeleton loading state |
 | Time to first content | **3000 ms** | First real content visible |

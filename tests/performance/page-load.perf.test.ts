@@ -50,7 +50,7 @@ describe.skipIf(!process.env.TEST_BASE_URL)('Page Load Performance', () => {
  * |------------------------|-----------|---------------------------------------|
  * | Time to Skeleton       | 500ms     | Skeleton loader should appear         |
  * | Time to First Content  | 3000ms    | First real recipe data should appear  |
- * | API First Batch        | 1600ms    | Initial 20 recipes fetch              |
+ * | API First Batch        | 2000ms    | Initial 20 recipes fetch              |
  * | API Subsequent Batch   | 1000ms    | Next page fetch                       |
  * 
  * These are "relaxed" thresholds (2x social media standards) to account for:
