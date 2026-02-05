@@ -1,11 +1,19 @@
 // Shared meal plan storage utilities
 
+// Minimal recipe reference stored in localStorage (to avoid quota issues)
+export interface RecipeReference {
+  id: string;
+  title: string;
+  thumbnail?: string;
+}
+
 export interface MealPlan {
   [dateKey: string]: {
-    [mealType: string]: any; // Recipe object
+    [mealType: string]: RecipeReference;
   };
 }
 
+// Full recipe type (for API responses, not for storage)
 export interface Recipe {
   id: string;
   title: string;
@@ -17,13 +25,41 @@ export interface Recipe {
   saved_id?: string;
 }
 
-// Get meal plans from localStorage
+// Remove meal plans from past weeks (keeps current week and future)
+const cleanupPastMealPlans = (mealPlans: MealPlan): MealPlan => {
+  const today = new Date();
+  const startOfCurrentWeek = getStartOfWeek(today);
+  const cutoffDate = getDateKey(startOfCurrentWeek);
+  
+  const cleanedPlans: MealPlan = {};
+  
+  for (const dateKey of Object.keys(mealPlans)) {
+    // Keep dates that are >= start of current week
+    if (dateKey >= cutoffDate) {
+      cleanedPlans[dateKey] = mealPlans[dateKey];
+    }
+  }
+  
+  return cleanedPlans;
+};
+
+// Get meal plans from localStorage (auto-cleans past weeks)
 export const getMealPlans = (): MealPlan => {
   if (typeof window === 'undefined') return {};
   
   try {
     const stored = localStorage.getItem('mealPlans');
-    return stored ? JSON.parse(stored) : {};
+    if (!stored) return {};
+    
+    const mealPlans = JSON.parse(stored) as MealPlan;
+    const cleanedPlans = cleanupPastMealPlans(mealPlans);
+    
+    // Save cleaned plans back if any were removed
+    if (Object.keys(cleanedPlans).length < Object.keys(mealPlans).length) {
+      localStorage.setItem('mealPlans', JSON.stringify(cleanedPlans));
+    }
+    
+    return cleanedPlans;
   } catch (error) {
     console.error('Error loading meal plans:', error);
     return {};
@@ -42,14 +78,22 @@ export const saveMealPlans = (mealPlans: MealPlan): void => {
 };
 
 // Add a recipe to a specific day and meal type
+// Only stores minimal reference data to avoid localStorage quota issues
 export const addRecipeToMealPlan = (dateKey: string, mealType: string, recipe: Recipe): void => {
   const currentPlans = getMealPlans();
+  
+  // Store only the minimal data needed for display
+  const recipeRef: RecipeReference = {
+    id: recipe.id,
+    title: recipe.title,
+    thumbnail: recipe.thumbnail || recipe.imageUrl,
+  };
   
   const updatedPlans = {
     ...currentPlans,
     [dateKey]: {
       ...currentPlans[dateKey],
-      [mealType]: recipe
+      [mealType]: recipeRef
     }
   };
   

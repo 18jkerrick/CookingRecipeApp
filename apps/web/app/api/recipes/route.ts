@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@acme/db/server';
 
-// Cursor format: "2026-02-04T10:30:00.000Z_abc123" (created_at + id)
+// Cursor format: "2026-02-04T10:30:00.000000+00:00_abc123" (created_at + id)
+// Supabase returns timestamps with +00:00 timezone and microseconds
 function parseCursor(cursor: string | null): { timestamp: string; id: string } | null {
   if (!cursor) return null
   
   // Validate format to prevent injection
-  // Matches: ISO timestamp + underscore + UUID
-  const match = cursor.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)_([a-f0-9-]+)$/i)
+  // Matches: ISO timestamp (with Z or +00:00 timezone, 3-6 digit fractional seconds) + underscore + UUID
+  // Examples:
+  //   2026-02-04T10:30:00.000Z_abc123
+  //   2025-06-23T04:31:18.442456+00:00_681bbe33-e0ee-4b41-acf9-c14c78ecf126
+  const match = cursor.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3,6})?(?:Z|[+-]\d{2}:\d{2}))_([a-f0-9-]+)$/i)
   
   if (!match) {
     console.warn('Invalid cursor format:', cursor)
