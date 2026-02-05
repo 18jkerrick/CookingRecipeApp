@@ -115,6 +115,7 @@ Tests live in `tests/` and use **Vitest + React Testing Library** for unit/compo
 pnpm test                    # Vitest (unit/integration/component)
 pnpm test:watch              # Vitest watch
 pnpm test:coverage           # Vitest coverage
+pnpm test:perf               # Vitest perf
 pnpm test:e2e                # Playwright E2E
 pnpm test:e2e:ui             # Playwright UI mode
 ```
@@ -129,6 +130,30 @@ For authenticated E2E flows (real auth), generate a storage state file:
 
 ```bash
 pnpm test:e2e --project setup
+```
+
+### Performance Tests
+
+Performance regression tests measure API response times and page load times. Authentication is automatic using test user credentials from `.env.local`.
+
+| Metric | Threshold | Description |
+|--------|-----------|-------------|
+| API first batch | **2000 ms** | Initial 20 recipes load |
+| API subsequent batch | **1000 ms** | Next page with cursor |
+| Time to loading state | **1000 ms** | Loading indicator visible |
+| Time to first content | **3000 ms** | First real content visible |
+
+Run performance tests (requires dev server running):
+
+```bash
+# Start dev server first
+pnpm dev
+
+# API performance tests (Vitest)
+pnpm test:perf
+
+# Page load performance tests (Playwright)
+pnpm test:perf:e2e
 ```
 
 More details: `docs/testing.md` and `tests/README.md`.

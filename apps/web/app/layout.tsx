@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
+import { QueryProvider } from "../providers/QueryProvider";
 
 const playfairDisplay = Playfair_Display({
   variable: "--font-playfair",
@@ -51,7 +52,9 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <AuthProvider>
-          {children}
+          <QueryProvider>
+            {children}
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>

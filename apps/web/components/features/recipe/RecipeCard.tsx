@@ -18,20 +18,6 @@ export default function RecipeCard({
   instructions = [],
   extractionPhase = 'text'
 }: RecipeCardProps) {
-  const ingredientCount = ingredients.length;
-  const stepCount = instructions.length;
-
-  const formatMetadata = () => {
-    const parts = [];
-    if (ingredientCount > 0) {
-      parts.push(`${ingredientCount} ingredient${ingredientCount !== 1 ? 's' : ''}`);
-    }
-    if (stepCount > 0) {
-      parts.push(`${stepCount} step${stepCount !== 1 ? 's' : ''}`);
-    }
-    return parts.join(' • ');
-  };
-
   if (processing) {
     const getPhaseMessage = () => {
       switch (extractionPhase) {
@@ -47,14 +33,14 @@ export default function RecipeCard({
     };
 
     return (
-      <div className="bg-wk-bg-surface rounded-xl overflow-hidden shadow-wk">
+      <div className="bg-[#1e1f26] rounded-xl overflow-hidden">
         {/* Shimmer background with Lottie Loading Animation */}
-        <div className="aspect-[4/3] relative overflow-hidden">
-          {/* Shimmer background */}
+        <div className="aspect-square relative overflow-hidden">
+          {/* Shimmer background - theme aware */}
           <div 
             className="absolute inset-0 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite]"
             style={{
-              background: 'linear-gradient(90deg, var(--bg-surface-hover) 25%, var(--border) 50%, var(--bg-surface-hover) 75%)',
+              background: 'linear-gradient(90deg, var(--bg-surface-hover) 25%, var(--bg-surface) 50%, var(--bg-surface-hover) 75%)',
               backgroundSize: '200% 100%'
             }}
           ></div>
@@ -73,11 +59,11 @@ export default function RecipeCard({
         
         {/* Dynamic loading text */}
         <div className="p-4 h-20 flex flex-col justify-center">
-          <p className="text-wk-text-primary text-center text-sm font-medium font-body">
+          <p className="text-white/90 text-center text-sm font-medium">
             {getPhaseMessage()}
           </p>
           {extractionPhase === 'video' && (
-            <p className="text-wk-text-muted text-center text-xs mt-1 font-body">
+            <p className="text-white/50 text-center text-xs mt-1">
               This may take several minutes
             </p>
           )}
@@ -86,36 +72,29 @@ export default function RecipeCard({
     );
   }
 
-  const metadata = formatMetadata();
-
   return (
-    <div className="bg-wk-bg-surface rounded-xl overflow-hidden shadow-wk card-hover cursor-pointer group">
+    <div className="bg-wk-bg-surface rounded-xl overflow-hidden hover:ring-2 hover:ring-wk-accent/50 transition-all cursor-pointer group shadow-wk card-hover">
       {/* Recipe image */}
-      <div className="aspect-[4/3] bg-wk-bg-surface-hover flex items-center justify-center overflow-hidden">
+      <div className="aspect-square bg-wk-bg-surface-hover flex items-center justify-center overflow-hidden">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={title || 'Recipe'}
-            className="w-full h-full object-cover border-0 card-image"
+            className="w-full h-full object-cover border-0 group-hover:scale-105 transition-transform duration-300 card-image"
             style={{ backgroundColor: 'transparent' }}
           />
         ) : (
-          <div className="text-wk-text-muted text-4xl">🍽️</div>
+          <div className="text-gray-600 text-4xl">🍽️</div>
         )}
       </div>
       
       {/* Recipe content */}
-      <div className="p-4 flex flex-col justify-start">
+      <div className="p-4 h-20 flex flex-col justify-start">
+      <div className="p-4 h-20 flex flex-col justify-start">
         {/* Recipe title */}
-        <h3 className="font-display font-semibold text-wk-text-primary leading-tight text-center line-clamp-2">
+        <h3 className="font-medium text-wk-text-primary leading-tight text-center line-clamp-2 font-body">
           {title}
         </h3>
-        {/* Recipe metadata */}
-        {metadata && (
-          <p className="text-wk-text-secondary text-sm font-body text-center mt-1">
-            {metadata}
-          </p>
-        )}
       </div>
     </div>
   );

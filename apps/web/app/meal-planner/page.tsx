@@ -1,14 +1,15 @@
 'use client'
 
 import { useAuth } from '../../context/AuthContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@acme/db/client'
 import { Search, Filter, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '@/lib/meal-plan'
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
 import { Navigation } from '../../components/shared/Navigation'
+import { useRecipes } from '../../hooks/useRecipes'
+import { RecipeSidebarSkeleton } from '../../components/skeletons'
 
 // Types for meal planning (Recipe interface for local use)
 interface Recipe {
@@ -24,15 +25,33 @@ interface Recipe {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function MealPlanner() {
-  const { user, loading } = useAuth()
+  const { user, loading, accessToken } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const router = useRouter()
   
   // Save this page as the last visited
   useNavigationPersistence()
 
-  // Recipe state management
-  const [recipes, setRecipes] = useState<Recipe[]>([])
+  // Use token directly from auth context
+  const token = accessToken
+
+  // Use React Query for recipes
+  const { recipes: fetchedRecipes, isLoading: isLoadingRecipes } = useRecipes(token, { enabled: !!user })
+
+  // Convert fetched recipes to local format
+  const recipes = useMemo(() => {
+    return fetchedRecipes.map((recipe) => ({
+      id: recipe.id,
+      title: recipe.title,
+      imageUrl: recipe.thumbnail || '',
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      created_at: recipe.created_at,
+      saved_id: recipe.id
+    }))
+  }, [fetchedRecipes])
+
+  // Search and filter state
   const [searchTerm, setSearchTerm] = useState('')
   const [filterOption, setFilterOption] = useState<'recent' | 'oldest' | 'alphabetical'>('recent')
   const [showFilterMenu, setShowFilterMenu] = useState(false)
@@ -56,7 +75,6 @@ export default function MealPlanner() {
       return
     }
     if (user) {
-      loadRecipes()
       initializeWeek()
     }
   }, [isClient, loading, user, router])
@@ -100,37 +118,6 @@ export default function MealPlanner() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [user, currentWeek])
-
-  const loadRecipes = async () => {
-    if (!user) return
-
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session?.session?.access_token) return
-
-      const response = await fetch('/api/recipes', {
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`
-        }
-      })
-
-      if (response.ok) {
-        const { recipes: savedRecipes } = await response.json()
-        const formattedRecipes = savedRecipes.map((recipe: any) => ({
-          id: recipe.id,
-          title: recipe.title,
-          imageUrl: recipe.thumbnail || '',
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-          created_at: recipe.created_at,
-          saved_id: recipe.id
-        }))
-        setRecipes(formattedRecipes)
-      }
-    } catch (error) {
-      console.error('Error loading recipes:', error)
-    }
-  }
 
   const initializeWeek = () => {
     // Load multiple weeks from shared meal plan storage
@@ -240,8 +227,40 @@ export default function MealPlanner() {
 
   if (!isClient || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
-        <div className="text-lg text-wk-text-primary font-body">Loading...</div>
+      <div className="min-h-screen bg-wk-bg-primary text-wk-text-primary">
+        <Navigation currentPath="/meal-planner" />
+        <div className="flex h-[calc(100vh-73px)]">
+          {/* Recipe Sidebar Skeleton */}
+          <div className="sidebar w-72 bg-wk-bg-surface border-r border-wk-border flex flex-col shadow-wk">
+            <div className="p-4 border-b border-wk-border">
+              <div className="h-6 bg-wk-bg-surface-hover rounded w-1/2 mb-4 animate-pulse" />
+              <div className="h-9 bg-wk-bg-surface-hover rounded animate-pulse" />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <RecipeSidebarSkeleton count={6} />
+            </div>
+          </div>
+          {/* Calendar Skeleton */}
+          <div className="flex-1 flex flex-col">
+            <div className="p-4 border-b border-wk-border">
+              <div className="h-8 bg-wk-bg-surface-hover rounded w-1/4 animate-pulse" />
+            </div>
+            <div className="flex-1 p-4">
+              <div className="grid grid-cols-7 gap-3 h-full">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div key={i} className="flex flex-col h-full">
+                    <div className="h-12 bg-wk-bg-surface-hover rounded mb-3 animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      {Array.from({ length: 4 }).map((_, j) => (
+                        <div key={j} className="h-20 bg-wk-bg-surface rounded border-2 border-dashed border-wk-border animate-pulse" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -315,6 +334,9 @@ export default function MealPlanner() {
 
           {/* Recipe List */}
           <div className="flex-1 overflow-y-auto p-4">
+            {isLoadingRecipes ? (
+              <RecipeSidebarSkeleton count={6} />
+            ) : (
             <div className="space-y-3">
               {getFilteredAndSortedRecipes().map((recipe) => (
                 <div
@@ -349,6 +371,7 @@ export default function MealPlanner() {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
 

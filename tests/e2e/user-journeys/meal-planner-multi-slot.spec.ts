@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Meal Planner Multi-Slot Journey', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/recipes', async (route) => {
+    // Use regex to match /api/recipes with or without query params
+    await page.route(/\/api\/recipes(\?.*)?$/, async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
@@ -26,6 +27,8 @@ test.describe('Meal Planner Multi-Slot Journey', () => {
                 created_at: '2026-02-01',
               },
             ],
+            nextCursor: null,
+            hasMore: false,
           }),
         })
         return

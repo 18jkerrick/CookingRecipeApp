@@ -263,6 +263,7 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const [editableRecipe, setEditableRecipe] = useState<EditableRecipe | null>(null);
   const [ingredientIds, setIngredientIds] = useState<string[]>([]);
   const [instructionIds, setInstructionIds] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   
   // @dnd-kit sensors
   const sensors = useSensors(
@@ -296,6 +297,9 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const [selectedGroceryList, setSelectedGroceryList] = useState<string>('');
   const [newGroceryListName, setNewGroceryListName] = useState<string>('');
   const [showCreateNewList, setShowCreateNewList] = useState(false);
+  const [isAddingToList, setIsAddingToList] = useState(false);
+  const [addingToListId, setAddingToListId] = useState<string | null>(null);
+  const [isCreatingList, setIsCreatingList] = useState(false);
   const [showMealPlanModal, setShowMealPlanModal] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -529,37 +533,43 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
   const saveEditedRecipe = async () => {
     if (editableRecipe && recipe) {
       console.log('Saving edited recipe:', editableRecipe);
+      setIsSaving(true);
       
-      // Try to update in database first
-      const dbUpdateSuccess = await updateRecipeInDatabase(editableRecipe);
-      
-      if (dbUpdateSuccess || !recipe.saved_id) {
-        // Update the original recipe data with the edited values
-        const updatedRecipe = {
-          ...recipe,
-          title: editableRecipe.title,
-          ingredients: [...editableRecipe.ingredients],
-          instructions: [...editableRecipe.instructions],
-          thumbnail: editableRecipe.thumbnail
-        };
+      try {
+        // Try to update in database first
+        const dbUpdateSuccess = await updateRecipeInDatabase(editableRecipe);
         
-        // Update the recipe object in memory
-        Object.assign(recipe, updatedRecipe);
-        
-        // Notify parent component of the update
-        if (onUpdate) {
-          onUpdate(updatedRecipe);
+        if (dbUpdateSuccess || !recipe.saved_id) {
+          // Update the original recipe data with the edited values
+          const updatedRecipe = {
+            ...recipe,
+            title: editableRecipe.title,
+            ingredients: [...editableRecipe.ingredients],
+            instructions: [...editableRecipe.instructions],
+            thumbnail: editableRecipe.thumbnail
+          };
+          
+          // Update the recipe object in memory
+          Object.assign(recipe, updatedRecipe);
+          
+          // Notify parent component of the update
+          if (onUpdate) {
+            onUpdate(updatedRecipe);
+          }
+          
+          console.log('Recipe updated successfully');
+        } else {
+          alert('Failed to save changes to database. Please try again.');
+          setIsSaving(false);
+          return; // Don't exit edit mode if save failed
         }
         
-        console.log('Recipe updated successfully');
-      } else {
-        alert('Failed to save changes to database. Please try again.');
-        return; // Don't exit edit mode if save failed
-      }
-      
-      // Call the optional onSave callback if provided
-      if (onSave) {
-        onSave();
+        // Call the optional onSave callback if provided
+        if (onSave) {
+          onSave();
+        }
+      } finally {
+        setIsSaving(false);
       }
     }
     
@@ -1482,11 +1492,21 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
               <div className="flex space-x-2">
                 {isEditMode ? (
                   <>
-                    <Button variant="ghost" onClick={exitEditMode}>
+                    <Button variant="ghost" onClick={exitEditMode} disabled={isSaving}>
                       Cancel
                     </Button>
-                    <Button variant="default" onClick={saveEditedRecipe}>
-                      Save Changes
+                    <Button variant="default" onClick={saveEditedRecipe} disabled={isSaving}>
+                      {isSaving ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Saving...
+                        </span>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </Button>
                   </>
                 ) : (
@@ -1633,7 +1653,8 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                   setShowCreateNewList(false);
                   setNewGroceryListName('');
                 }}
-                className="text-wk-accent font-medium font-body text-lg hover:text-wk-accent-hover transition-colors"
+                disabled={addingToListId !== null || isCreatingList}
+                className="text-wk-accent font-medium font-body text-lg hover:text-wk-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
@@ -1649,29 +1670,35 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                       {groceryLists.map(list => (
                         <button
                           key={list.id}
+                          disabled={addingToListId !== null}
                           onClick={async () => {
-                            // Add to existing list using database function
-                            const success = await addRecipeToGroceryList(list.id, {
-                              id: recipe.saved_id || Date.now().toString(),
-                              title: recipe.title,
-                              ingredients: recipe.ingredients.filter((_, index) => selectedIngredients[index]),
-                              instructions: recipe.instructions,
-                              platform: recipe.platform || '',
-                              source: recipe.source || '',
-                              original_url: '',
-                              created_at: new Date().toISOString()
-                            });
-                            
-                            if (success) {
-                              console.log('Recipe added to grocery list successfully');
-                            } else {
-                              console.error('Failed to add recipe to grocery list');
+                            setAddingToListId(list.id);
+                            try {
+                              // Add to existing list using database function
+                              const success = await addRecipeToGroceryList(list.id, {
+                                id: recipe.saved_id || Date.now().toString(),
+                                title: recipe.title,
+                                ingredients: recipe.ingredients.filter((_, index) => selectedIngredients[index]),
+                                instructions: recipe.instructions,
+                                platform: recipe.platform || '',
+                                source: recipe.source || '',
+                                original_url: '',
+                                created_at: new Date().toISOString()
+                              });
+                              
+                              if (success) {
+                                console.log('Recipe added to grocery list successfully');
+                              } else {
+                                console.error('Failed to add recipe to grocery list');
+                              }
+                              
+                              setShowListSelectionModal(false);
+                              setSelectedIngredients(new Array(recipe.ingredients.length).fill(true));
+                            } finally {
+                              setAddingToListId(null);
                             }
-                            
-                            setShowListSelectionModal(false);
-                            setSelectedIngredients(new Array(recipe.ingredients.length).fill(true));
                           }}
-                          className="w-full text-left p-3 bg-wk-bg-primary hover:bg-wk-bg-surface-hover rounded-lg transition-colors cursor-pointer"
+                          className={`w-full text-left p-3 bg-wk-bg-primary rounded-lg transition-colors ${addingToListId !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-wk-bg-surface-hover cursor-pointer'}`}
                         >
                           <div className="flex items-center gap-3">
                             {/* Visual Element */}
@@ -1694,10 +1721,16 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                                 />
                               )}
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <div className="text-wk-text-primary font-medium font-body">{list.name}</div>
                               <div className="text-wk-text-muted text-sm font-body">{list.items.length} items</div>
                             </div>
+                            {addingToListId === list.id && (
+                              <svg className="animate-spin h-5 w-5 text-wk-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            )}
                           </div>
                         </button>
                       ))}
@@ -1734,6 +1767,7 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                         setShowCreateNewList(false);
                         setNewGroceryListName('');
                       }}
+                      disabled={isCreatingList}
                       className="flex-1"
                     >
                       Back
@@ -1743,36 +1777,49 @@ export default function RecipeDetailModal({ isOpen, onClose, recipe, isSaved = f
                       onClick={async () => {
                         if (!newGroceryListName) return;
                         
-                        const selectedItems = recipe.ingredients.filter((_, index) => selectedIngredients[index]);
-                        
-                        // Create new list with selected ingredients
-                        const newList = await createGroceryList(newGroceryListName, [{
-                          title: recipe.title,
-                          thumbnail: recipe.thumbnail || '',
-                          ingredients: selectedItems,
-                          instructions: recipe.instructions,
-                          platform: recipe.platform || '',
-                          source: recipe.source || '',
-                          original_url: '',
-                          created_at: new Date().toISOString(),
-                          id: recipe.saved_id || Date.now().toString()
-                        }]);
-                        
-                        if (newList) {
-                          console.log('Grocery list created successfully:', newList);
-                        } else {
-                          console.error('Failed to create grocery list');
+                        setIsCreatingList(true);
+                        try {
+                          const selectedItems = recipe.ingredients.filter((_, index) => selectedIngredients[index]);
+                          
+                          // Create new list with selected ingredients
+                          const newList = await createGroceryList(newGroceryListName, [{
+                            title: recipe.title,
+                            thumbnail: recipe.thumbnail || '',
+                            ingredients: selectedItems,
+                            instructions: recipe.instructions,
+                            platform: recipe.platform || '',
+                            source: recipe.source || '',
+                            original_url: '',
+                            created_at: new Date().toISOString(),
+                            id: recipe.saved_id || Date.now().toString()
+                          }]);
+                          
+                          if (newList) {
+                            console.log('Grocery list created successfully:', newList);
+                          } else {
+                            console.error('Failed to create grocery list');
+                          }
+                          
+                          setShowListSelectionModal(false);
+                          setShowCreateNewList(false);
+                          setNewGroceryListName('');
+                          setSelectedIngredients(new Array(recipe.ingredients.length).fill(true));
+                        } finally {
+                          setIsCreatingList(false);
                         }
-                        
-                        setShowListSelectionModal(false);
-                        setShowCreateNewList(false);
-                        setNewGroceryListName('');
-                        setSelectedIngredients(new Array(recipe.ingredients.length).fill(true));
                       }}
-                      disabled={!newGroceryListName}
+                      disabled={!newGroceryListName || isCreatingList}
                       className="flex-1"
                     >
-                      Create
+                      {isCreatingList ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Creating...
+                        </span>
+                      ) : 'Create'}
                     </Button>
                   </div>
                 </div>

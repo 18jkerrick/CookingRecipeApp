@@ -102,7 +102,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
           NEXT_PRIVATE_SUPABASE_KEY: ${{ secrets.NEXT_PRIVATE_SUPABASE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
 
       - name: Start Next.js app
         run: pnpm --filter @acme/web start -- --port 3000 &
@@ -111,7 +110,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
           NEXT_PRIVATE_SUPABASE_KEY: ${{ secrets.NEXT_PRIVATE_SUPABASE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
 
       - name: Wait for app
         run: npx wait-on http://127.0.0.1:3000/login

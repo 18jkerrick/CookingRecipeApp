@@ -53,12 +53,17 @@ test.describe('Grocery List Merge Journey', () => {
       },
     ]
 
-    await page.route('**/api/recipes', async (route) => {
+    // Use regex to match /api/recipes with or without query params
+    await page.route(/\/api\/recipes(\?.*)?$/, async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ recipes }),
+          body: JSON.stringify({
+            recipes,
+            nextCursor: null,
+            hasMore: false,
+          }),
         })
         return
       }
@@ -175,7 +180,11 @@ test.describe('Grocery List Merge Journey', () => {
 
   test('adds another recipe to an existing list', async ({ page }) => {
     await page.goto('/cookbooks')
-    await page.getByRole('link', { name: /grocery lists/i }).click()
+    // Use Promise.all to ensure navigation completes after click
+    await Promise.all([
+      page.waitForURL(/\/grocery-list/),
+      page.getByRole('link', { name: /grocery lists/i }).click(),
+    ])
     await expect(page).toHaveURL(/\/grocery-list/)
 
     await expect(page.getByText(/weeknight dinner/i)).toBeVisible()
