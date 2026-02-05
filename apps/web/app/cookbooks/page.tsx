@@ -3,7 +3,6 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@acme/db/client'
 import PushNotificationPrompt from '../../components/shared/PushNotificationPrompt'
 import RecipeCard from '../../components/features/recipe/RecipeCard'
 import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'
@@ -17,25 +16,16 @@ import { useInfiniteScroll } from '../../hooks/useInfiniteScroll'
 import { RecipeGridSkeleton } from '../../components/skeletons'
 
 export default function Cookbooks() {
-  const { user, loading } = useAuth()
+  const { user, loading, accessToken } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
-  const [token, setToken] = useState<string | null>(null)
   const router = useRouter()
   
   // Save this page as the last visited
   useNavigationPersistence()
 
-  // Get auth token for API calls
-  useEffect(() => {
-    const getToken = async () => {
-      const { data: session } = await supabase.auth.getSession()
-      setToken(session?.session?.access_token ?? null)
-    }
-    if (user) {
-      getToken()
-    }
-  }, [user])
+  // Use token directly from auth context (no extra fetch needed)
+  const token = accessToken
 
   // Use React Query for recipes with infinite scroll
   const {

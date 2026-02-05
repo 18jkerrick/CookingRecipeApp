@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { AuthError, User } from '@supabase/supabase-js'
+import { AuthError, User, Session } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@acme/db/client'
 
@@ -9,6 +9,8 @@ type SignUpResult = Awaited<ReturnType<typeof supabase.auth.signUp>>
 
 interface AuthContextType {
   user: User | null
+  session: Session | null
+  accessToken: string | null
   signInWithGoogle: () => Promise<void>
   signInWithApple: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<AuthError | null>
@@ -24,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
   const router = useRouter()
@@ -34,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
     })
@@ -41,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
       if (event === 'SIGNED_IN' && session?.user) {
@@ -118,6 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
+    session,
+    accessToken: session?.access_token ?? null,
     signInWithGoogle,
     signInWithApple,
     signInWithEmail,

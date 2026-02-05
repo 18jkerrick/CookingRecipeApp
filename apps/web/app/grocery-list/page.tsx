@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { supabase } from '@acme/db/client'
 import { useUnitPreference, formatMeasurement } from '../../hooks/useUnitPreference'
 import { Filter, Plus, ChevronDown, Edit3, Trash2, ShoppingCart, Share } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -144,25 +143,16 @@ const CardImage = ({ item, recipes, sortBy }: {
 
 
 export default function GroceryLists() {
-  const { user, signOut, loading } = useAuth()
+  const { user, signOut, loading, accessToken } = useAuth()
   const [isClient, setIsClient] = useState(false)
-  const [token, setToken] = useState<string | null>(null)
   const router = useRouter()
   const unitPreference = useUnitPreference()
   
   // Save this page as the last visited
   useNavigationPersistence()
 
-  // Get auth token for API calls
-  useEffect(() => {
-    const getToken = async () => {
-      const { data: session } = await supabase.auth.getSession()
-      setToken(session?.session?.access_token ?? null)
-    }
-    if (user) {
-      getToken()
-    }
-  }, [user])
+  // Use token directly from auth context
+  const token = accessToken
 
   // Use React Query for recipes
   const { recipes: fetchedRecipes, isLoading: isLoadingRecipes } = useRecipesQuery(token, { enabled: !!user })

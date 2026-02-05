@@ -3,7 +3,6 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@acme/db/client'
 import { Search, Filter, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { convertMealPlansToWeekPlan, convertWeekPlanToMealPlans, MEAL_TYPES, DayPlan, getStartOfWeek } from '@/lib/meal-plan'
@@ -26,24 +25,15 @@ interface Recipe {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function MealPlanner() {
-  const { user, loading } = useAuth()
+  const { user, loading, accessToken } = useAuth()
   const [isClient, setIsClient] = useState(false)
-  const [token, setToken] = useState<string | null>(null)
   const router = useRouter()
   
   // Save this page as the last visited
   useNavigationPersistence()
 
-  // Get auth token for API calls
-  useEffect(() => {
-    const getToken = async () => {
-      const { data: session } = await supabase.auth.getSession()
-      setToken(session?.session?.access_token ?? null)
-    }
-    if (user) {
-      getToken()
-    }
-  }, [user])
+  // Use token directly from auth context
+  const token = accessToken
 
   // Use React Query for recipes
   const { recipes: fetchedRecipes, isLoading: isLoadingRecipes } = useRecipes(token, { enabled: !!user })
