@@ -90,7 +90,6 @@ export default function RecipeCard({
       
       {/* Recipe content */}
       <div className="p-4 h-20 flex flex-col justify-start">
-      <div className="p-4 h-20 flex flex-col justify-start">
         {/* Recipe title */}
         <h3 className="font-medium text-wk-text-primary leading-tight text-center line-clamp-2 font-body">
           {title}
