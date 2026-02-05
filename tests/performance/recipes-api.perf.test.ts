@@ -9,8 +9,10 @@ import { PERF_THRESHOLDS } from './thresholds'
  * 
  * Note: These tests require authentication. Set up test user credentials
  * in your test environment.
+ * 
+ * Run with: TEST_API_URL=http://localhost:3000 TEST_AUTH_TOKEN=<token> pnpm test tests/performance
  */
-describe('Recipes API Performance', () => {
+describe.skipIf(!process.env.TEST_API_URL)('Recipes API Performance', () => {
   let authHeaders: HeadersInit
   const baseUrl = process.env.TEST_API_URL || 'http://localhost:3000'
   

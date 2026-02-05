@@ -1,33 +1,60 @@
 'use client'
 
 import { useAuth } from '../../context/AuthContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@acme/db/client'
 import PushNotificationPrompt from '../../components/shared/PushNotificationPrompt'
 import RecipeCard from '../../components/features/recipe/RecipeCard'
 import RecipeDetailModal from '../../components/features/recipe/RecipeDetailModal'
 import { Navigation } from '../../components/shared/Navigation'
-import { Search, Filter } from "lucide-react"
+import { Search, Filter, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useNavigationPersistence } from '../../hooks/useNavigationPersistence'
+import { useRecipes, useDeleteRecipe } from '../../hooks/useRecipes'
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll'
+import { RecipeGridSkeleton } from '../../components/skeletons'
 
 export default function Cookbooks() {
   const { user, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
   const router = useRouter()
   
   // Save this page as the last visited
   useNavigationPersistence()
 
-  // Recipe state management
-  const [recipes, setRecipes] = useState<any[]>([])
+  // Get auth token for API calls
+  useEffect(() => {
+    const getToken = async () => {
+      const { data: session } = await supabase.auth.getSession()
+      setToken(session?.session?.access_token ?? null)
+    }
+    if (user) {
+      getToken()
+    }
+  }, [user])
+
+  // Use React Query for recipes with infinite scroll
+  const {
+    recipes: fetchedRecipes,
+    isLoading: isLoadingRecipes,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    refetch: refetchRecipes,
+  } = useRecipes(token, { enabled: !!user })
+
+  // Delete mutation with optimistic update
+  const deleteRecipeMutation = useDeleteRecipe(token)
+
+  // Local state for processing cards (recipes being extracted)
+  const [processingRecipes, setProcessingRecipes] = useState<any[]>([])
   const [isExtracting, setIsExtracting] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
   const [showRecipeModal, setShowRecipeModal] = useState(false)
-  const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set())
   const [url, setUrl] = useState('')
   const [extractionPhase, setExtractionPhase] = useState<'text' | 'audio' | 'video'>('text')
   
@@ -35,6 +62,13 @@ export default function Cookbooks() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterOption, setFilterOption] = useState<'recent' | 'oldest' | 'alphabetical'>('recent')
   const [showFilterMenu, setShowFilterMenu] = useState(false)
+
+  // Infinite scroll sentinel ref
+  const sentinelRef = useInfiniteScroll(
+    () => fetchNextPage(),
+    hasNextPage ?? false,
+    isFetchingNextPage
+  )
 
   useEffect(() => {
     setIsClient(true)
@@ -52,75 +86,46 @@ export default function Cookbooks() {
     }
   }, [showFilterMenu])
 
-  // Load saved recipes on mount
-  useEffect(() => {
-    if (user) {
-      loadSavedRecipes()
-    }
-  }, [user])
+  // Convert fetched recipes to display format
+  const recipes = useMemo(() => {
+    const formattedRecipes = fetchedRecipes.map((recipe) => ({
+      id: recipe.id,
+      title: recipe.title,
+      imageUrl: recipe.thumbnail || '',
+      processing: false,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      platform: recipe.platform,
+      source: recipe.source,
+      thumbnail: recipe.thumbnail || '',
+      saved_id: recipe.id,
+      created_at: recipe.created_at,
+      normalized_ingredients: recipe.normalized_ingredients,
+    }))
+    // Processing cards always go first
+    return [...processingRecipes, ...formattedRecipes]
+  }, [fetchedRecipes, processingRecipes])
 
-  const loadSavedRecipes = async () => {
-    if (!user) return
-
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session?.session?.access_token) return
-
-      const response = await fetch('/api/recipes', {
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`
-        }
-      })
-
-      if (response.ok) {
-        const { recipes: savedRecipes } = await response.json()
-        
-        // Convert saved recipes to our format and track their IDs
-        const formattedRecipes = savedRecipes.map((recipe: any) => ({
-          id: recipe.id,
-          title: recipe.title,
-          imageUrl: recipe.thumbnail || '',
-          processing: false,
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-          platform: recipe.platform,
-          source: recipe.source,
-          thumbnail: recipe.thumbnail || '',
-          saved_id: recipe.id, // Track the database ID
-          created_at: recipe.created_at // Preserve the creation timestamp
-        }))
-
-        // Preserve any existing processing cards at the front when loading saved recipes
-        setRecipes(prev => {
-          const processingCards = prev.filter(recipe => recipe.processing)
-          return [...processingCards, ...formattedRecipes]
-        })
-        setSavedRecipeIds(new Set(savedRecipes.map((r: any) => r.id)))
-      }
-    } catch (error) {
-      console.error('Error loading saved recipes:', error)
-    }
-  }
+  // Track saved recipe IDs from fetched data
+  const savedRecipeIds = useMemo(() => 
+    new Set(fetchedRecipes.map(r => r.id)),
+    [fetchedRecipes]
+  )
 
   const saveRecipe = async (recipe: any, originalUrl?: string) => {
-    if (!user) {
-      console.log('Cannot save recipe: No user')
+    if (!user || !token) {
+      console.log('Cannot save recipe: No user or token')
       return null
     }
 
     try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session?.session?.access_token) {
-        console.log('Cannot save recipe: No session token')
-        return null
-      }
       console.log('Saving recipe with auth token...')
 
       const response = await fetch('/api/recipes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.session.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           title: recipe.title,
@@ -137,7 +142,8 @@ export default function Cookbooks() {
       if (response.ok) {
         const { recipe: savedRecipe } = await response.json()
         console.log('Recipe saved successfully:', savedRecipe.id)
-        setSavedRecipeIds(prev => new Set([...prev, savedRecipe.id]))
+        // Refetch to get the new recipe in the list
+        refetchRecipes()
         return savedRecipe.id
       } else {
         const errorData = await response.json()
@@ -153,31 +159,12 @@ export default function Cookbooks() {
     if (!user) return false
 
     try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session?.session?.access_token) return false
-
-      const response = await fetch(`/api/recipes/${savedId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`
-        }
-      })
-
-      if (response.ok) {
-        setSavedRecipeIds(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(savedId)
-          return newSet
-        })
-        
-        // Remove from recipes list
-        setRecipes(prev => prev.filter(recipe => recipe.saved_id !== savedId))
-        return true
-      }
+      await deleteRecipeMutation.mutateAsync(savedId)
+      return true
     } catch (error) {
       console.error('Error deleting recipe:', error)
+      return false
     }
-    return false
   }
 
   useEffect(() => {
@@ -255,29 +242,19 @@ export default function Cookbooks() {
         const savedId = await saveRecipe(newRecipe, urlToExtract)
         console.log('Recipe save result:', savedId)
         
-        // Replace the processing card with the actual recipe (maintain front position)
-        setRecipes(prev => 
-          prev.map(recipe => 
-            recipe.id === processingId 
-              ? {
-                  ...newRecipe,
-                  saved_id: savedId, // Track the database ID
-                  created_at: new Date().toISOString() // Add current timestamp
-                }
-              : recipe
-          )
-        )
+        // Remove the processing card - the saved recipe will appear via React Query refetch
+        setProcessingRecipes(prev => prev.filter(recipe => recipe.id !== processingId))
         
         console.log('Recipe extracted and saved successfully:', data)
       } else {
         // Remove the processing card and show error
-        setRecipes(prev => prev.filter(recipe => recipe.id !== processingId))
+        setProcessingRecipes(prev => prev.filter(recipe => recipe.id !== processingId))
         alert(data.error || data.message || 'Failed to extract recipe. Please try a different URL.')
       }
     } catch (error) {
       console.error('Error extracting recipe:', error)
       // Remove the processing card and show error
-      setRecipes(prev => prev.filter(recipe => recipe.id !== processingId))
+      setProcessingRecipes(prev => prev.filter(recipe => recipe.id !== processingId))
       
       // More specific error messages
       if (error instanceof Error) {
@@ -306,7 +283,7 @@ export default function Cookbooks() {
     if (url.trim()) {
       // Add processing card immediately before any API calls
       const processingId = Date.now()
-      setRecipes(prev => [{
+      setProcessingRecipes(prev => [{
         id: processingId,
         title: '',
         imageUrl: '',
@@ -377,8 +354,18 @@ export default function Cookbooks() {
   // Show loading until client-side hydration is complete
   if (!isClient || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-wk-bg-primary">
-        <div className="text-lg text-wk-text-primary">Loading...</div>
+      <div className="min-h-screen bg-wk-bg-primary">
+        <Navigation currentPath="/cookbooks" />
+        <section className="container mx-auto px-4 py-8 md:py-10 text-center">
+          <div className="max-w-2xl mx-auto p-6 md:p-8 rounded-xl bg-wk-bg-surface shadow-wk">
+            <div className="h-8 bg-wk-bg-surface-hover rounded w-1/3 mx-auto mb-2 animate-pulse" />
+            <div className="h-4 bg-wk-bg-surface-hover rounded w-2/3 mx-auto mb-6 animate-pulse" />
+            <div className="h-10 bg-wk-bg-surface-hover rounded animate-pulse" />
+          </div>
+        </section>
+        <section className="container mx-auto px-4 py-4 md:py-6">
+          <RecipeGridSkeleton count={8} />
+        </section>
       </div>
     )
   }
@@ -472,18 +459,35 @@ export default function Cookbooks() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {getFilteredAndSortedRecipes().map((recipe) => (
-            <div key={recipe.id} onClick={() => handleRecipeClick(recipe)}>
-              <RecipeCard
-                title={recipe.title}
-                imageUrl={recipe.imageUrl}
-                processing={recipe.processing}
-                extractionPhase={recipe.processing ? extractionPhase : undefined}
-              />
+        {/* Show skeleton while loading initial data */}
+        {isLoadingRecipes && recipes.length === 0 ? (
+          <RecipeGridSkeleton count={8} />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {getFilteredAndSortedRecipes().map((recipe) => (
+                <div key={recipe.id} onClick={() => handleRecipeClick(recipe)}>
+                  <RecipeCard
+                    title={recipe.title}
+                    imageUrl={recipe.imageUrl}
+                    processing={recipe.processing}
+                    extractionPhase={recipe.processing ? extractionPhase : undefined}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+            
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-4" />
+            
+            {/* Loading indicator for next page */}
+            {isFetchingNextPage && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-wk-accent" />
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       <PushNotificationPrompt
