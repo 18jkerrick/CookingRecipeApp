@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '../../context/AuthContext'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { supabase } from '@acme/db/client'
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Navigation } from '../../components/shared/Navigation'
 import NetflixCarousel from '../../components/features/grocery/NetflixCarousel'
+import { useRecipes as useRecipesQuery } from '../../hooks/useRecipes'
 import { 
   GroceryList, 
   GroceryItem, 
@@ -145,14 +146,44 @@ const CardImage = ({ item, recipes, sortBy }: {
 export default function GroceryLists() {
   const { user, signOut, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
   const router = useRouter()
   const unitPreference = useUnitPreference()
   
   // Save this page as the last visited
   useNavigationPersistence()
 
-  // Data state
-  const [recipes, setRecipes] = useState<Recipe[]>([])
+  // Get auth token for API calls
+  useEffect(() => {
+    const getToken = async () => {
+      const { data: session } = await supabase.auth.getSession()
+      setToken(session?.session?.access_token ?? null)
+    }
+    if (user) {
+      getToken()
+    }
+  }, [user])
+
+  // Use React Query for recipes
+  const { recipes: fetchedRecipes, isLoading: isLoadingRecipes } = useRecipesQuery(token, { enabled: !!user })
+
+  // Convert fetched recipes to local format
+  const recipes = useMemo(() => {
+    return fetchedRecipes.map((recipe) => ({
+      id: recipe.id,
+      title: recipe.title,
+      imageUrl: recipe.thumbnail || '',
+      thumbnail: recipe.thumbnail,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      platform: recipe.platform || '',
+      source: recipe.source || '',
+      original_url: recipe.original_url,
+      created_at: recipe.created_at,
+      saved_id: recipe.id,
+      normalized_ingredients: recipe.normalized_ingredients || []
+    }))
+  }, [fetchedRecipes])
   const [groceryLists, setGroceryLists] = useState<GroceryList[]>([])
   const [selectedList, setSelectedList] = useState<GroceryList | null>(null)
 
@@ -217,7 +248,6 @@ export default function GroceryLists() {
       return
     }
     if (user) {
-      loadRecipes()
       loadGroceryLists()
     }
   }, [isClient, loading, user, router])
@@ -247,42 +277,6 @@ export default function GroceryLists() {
 
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showShareDropdown]);
-
-  const loadRecipes = async () => {
-    if (!user) return
-
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session?.session?.access_token) return
-
-      const response = await fetch('/api/recipes', {
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`
-        }
-      })
-
-      if (response.ok) {
-        const { recipes: savedRecipes } = await response.json()
-        const formattedRecipes = savedRecipes.map((recipe: any) => ({
-          id: recipe.id,
-          title: recipe.title,
-          imageUrl: recipe.thumbnail || '',
-          thumbnail: recipe.thumbnail,
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-          platform: recipe.platform || '',
-          source: recipe.source || '',
-          original_url: recipe.original_url,
-          created_at: recipe.created_at,
-          saved_id: recipe.id,
-          normalized_ingredients: recipe.normalized_ingredients || []
-        }))
-        setRecipes(formattedRecipes)
-      }
-    } catch (error) {
-      console.error('Error loading recipes:', error)
-    }
-  }
 
   const loadGroceryLists = async () => {
     try {
