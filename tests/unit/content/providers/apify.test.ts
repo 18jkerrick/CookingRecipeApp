@@ -125,8 +125,7 @@ describe('ApifyProvider', () => {
       expect(result.caption).toBe('Recipe video caption with ingredients')
     })
 
-    // TODO: Fix fake timer handling - test logic works but leaves unhandled rejections
-    it.skip('throws ContentAcquisitionError on timeout after max wait time', async () => {
+    it('throws ContentAcquisitionError on timeout after max wait time', async () => {
       // Create provider with shorter timeout for test
       const shortTimeoutProvider = new ApifyProvider({
         apiToken: 'test-apify-api-token',
@@ -156,43 +155,20 @@ describe('ApifyProvider', () => {
         }),
       })
 
-      const acquirePromise = shortTimeoutProvider.acquire(tiktokUrl)
+      // Capture rejection immediately to prevent unhandled rejection warning
+      const acquirePromise = shortTimeoutProvider.acquire(tiktokUrl).catch((e) => e)
 
       // Advance time past the timeout
-      await vi.advanceTimersByTimeAsync(6000)
+      await vi.runAllTimersAsync()
 
-      await expect(acquirePromise).rejects.toThrow(ContentAcquisitionError)
-
-      try {
-        // Reset mocks for another attempt
-        mockFetch.mockClear()
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            data: { id: actorRunId, defaultDatasetId: datasetId },
-          }),
-        })
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            data: { id: actorRunId, status: 'RUNNING' },
-          }),
-        })
-
-        const promise = shortTimeoutProvider.acquire(tiktokUrl)
-        await vi.advanceTimersByTimeAsync(6000)
-        await promise
-      } catch (error) {
-        expect(error).toBeInstanceOf(ContentAcquisitionError)
-        const acquisitionError = error as ContentAcquisitionError
-        expect(acquisitionError.message).toMatch(/timeout/i)
-        expect(acquisitionError.provider).toBe('apify')
-        expect(acquisitionError.isRetryable).toBe(true)
-      }
+      const error = await acquirePromise
+      expect(error).toBeInstanceOf(ContentAcquisitionError)
+      expect(error.message).toMatch(/timeout/i)
+      expect(error.provider).toBe('apify')
+      expect(error.isRetryable).toBe(true)
     })
 
-    // TODO: Fix fake timer handling - test logic works but leaves unhandled rejections
-    it.skip('handles FAILED run status', async () => {
+    it('handles FAILED run status', async () => {
       // Mock: Create actor run
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -216,42 +192,19 @@ describe('ApifyProvider', () => {
         }),
       })
 
-      const acquirePromise = provider.acquire(tiktokUrl)
+      // Capture rejection immediately to prevent unhandled rejection warning
+      const acquirePromise = provider.acquire(tiktokUrl).catch((e) => e)
 
       // Advance timers to trigger poll
-      await vi.advanceTimersByTimeAsync(1000)
+      await vi.runAllTimersAsync()
 
-      await expect(acquirePromise).rejects.toThrow(ContentAcquisitionError)
-
-      try {
-        // Reset and try again
-        mockFetch.mockClear()
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            data: { id: actorRunId, defaultDatasetId: datasetId },
-          }),
-        })
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            data: { id: actorRunId, status: 'FAILED' },
-          }),
-        })
-
-        const promise = provider.acquire(tiktokUrl)
-        await vi.advanceTimersByTimeAsync(1000)
-        await promise
-      } catch (error) {
-        expect(error).toBeInstanceOf(ContentAcquisitionError)
-        const acquisitionError = error as ContentAcquisitionError
-        expect(acquisitionError.provider).toBe('apify')
-        expect(acquisitionError.isRetryable).toBe(false)
-      }
+      const error = await acquirePromise
+      expect(error).toBeInstanceOf(ContentAcquisitionError)
+      expect(error.provider).toBe('apify')
+      expect(error.isRetryable).toBe(false)
     })
 
-    // TODO: Fix fake timer handling - test logic works but leaves unhandled rejections
-    it.skip('handles ABORTED run status', async () => {
+    it('handles ABORTED run status', async () => {
       // Mock: Create actor run
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -274,10 +227,13 @@ describe('ApifyProvider', () => {
         }),
       })
 
-      const acquirePromise = provider.acquire(tiktokUrl)
-      await vi.advanceTimersByTimeAsync(1000)
+      // Capture rejection immediately to prevent unhandled rejection warning
+      const acquirePromise = provider.acquire(tiktokUrl).catch((e) => e)
+      await vi.runAllTimersAsync()
 
-      await expect(acquirePromise).rejects.toThrow(ContentAcquisitionError)
+      const error = await acquirePromise
+      expect(error).toBeInstanceOf(ContentAcquisitionError)
+      expect(error.message).toMatch(/aborted/i)
     })
 
     it('throws on actor run creation failure', async () => {
@@ -292,8 +248,7 @@ describe('ApifyProvider', () => {
       )
     })
 
-    // TODO: Fix fake timer handling - test logic works but leaves unhandled rejections
-    it.skip('throws on dataset fetch failure', async () => {
+    it('throws on dataset fetch failure', async () => {
       // Mock: Create actor run
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -323,19 +278,16 @@ describe('ApifyProvider', () => {
         statusText: 'Internal Server Error',
       })
 
-      // Run timers and catch expected rejection
-      try {
-        const acquirePromise = provider.acquire(tiktokUrl)
-        await vi.runAllTimersAsync()
-        await acquirePromise
-        expect.fail('Should have thrown ContentAcquisitionError')
-      } catch (error) {
-        expect(error).toBeInstanceOf(ContentAcquisitionError)
-      }
+      // Capture rejection immediately to prevent unhandled rejection warning
+      const acquirePromise = provider.acquire(tiktokUrl).catch((e) => e)
+      await vi.runAllTimersAsync()
+
+      const error = await acquirePromise
+      expect(error).toBeInstanceOf(ContentAcquisitionError)
+      expect(error.message).toMatch(/dataset/i)
     })
 
-    // TODO: Fix fake timer handling - test logic works but leaves unhandled rejections
-    it.skip('handles empty dataset results', async () => {
+    it('handles empty dataset results', async () => {
       // Mock: Create actor run
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -364,15 +316,13 @@ describe('ApifyProvider', () => {
         json: async () => [],
       })
 
-      // Run timers and catch expected rejection
-      try {
-        const acquirePromise = provider.acquire(tiktokUrl)
-        await vi.runAllTimersAsync()
-        await acquirePromise
-        expect.fail('Should have thrown ContentAcquisitionError')
-      } catch (error) {
-        expect(error).toBeInstanceOf(ContentAcquisitionError)
-      }
+      // Capture rejection immediately to prevent unhandled rejection warning
+      const acquirePromise = provider.acquire(tiktokUrl).catch((e) => e)
+      await vi.runAllTimersAsync()
+
+      const error = await acquirePromise
+      expect(error).toBeInstanceOf(ContentAcquisitionError)
+      expect(error.message).toMatch(/no results/i)
     })
   })
 
