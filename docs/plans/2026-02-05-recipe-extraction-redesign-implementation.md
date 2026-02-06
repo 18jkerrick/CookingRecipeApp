@@ -214,6 +214,14 @@ git commit -m "feat(content): add content acquisition types and interfaces"
 
 ### Task 1.2: Implement Supadata Provider
 
+> **Implementation Note (Updated 2026-02-05):** The actual implementation uses a two-endpoint strategy:
+> 1. `GET /v1/metadata?url=...` - Retrieves caption, title, author, stats for ALL platforms
+> 2. `GET /v1/transcript?url=...&text=true&mode=auto` - Retrieves audio transcript for video content
+>
+> This ensures captions/descriptions are always retrieved first (primary text source), with transcripts
+> added for video content. The code examples below were the original plan; see actual implementation
+> in `packages/core/src/content/providers/supadata.ts`.
+
 **Files:**
 - Create: `packages/core/src/content/providers/supadata.ts`
 - Test: `tests/unit/content/providers/supadata.test.ts`

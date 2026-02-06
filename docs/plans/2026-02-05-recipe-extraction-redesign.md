@@ -22,7 +22,8 @@ The current recipe extraction system has multiple failure modes:
 | LLM Model | GPT-4o-mini with structured outputs | Better accuracy, cheaper than 3.5-turbo, guaranteed valid JSON |
 | Completeness Check | AI confidence scoring (0-1 scale) | Avoids arbitrary thresholds, LLM reasons about recipe completeness |
 | Prompt Strategy | Single-pass with structured schema | Two-pass or CoT adds latency without proportional accuracy gain |
-| Audio Transcription | Supadata's Whisper-based transcript API | Replaces custom audio pipeline |
+| Caption/Metadata | Supadata `/v1/metadata` endpoint | Gets title, description, author, stats for all platforms |
+| Audio Transcription | Supadata `/v1/transcript` endpoint | Whisper-based, called after metadata if video content |
 | Visual Extraction | Improved: smart frames, parallel analysis, context-aware prompts | 2-3x faster, better accuracy |
 | Testing | Semantic similarity with embeddings (threshold ~0.85) | Handles natural language variance |
 | Fallback Threshold | Confidence < 0.8 triggers visual extraction | Balances accuracy vs speed |
@@ -40,9 +41,9 @@ Platform Detection (YouTube/TikTok/Instagram/Facebook/Pinterest/Blog)
     ↓
 ┌─────────────────────────────────────────────────────────┐
 │  Stage 1: Content Acquisition (Supadata → Apify fallback) │
-│  - Caption/description text                              │
-│  - Transcript (Supadata's Whisper-based generation)      │
-│  - Video metadata (title, author, etc.)                  │
+│  Step 1a: GET /v1/metadata → caption, title, author      │
+│  Step 1b: GET /v1/transcript → audio transcript (videos) │
+│  - Apify fallback for TikTok/Instagram if Supadata fails │
 └─────────────────────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -67,10 +68,12 @@ Return recipe (with completeness indicator)
 
 ### Key Changes from Current System
 
-- Supadata replaces custom scrapers for caption + transcript acquisition
+- Supadata replaces custom scrapers:
+  - `/v1/metadata` for captions/descriptions (primary text source)
+  - `/v1/transcript` for audio transcripts (video content only)
 - Single LLM call with confidence scoring determines fallback need
 - Visual extraction only triggered when confidence is low
-- Apify as backup if Supadata fails
+- Apify as backup for TikTok/Instagram if Supadata fails
 
 ---
 
