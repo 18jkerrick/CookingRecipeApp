@@ -24,3 +24,11 @@ export {
   createCaptionExtractor,
   type CaptionExtractorConfig,
 } from './extractors/caption-extractor';
+
+// Confidence Scoring
+export {
+  ConfidenceScorer,
+  createConfidenceScorer,
+  type ConfidenceScorerConfig,
+  type FallbackDecision,
+} from './confidence-scorer';
