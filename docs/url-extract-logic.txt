@@ -1,0 +1,131 @@
+This document breaks down the logic that our application should follow 
+once it determines what the base url/platform is. 
+
+FOR ALL PLATFORMS, WE SHOULD BE ABLE TO HANDLE INVALID URLS. Ex: fsdgfg (does not have .com, .org, .co, etc.)
+
+Base URL/platform's that we support:
+
+1. Tiktok -> baseurl = tiktok.com
+    - There are two types of formats that tiktok users can post
+        1. a normal video. Ex url: https://www.tiktok.com/@subwaytakes/video/7603026907248020766
+        2. a photo slideshow. Ex url (this is not a recipe fyi, just to show ex url): https://www.tiktok.com/@saradeani/photo/7274254101884538145?_r=1&_t=ZT-93gF9KWQ4Io
+    
+    Steps: 
+    1. For video 
+        - Try to get title, ingredients and instructions from the text.
+        - These are not mutually exclusive, you may be able to get the title from the text on the post,
+        but not the ingredients or instructions. 
+        - If any of these 3 (title, ingredients and instructions) are missing, move on to the next extraction
+        step
+        - The next extraction step is audio. Sometimes there will be a transcript, but othertimes 
+        we will have to use a transciber tool or api to take the audio and put it into text. 
+        - Move on to the next extraction step if you still do not have all 3 fields (title, ingredients and instructions)
+        - The final method is visual. We will take photos periodically of the video. Then we analyze with computer vision.
+        This is currently implemented with some type of computer vision. 
+        - if we still do not have all three, return a placeholder to the user in the newly created recipe created
+
+    2. For slideshows
+        - We try the same steps as before except, we will never try to get audio. 
+        - We will also not need to take screenshots periodically for the visual step. This 
+        is because we will just download the photos from the photo slideshow and analyze those.  
+
+2. Instagram -> baseurl = instagram.com
+     - There are two types of formats that tiktok users can post
+        1. Posts. Ex url: https://www.instagram.com/p/DTJukFfjVZv/ or https://www.tiktok.com/@bradyyourtutor/video/7602038479291206942?is_from_webapp=1
+        2. Reels. Ex url: https://www.instagram.com/reels/DUWe9HUEkVT/
+    Steps: 
+    1. Posts (sometimes video's, sometimes photos. Adjust accordingly)
+        - If it is a photo slideshow, it will have "img_index={1,2,3,n}" in the url.
+        - Try to get title, ingredients and instructions from the text.
+        - These are not mutually exclusive, you may be able to get the title from the text on the post,
+        but not the ingredients or instructions. 
+        - If any of these 3 (title, ingredients and instructions) are missing, move on to the next extraction
+        step
+        - The next extraction step is audio. Sometimes there will be a transcript, but othertimes 
+        we will have to use a transciber tool or api to take the audio and put it into text. (not needed for photos)
+        - Move on to the next extraction step if you still do not have all 3 fields (title, ingredients and instructions)
+        - The final method is visual. We will take photos periodically of the video. Then we analyze with computer vision.
+        This is currently implemented with some type of computer vision. 
+        - If it is a photo slideshow, just download. Do not take screenshots because there is no video. 
+        - if we still do not have all three, return a placeholder to the user in the newly created recipe created
+    2. Reels
+        - Try to get title, ingredients and instructions from the text.
+        - These are not mutually exclusive, you may be able to get the title from the text on the post,
+        but not the ingredients or instructions. 
+        - If any of these 3 (title, ingredients and instructions) are missing, move on to the next extraction
+        step
+        - The next extraction step is audio. Sometimes there will be a transcript, but othertimes 
+        we will have to use a transciber tool or api to take the audio and put it into text. 
+        - Move on to the next extraction step if you still do not have all 3 fields (title, ingredients and instructions)
+        - The final method is visual. We will take photos periodically of the video. Then we analyze with computer vision.
+        This is currently implemented with some type of computer vision. 
+        - if we still do not have all three, return a placeholder to the user in the newly created recipe created
+
+3. Facebook -> baseurl = facebook.com
+     - There are two types of formats that tiktok users can post
+        1. Posts. Ex url: https://www.facebook.com/HomeandLifeHack/posts/pfbid0K1emYhduuGzhHYaYwftpG75X1AALRwGucVm4uz3tffLRsH57ESUsnUqjLuR6seFKl
+        2. Reels. Ex url: https://www.facebook.com/reel/1528342874885740
+    Steps: 
+    1. Posts (sometimes a video, sometimes just a photo)
+        - if it is just a photo, the fields we want will almost always be in the caption/title/comments (first 5). 
+        if it is not, then sometimes it is in the photo, so just download and analyze with computer vision. 
+        - Try to get title, ingredients and instructions from the text.
+        - These are not mutually exclusive, you may be able to get the title from the text on the post,
+        but not the ingredients or instructions. 
+        - If any of these 3 (title, ingredients and instructions) are missing, move on to the next extraction
+        step
+        - The next extraction step is audio. Sometimes there will be a transcript, but othertimes 
+        we will have to use a transciber tool or api to take the audio and put it into text. (not needed for photos)
+        - Move on to the next extraction step if you still do not have all 3 fields (title, ingredients and instructions)
+        - The final method is visual. We will take photos periodically of the video. Then we analyze with computer vision.
+        This is currently implemented with some type of computer vision. 
+        - If it is a photo slideshow, just download. Do not take screenshots because there is no video. 
+        - if we still do not have all three, return a placeholder to the user in the newly created recipe created
+    2. Reels
+        - Always a video
+        - Try to get title, ingredients and instructions from the text.
+        - These are not mutually exclusive, you may be able to get the title from the text on the post,
+        but not the ingredients or instructions. 
+        - If any of these 3 (title, ingredients and instructions) are missing, move on to the next extraction
+        step
+        - The next extraction step is audio. Sometimes there will be a transcript, but othertimes 
+        we will have to use a transciber tool or api to take the audio and put it into text. 
+        - Move on to the next extraction step if you still do not have all 3 fields (title, ingredients and instructions)
+        - The final method is visual. We will take photos periodically of the video. Then we analyze with computer vision.
+        This is currently implemented with some type of computer vision. 
+        - if we still do not have all three, return a placeholder to the user in the newly created recipe created
+
+4. Youtube -> baseurl = youtube.com
+    - There are two types of formats that tiktok users can post
+        1. Videos. Ex url: https://www.youtube.com/watch?v=FYaRp7KSC_E
+        2. Shorts. Ex url: https://www.youtube.com/shorts/T4QAV9qbbD4
+    Steps: 
+    1. videos (always videos)
+        - Try to get title, ingredients and instructions from the text.
+        - These are not mutually exclusive, you may be able to get the title from the text on the post,
+        but not the ingredients or instructions. 
+        - If any of these 3 (title, ingredients and instructions) are missing, move on to the next extraction
+        step
+        - The next extraction step is audio. Sometimes there will be a transcript, but othertimes 
+        we will have to use a transciber tool or api to take the audio and put it into text. 
+        - Move on to the next extraction step if you still do not have all 3 fields (title, ingredients and instructions)
+        - The final method is visual. We will take photos periodically of the video. Then we analyze with computer vision.
+        This is currently implemented with some type of computer vision. 
+        - These videos can be long, so we want to make sure we have have checks to ensure we take large screenshot intervals. 
+        That way the extraction process does not take too long and cost us too much in API costs. 
+        - if we still do not have all three, return a placeholder to the user in the newly created recipe created
+    2. Shorts (always videos)
+        - basically the same and videos except that the metadata might be in a different format so 
+        watch out for that. 
+
+5. Pinterest -> baseurl = pinterest.com
+    steps: 
+    - Pinterest will have a button called "Visit site", if we follow that, it will take us to the 
+    recipe site or the cooking blog. From there we can scrape like in #6
+
+6. Other website/people's personal blogs
+    - there is no base url, it will be unique.
+    - could be behind a paywall, if it is then we handle gracefully and return an error to the user. 
+
+    steps: 
+    - extract indredients and instructions from website text. This will be mostly handled by webscapping 
