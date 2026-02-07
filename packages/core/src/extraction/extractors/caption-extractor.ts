@@ -69,6 +69,13 @@ const SYSTEM_PROMPT = `You are a recipe extraction expert. Your task is to extra
 - If quantity unclear, set quantity and unit to null
 - Include preparation notes (diced, minced, melted, etc.)
 
+**DEDUPLICATION RULES (CRITICAL)**:
+- NEVER list the same ingredient twice
+- If an ingredient is mentioned multiple times (e.g., "chicken" in title, then "2 lb chicken thighs" in recipe), only include the MOST SPECIFIC version with quantity
+- Merge duplicates: "chicken thighs" + "2 lb boneless skinless chicken thighs" → keep only "2 lb boneless skinless chicken thighs"
+- Bad: ["chicken thighs", "2 lb boneless skinless chicken thighs"] ← WRONG, duplicate
+- Good: ["2 lb boneless skinless chicken thighs"] ← CORRECT, deduplicated
+
 ### Instructions  
 - Extract cooking steps in logical order
 - Each step should be a complete action
@@ -96,6 +103,7 @@ Rate your extraction quality honestly:
 2. Don't hallucinate or add information not present in the source
 3. If content mentions food but has no recipe, return empty with low confidence
 4. Be conservative - it's better to return low confidence than fabricate content
+5. NEVER include duplicate ingredients - each ingredient should appear exactly ONCE
 
 ## OUTPUT FORMAT
 Return structured JSON matching the provided schema exactly.

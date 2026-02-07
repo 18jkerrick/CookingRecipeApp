@@ -18,6 +18,7 @@ import { extractVideoTitle } from '@acme/core/utils/titleExtractor';
 import { parseIngredients, NormalizedIngredient, formatIngredient } from '@acme/core/parsers/ingredient-parser';
 import { normalizeIngredientsWithAIBatch, AINormalizedIngredient } from '@acme/core/ai/ingredient-normalizer';
 import { createExtractionServiceFromEnv, type ExtractionResult } from '@acme/core/extraction';
+import { deduplicateIngredients } from '@/lib/ingredient-deduplication';
 
 // Feature flag for new extraction service
 const USE_NEW_EXTRACTION_SERVICE = process.env.USE_NEW_EXTRACTION_SERVICE === 'true';
@@ -36,6 +37,9 @@ function convertToLegacyFormat(result: ExtractionResult): {
   source: string;
 } {
   const { recipe, platform, usedVisualFallback } = result;
+  
+  // Apply deduplication (keeps most specific version, see lib/ingredient-deduplication.ts)
+  const dedupedIngredients = deduplicateIngredients(recipe.ingredients, true);
   
   // Helper to convert decimal to fraction with tolerance
   const toFraction = (qty: number): string => {
@@ -86,22 +90,22 @@ function convertToLegacyFormat(result: ExtractionResult): {
   };
 
   // Convert structured ingredients to display strings
-  const ingredientStrings = recipe.ingredients.map((ing) => {
+  const ingredientStrings = dedupedIngredients.map((ing) => {
     const parts: string[] = [];
     
     if (ing.quantity && ing.quantity > 0) {
       parts.push(toFraction(ing.quantity));
     }
     
-    if (ing.unit) parts.push(ing.unit);
-    if (ing.name) parts.push(ing.name);
-    if (ing.preparation) parts.push(`(${ing.preparation})`);
+    if (ing.unit) parts.push(ing.unit.toLowerCase());
+    if (ing.name) parts.push(ing.name.toLowerCase());
+    if (ing.preparation) parts.push(`(${ing.preparation.toLowerCase()})`);
     
-    return parts.join(' ') || ing.raw;
+    return parts.join(' ') || ing.raw.toLowerCase();
   });
   
   // Convert to NormalizedIngredient format
-  const normalizedIngredients: NormalizedIngredient[] = recipe.ingredients.map((ing) => {
+  const normalizedIngredients: NormalizedIngredient[] = dedupedIngredients.map((ing) => {
     const normalized: NormalizedIngredient = {
       quantity: ing.quantity || 0,
       ingredient: ing.name || '',
@@ -128,12 +132,21 @@ function convertToLegacyFormat(result: ExtractionResult): {
     pinterest: 'Pinterest',
   };
   
+  // Clean up instructions - remove redundant "Step X:" prefixes since UI shows step numbers
+  const cleanedInstructions = recipe.instructions.map((instruction) => {
+    // Remove patterns like "Step 1:", "Step 2:", "1.", "1)", "1:" at the start
+    return instruction
+      .replace(/^step\s*\d+\s*[:.\-)]\s*/i, '')  // "Step 1:", "Step 1.", "Step 1)"
+      .replace(/^\d+\s*[:.\-)]\s*/, '')          // "1:", "1.", "1)"
+      .trim();
+  });
+
   return {
     platform: platformMap[platform.toLowerCase()] || platform,
     title: recipe.title || 'Unknown Recipe',
     thumbnail: result.content.thumbnailUrl,
     ingredients: ingredientStrings,
-    instructions: recipe.instructions,
+    instructions: cleanedInstructions,
     normalizedIngredients,
     source,
   };

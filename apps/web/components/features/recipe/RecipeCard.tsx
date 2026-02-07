@@ -33,7 +33,7 @@ export default function RecipeCard({
     };
 
     return (
-      <div className="bg-[#1e1f26] rounded-xl overflow-hidden">
+      <div className="bg-wk-bg-surface rounded-xl overflow-hidden shadow-wk">
         {/* Shimmer background with Lottie Loading Animation */}
         <div className="aspect-square relative overflow-hidden">
           {/* Shimmer background - theme aware */}
@@ -59,11 +59,11 @@ export default function RecipeCard({
         
         {/* Dynamic loading text */}
         <div className="p-4 h-20 flex flex-col justify-center">
-          <p className="text-white/90 text-center text-sm font-medium">
+          <p className="text-wk-text-primary text-center text-sm font-medium">
             {getPhaseMessage()}
           </p>
           {extractionPhase === 'video' && (
-            <p className="text-white/50 text-center text-xs mt-1">
+            <p className="text-wk-text-muted text-center text-xs mt-1">
               This may take several minutes
             </p>
           )}

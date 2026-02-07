@@ -276,7 +276,8 @@ export class ExtractionService {
         provider: content.provider,
         hasCaption: Boolean(content.caption),
         hasTranscript: Boolean(content.transcript),
-        thumbnailUrl: content.thumbnailUrl || null,
+        // Use thumbnailUrl, or first image from slideshow/photo content
+        thumbnailUrl: content.thumbnailUrl || content.imageUrls?.[0] || null,
       },
       confidence: {
         initial: initialConfidence,
