@@ -118,12 +118,8 @@ const DEFAULT_CONFIG = {
  * Supadata returns default.jpg (120x90) but we want hqdefault.jpg (480x360)
  */
 function upgradeYouTubeThumbnailUrl(url: string): string {
-  // Match YouTube thumbnail URLs and upgrade resolution
-  // https://i.ytimg.com/vi/VIDEO_ID/default.jpg → https://i.ytimg.com/vi/VIDEO_ID/hqdefault.jpg
   if (url.includes('ytimg.com') && url.includes('/default.jpg')) {
-    const upgraded = url.replace('/default.jpg', '/hqdefault.jpg');
-    console.log(`[Supadata] Upgrading YouTube thumbnail: default.jpg → hqdefault.jpg`);
-    return upgraded;
+    return url.replace('/default.jpg', '/hqdefault.jpg');
   }
   return url;
 }
@@ -232,14 +228,6 @@ export class SupadataProvider implements ContentProvider {
       // Step 1: Get metadata (caption, title, description)
       const metadata = await this.fetchMetadata(url);
       const contentType = this.mapContentType(metadata.type, url, platform);
-      
-      // Debug log full metadata for troubleshooting missing thumbnails
-      console.log(`[Supadata] Full metadata for ${platform}:`, JSON.stringify({
-        type: metadata.type,
-        media: metadata.media,
-        hasAdditionalData: !!metadata.additionalData,
-        additionalDataKeys: metadata.additionalData ? Object.keys(metadata.additionalData) : [],
-      }, null, 2));
 
       // Step 2: For video content, try to get transcript
       let transcript: string | null = null;
@@ -263,23 +251,13 @@ export class SupadataProvider implements ContentProvider {
         thumbnailUrl = metadata.media.url;
       }
       
-      console.log(`[Supadata] Content type: ${contentType}, thumbnailUrl: ${thumbnailUrl ? 'present' : 'missing'}, imageUrls: ${imageUrls?.length || 0}`);
-      
       // Download thumbnail and convert to base64 to avoid CDN URL expiration
       // (Instagram/TikTok CDN URLs expire quickly)
       let thumbnailBase64: string | undefined;
       if (thumbnailUrl) {
-        // Upgrade low-resolution thumbnails (e.g., YouTube default.jpg)
         const upgradedUrl = upgradeYouTubeThumbnailUrl(thumbnailUrl);
-        console.log('[Supadata] Downloading thumbnail to convert to base64...');
         const downloaded = await downloadImageAsBase64(upgradedUrl);
-        if (downloaded) {
-          thumbnailBase64 = downloaded;
-          console.log('[Supadata] Thumbnail downloaded and converted to base64');
-        } else {
-          console.warn('[Supadata] Failed to download thumbnail, falling back to URL');
-          thumbnailBase64 = thumbnailUrl; // Fallback to URL if download fails
-        }
+        thumbnailBase64 = downloaded || thumbnailUrl; // Fallback to URL if download fails
       }
       
       return {

@@ -24,28 +24,17 @@ function parseHtmlForPinterestData(htmlContent: string): PinterestData {
   let description: string | null = null;
   let imageUrl: string | null = null;
 
-  // Debug: Log all meta tags with "og:" or "pinterest" to see what's available
-  const allMetaTags = htmlContent.match(/<meta[^>]+(?:property|name)=["'][^"']*(?:og:|pinterest)[^"']*["'][^>]*>/gi);
-  if (allMetaTags) {
-    console.log(`📌 Found ${allMetaTags.length} relevant meta tags`);
-    for (const tag of allMetaTags.slice(0, 10)) { // Log first 10
-      console.log(`   ${tag.substring(0, 150)}...`);
-    }
-  }
-
   // Extract og:image for pins without source URL (we can use visual extraction)
   const ogImageMatch = htmlContent.match(/<meta[^>]+(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
                        htmlContent.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i);
   if (ogImageMatch) {
     imageUrl = ogImageMatch[1];
-    console.log(`📌 Found og:image: ${imageUrl}`);
   }
 
   // Method 1: Look for og:see_also meta tag (most reliable for source URL)
   const ogSeeAlsoMatch = htmlContent.match(/<meta[^>]+property=["']og:see_also["'][^>]+content=["']([^"']+)["']/i);
   if (ogSeeAlsoMatch && isExternalUrl(ogSeeAlsoMatch[1])) {
     sourceUrl = ogSeeAlsoMatch[1];
-    console.log(`📌 Found source URL in og:see_also: ${sourceUrl}`);
   }
 
   // Method 2: Look for pinterestapp:source meta tag
@@ -53,7 +42,6 @@ function parseHtmlForPinterestData(htmlContent: string): PinterestData {
     const appSourceMatch = htmlContent.match(/<meta[^>]+name=["']pinterestapp:source["'][^>]+content=["']([^"']+)["']/i);
     if (appSourceMatch && isExternalUrl(appSourceMatch[1])) {
       sourceUrl = appSourceMatch[1];
-      console.log(`📌 Found source URL in pinterestapp:source: ${sourceUrl}`);
     }
   }
 
@@ -68,7 +56,6 @@ function parseHtmlForPinterestData(htmlContent: string): PinterestData {
           const mainEntityUrl = jsonData.mainEntityOfPage?.['@id'] || jsonData.url;
           if (mainEntityUrl && isExternalUrl(mainEntityUrl)) {
             sourceUrl = mainEntityUrl;
-            console.log(`📌 Found source URL in JSON-LD: ${sourceUrl}`);
             break;
           }
         } catch {
@@ -93,7 +80,6 @@ function parseHtmlForPinterestData(htmlContent: string): PinterestData {
               domain.includes('meal') || domain.includes('eat') ||
               domain.includes('chef') || domain.includes('yum')) {
             sourceUrl = url;
-            console.log(`📌 Found cooking website URL: ${sourceUrl}`);
             break;
           }
         } catch {
@@ -105,22 +91,18 @@ function parseHtmlForPinterestData(htmlContent: string): PinterestData {
 
   // Method 5: Look for external URLs in JavaScript strings (Pinterest often embeds data in JS)
   if (!sourceUrl) {
-    // Match URLs in JSON strings or JS variables
     const jsUrlMatches = htmlContent.matchAll(/"(https?:\/\/(?!(?:www\.)?pinterest\.com|pinimg\.com|schema\.org)[^"]+)"/gi);
     for (const match of jsUrlMatches) {
       const url = match[1];
       try {
-        // Decode any URL encoding
         const decodedUrl = decodeURIComponent(url.replace(/\\u002F/g, '/').replace(/\\\//g, '/'));
         if (isExternalUrl(decodedUrl) && !decodedUrl.includes('facebook.com') && !decodedUrl.includes('google.com')) {
           const urlObj = new URL(decodedUrl);
           const path = urlObj.pathname.toLowerCase();
-          // Look for URLs that look like recipe pages
           if (path.includes('recipe') || path.includes('chicken') || path.includes('food') || 
               path.includes('cook') || path.includes('dish') || path.includes('sauce') ||
               (path.length > 10 && path.split('/').length >= 2)) {
             sourceUrl = decodedUrl;
-            console.log(`📌 Found source URL in JS/JSON: ${sourceUrl}`);
             break;
           }
         }
@@ -161,19 +143,14 @@ function parseHtmlForPinterestData(htmlContent: string): PinterestData {
 }
 
 export async function getPinterestSourceUrl(url: string): Promise<PinterestData> {
-  console.log(`📌 Extracting source URL from Pinterest: ${url}`);
-  
   // First try: Simple HTTP fetch (fast, no browser needed)
-  // Use a real browser user agent to get fully rendered content
   try {
-    console.log('📌 Attempting simple HTTP fetch...');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        // Use real Chrome browser user agent - Pinterest serves more content to real browsers
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
@@ -188,29 +165,17 @@ export async function getPinterestSourceUrl(url: string): Promise<PinterestData>
 
     if (response.ok) {
       const htmlContent = await response.text();
-      console.log(`📌 HTTP fetch got ${htmlContent.length} chars`);
-      
       const result = parseHtmlForPinterestData(htmlContent);
-      if (result.sourceUrl) {
-        console.log(`📌 Pinterest extraction results (HTTP):`);
-        console.log(`   Source URL: ${result.sourceUrl}`);
-        console.log(`   Title: ${result.title || 'not found'}`);
-        return result;
-      }
       
-      // Even if no source URL, return what we have
-      if (result.title || result.description) {
-        console.log(`📌 No source URL found, but got metadata`);
+      if (result.sourceUrl || result.title || result.description) {
         return result;
       }
     }
-  } catch (fetchError) {
-    console.warn('📌 HTTP fetch failed:', fetchError instanceof Error ? fetchError.message : fetchError);
+  } catch {
+    // HTTP fetch failed, will try Puppeteer
   }
 
   // Second try: Puppeteer fallback (slower but more reliable for JS-heavy pages)
-  console.log('📌 HTTP fetch found no URL, trying Puppeteer fallback...');
-  
   let browser;
   try {
     const puppeteer = await import('puppeteer');
@@ -229,39 +194,29 @@ export async function getPinterestSourceUrl(url: string): Promise<PinterestData>
     });
 
     const page = await browser.newPage();
-    
-    // Use real Chrome browser user agent
     await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     
-    // Navigate with timeout
     await page.goto(url, { 
       waitUntil: 'domcontentloaded',
       timeout: 20000 
     });
 
-    // Try to get content immediately (don't wait - reduces chance of frame detach)
     let htmlContent = '';
     try {
       htmlContent = await page.content();
-      console.log(`📌 Puppeteer got ${htmlContent.length} chars`);
-    } catch (contentError) {
-      console.warn('⚠️ Failed to get page content:', contentError instanceof Error ? contentError.message : contentError);
+    } catch {
+      // Failed to get content
     }
 
     await browser.close();
     browser = null;
 
     if (htmlContent) {
-      const result = parseHtmlForPinterestData(htmlContent);
-      console.log(`📌 Pinterest extraction results (Puppeteer):`);
-      console.log(`   Source URL: ${result.sourceUrl || 'not found'}`);
-      console.log(`   Title: ${result.title || 'not found'}`);
-      return result;
+      return parseHtmlForPinterestData(htmlContent);
     }
 
     return { sourceUrl: null };
   } catch (error) {
-    console.error('❌ Error extracting Pinterest source URL:', error);
     throw new Error(`Failed to extract source URL from Pinterest: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
     if (browser) {

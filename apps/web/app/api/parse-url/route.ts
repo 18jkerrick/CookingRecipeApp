@@ -162,11 +162,6 @@ function convertToLegacyFormat(result: ExtractionResult): {
       .trim();
   });
 
-  console.log(`[convertToLegacyFormat] thumbnailUrl from result: ${result.content.thumbnailUrl ? 'present' : 'missing'}`);
-  if (result.content.thumbnailUrl) {
-    console.log(`[convertToLegacyFormat] thumbnailUrl value: ${result.content.thumbnailUrl.substring(0, 100)}...`);
-  }
-  
   return {
     platform: platformMap[platform.toLowerCase()] || platform,
     title: recipe.title || 'Unknown Recipe',
@@ -459,11 +454,6 @@ async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
       // Ingredient name (keep lowercase as requested)
       parts.push(normalized.ingredient);
       
-      // Special debugging for turmeric
-      if (normalized.ingredient.includes('turmeric')) {
-        console.log(`🌟 TURMERIC DISPLAY: quantity=${normalized.quantity}, unit="${normalized.unit}", parts so far=[${parts.join(', ')}]`);
-      }
-      
       // Add preparation if exists (no parentheses to avoid extra ones)
       if (normalized.preparation && normalized.preparation.trim().length > 0) {
         const prep = normalized.preparation.trim().replace(/^\(+|\)+$/g, ''); // Remove any existing parentheses
@@ -498,17 +488,6 @@ async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
       }
       
       return result;
-    });
-    
-    console.log(`✅ AI normalized ${validNormalized.length} valid ingredients`);
-    console.log(`📝 Sample AI normalized:`, validNormalized.slice(0, 2));
-    console.log(`📝 Sample display strings:`, cleanIngredients.slice(0, 2));
-    
-    // Debug range detection
-    validNormalized.forEach((ingredient, index) => {
-      if ((ingredient as any).range) {
-        console.log(`🔍 RANGE DETECTED: "${ingredient.original}" → range: ${JSON.stringify((ingredient as any).range)}, display: "${cleanIngredients[index]}"`);
-      }
     });
     
     const normalizedIngredients: NormalizedIngredient[] = validNormalized.map(
