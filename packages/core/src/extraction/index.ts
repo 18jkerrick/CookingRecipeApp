@@ -32,3 +32,30 @@ export {
   type ConfidenceScorerConfig,
   type FallbackDecision,
 } from './confidence-scorer';
+
+// Visual Extraction
+export {
+  // Frame Extractor
+  FrameExtractor,
+  createFrameExtractor,
+  FrameExtractionError,
+  type FrameExtractorConfig,
+  type FrameExtractionResult,
+  // Frame Analyzer
+  FrameAnalyzer,
+  createFrameAnalyzer,
+  type FrameAnalyzerConfig,
+  type FrameAnalysis,
+  type FrameAnalysisResult,
+  type CookingStage,
+  // Frame Consolidator
+  FrameConsolidator,
+  createFrameConsolidator,
+  type FrameConsolidatorConfig,
+  type ConsolidatedVisualExtraction,
+  // Visual Extractor (orchestrator)
+  VisualExtractor,
+  createVisualExtractor,
+  type VisualExtractorConfig,
+  type VisualExtractionResult,
+} from './visual';
