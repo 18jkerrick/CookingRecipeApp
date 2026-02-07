@@ -59,3 +59,12 @@ export {
   type VisualExtractorConfig,
   type VisualExtractionResult,
 } from './visual';
+
+// Extraction Service (Main Orchestrator)
+export {
+  ExtractionService,
+  createExtractionService,
+  createExtractionServiceFromEnv,
+  type ExtractionServiceConfig,
+  type ExtractionResult,
+} from './extraction-service';

@@ -17,6 +17,90 @@ import { getThumbnailUrl } from '@acme/core/utils/thumbnailExtractor';
 import { extractVideoTitle } from '@acme/core/utils/titleExtractor';
 import { parseIngredients, NormalizedIngredient, formatIngredient } from '@acme/core/parsers/ingredient-parser';
 import { normalizeIngredientsWithAIBatch, AINormalizedIngredient } from '@acme/core/ai/ingredient-normalizer';
+import { createExtractionServiceFromEnv, type ExtractionResult } from '@acme/core/extraction';
+
+// Feature flag for new extraction service
+const USE_NEW_EXTRACTION_SERVICE = process.env.USE_NEW_EXTRACTION_SERVICE === 'true';
+
+/**
+ * Convert ExtractionResult from new service to legacy API response format
+ * This ensures backward compatibility while migrating to the new pipeline
+ */
+function convertToLegacyFormat(result: ExtractionResult): {
+  platform: string;
+  title: string;
+  thumbnail: string | null;
+  ingredients: string[];
+  instructions: string[];
+  normalizedIngredients: NormalizedIngredient[];
+  source: string;
+} {
+  const { recipe, platform, usedVisualFallback } = result;
+  
+  // Convert structured ingredients to display strings
+  const ingredientStrings = recipe.ingredients.map((ing) => {
+    const parts: string[] = [];
+    
+    if (ing.quantity && ing.quantity > 0) {
+      // Format quantity with fractions
+      const qty = ing.quantity;
+      if (qty === 0.25) parts.push('¼');
+      else if (qty === 0.33 || qty === 0.3) parts.push('⅓');
+      else if (qty === 0.5) parts.push('½');
+      else if (qty === 0.67) parts.push('⅔');
+      else if (qty === 0.75) parts.push('¾');
+      else if (qty === 1.5) parts.push('1½');
+      else if (qty === 2.5) parts.push('2½');
+      else if (qty === 3.5) parts.push('3½');
+      else if (qty % 1 === 0) parts.push(qty.toString());
+      else parts.push(qty.toString());
+    }
+    
+    if (ing.unit) parts.push(ing.unit);
+    if (ing.name) parts.push(ing.name);
+    if (ing.preparation) parts.push(`(${ing.preparation})`);
+    
+    return parts.join(' ') || ing.raw;
+  });
+  
+  // Convert to NormalizedIngredient format
+  const normalizedIngredients: NormalizedIngredient[] = recipe.ingredients.map((ing) => {
+    const normalized: NormalizedIngredient = {
+      quantity: ing.quantity || 0,
+      ingredient: ing.name || '',
+      original: ing.raw,
+    };
+    if (ing.unit) normalized.unit = ing.unit;
+    if (ing.preparation) normalized.preparation = ing.preparation;
+    return normalized;
+  });
+  
+  // Map source
+  let source = 'extraction_service';
+  if (recipe.source === 'caption') source = 'captions';
+  else if (recipe.source === 'transcript') source = 'audio_transcript';
+  else if (recipe.source === 'visual') source = 'video_analysis';
+  else if (recipe.source === 'combined') source = usedVisualFallback ? 'merged_extraction' : 'captions';
+  
+  // Map platform
+  const platformMap: Record<string, string> = {
+    tiktok: 'TikTok',
+    youtube: 'YouTube',
+    instagram: 'Instagram',
+    facebook: 'Facebook',
+    pinterest: 'Pinterest',
+  };
+  
+  return {
+    platform: platformMap[platform.toLowerCase()] || platform,
+    title: recipe.title || 'Unknown Recipe',
+    thumbnail: null, // Thumbnail extraction handled separately
+    ingredients: ingredientStrings,
+    instructions: recipe.instructions,
+    normalizedIngredients,
+    source,
+  };
+}
 
 interface Recipe {
   ingredients: string[];
@@ -407,6 +491,37 @@ export async function POST(request: NextRequest) {
     const isFastMode = mode === 'fast';
     console.log(`\n🚀 STARTING PIPELINE: ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${normalizedUrl}`);
     console.log(`📅 Timestamp: ${new Date().toISOString()}`);
+
+    // =========================================================================
+    // NEW EXTRACTION SERVICE (Feature-flagged)
+    // =========================================================================
+    if (USE_NEW_EXTRACTION_SERVICE && process.env.OPENAI_API_KEY) {
+      console.log('🔬 Using NEW ExtractionService pipeline');
+      try {
+        const extractionService = createExtractionServiceFromEnv({
+          enableVisualFallback: !isFastMode,
+          verbose: true,
+        });
+
+        const result = await extractionService.extract(normalizedUrl);
+        
+        // Convert ExtractionResult to legacy response format
+        const legacyResponse = convertToLegacyFormat(result);
+        
+        console.log(`✅ New extraction pipeline complete in ${result.timing.totalMs}ms`);
+        console.log(`   Confidence: ${(result.confidence.final * 100).toFixed(0)}%`);
+        console.log(`   Visual fallback used: ${result.usedVisualFallback}`);
+        
+        return NextResponse.json(legacyResponse);
+      } catch (newServiceError) {
+        console.error('❌ New extraction service failed, falling back to legacy:', newServiceError);
+        // Fall through to legacy pipeline
+      }
+    }
+
+    // =========================================================================
+    // LEGACY EXTRACTION PIPELINE
+    // =========================================================================
 
     // Detect platform first (before caption extraction)
     let platform: string;
