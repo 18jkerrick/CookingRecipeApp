@@ -94,11 +94,17 @@ describe('SupadataProvider', () => {
           { text: 'Second segment', offset: 1000 },
         ]),
       })
+      // Mock thumbnail download call (now downloads thumbnails as base64)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'image/jpeg' }),
+        arrayBuffer: async () => new ArrayBuffer(100),
+      })
 
       await provider.acquire(tiktokUrl)
 
-      // Should make two calls: metadata first, then transcript
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+      // Should make three calls: metadata, transcript, and thumbnail download
+      expect(mockFetch).toHaveBeenCalledTimes(3)
       expect(mockFetch.mock.calls[0][0]).toContain('/metadata')
       expect(mockFetch.mock.calls[1][0]).toContain('/transcript')
       expect(mockFetch).toHaveBeenCalledWith(
@@ -290,11 +296,17 @@ describe('SupadataProvider', () => {
           media: { type: 'image', url: 'https://example.com/photo.jpg' },
         }),
       })
+      // Mock thumbnail download call (now downloads thumbnails as base64)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'image/jpeg' }),
+        arrayBuffer: async () => new ArrayBuffer(100),
+      })
 
       const result = await provider.acquire(tiktokUrl)
 
-      // Should only call metadata, not transcript
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Should call metadata and thumbnail download, but not transcript
+      expect(mockFetch).toHaveBeenCalledTimes(2)
       expect(result.transcript).toBeUndefined()
     })
   })

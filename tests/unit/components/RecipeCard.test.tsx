@@ -45,7 +45,7 @@ describe('RecipeCard', () => {
     render(<RecipeCard processing />)
 
     expect(
-      screen.getByText('Getting Recipe from Text')
+      screen.getByText('Extracting Recipe...')
     ).toBeInTheDocument()
     expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
