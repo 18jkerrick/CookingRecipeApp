@@ -5,9 +5,11 @@
   "type": "module",
   "exports": {
     "./ai": "./src/ai/index.ts",
+    "./content": "./src/content/index.ts",
     "./parsers": "./src/parsers/index.ts",
     "./utils": "./src/utils/index.ts",
     "./ai/*": "./src/ai/*.ts",
+    "./content/*": "./src/content/*.ts",
     "./parsers/*": "./src/parsers/*.ts",
     "./utils/*": "./src/utils/*.ts"
   }

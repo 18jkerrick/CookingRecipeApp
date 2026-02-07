@@ -301,7 +301,16 @@ export function formatIngredient(normalized: NormalizedIngredient): string {
     parts.push(`(${normalized.notes})`);
   }
   
-  return parts.join(' ');
+  let result = parts.join(' ');
+  
+  // Balance parentheses - close any unclosed opening parens
+  const openCount = (result.match(/\(/g) || []).length;
+  const closeCount = (result.match(/\)/g) || []).length;
+  if (openCount > closeCount) {
+    result += ')'.repeat(openCount - closeCount);
+  }
+  
+  return result;
 }
 
 // Batch parse ingredients

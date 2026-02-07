@@ -1,0 +1,305 @@
+This document covers testcases that we should have with URLs linked to real recipe usecases 
+
+1. Tiktok
+    A. a normal video
+        a. https://www.tiktok.com/@haileyateit/video/7596405804857560351
+            Expected Title: Hailey’s Lazy Soup Dumplings
+            Expected ingredients: 
+            • 1/2 lb ground pork
+            • 2 green onions, chopped
+            • 1 tsp chicken powder
+            • 1 tbsp oyster sauce
+            • 1 tsp soy sauce
+            • 1 tsp sugar
+            • 2 tsp minced ginger
+            • 1 tsp minced garlic
+            • 1 Tbsp cooking wine (optional)
+            • Black pepper, to taste
+            • 1/3 cup low-sodium chicken broth
+            • Dumpling wrappers
+            • Water (for steaming)
+            Expected instructions:
+            1. Make the pork filling. Add ground pork, green onions, chicken powder, oyster sauce, soy sauce, sugar, minced ginger, minced garlic, black pepper, cooking wine (if using), and chicken broth into a zip-top bag.
+            2. Mix. Remove excess air, seal the bag, and massage until the mixture becomes sticky and well combined.
+            3. Prepare for piping. Push the pork mixture toward one corner of the bag. Cut a small hole at the corner to use it like a piping bag.
+            4. Make lazy dumplings. Pipe the pork filling into a small heat-resistant bowl (such as a ramekin), filling it about 1/3 full, then gently press it flat. Place 1 dumpling wrapper on top of the filling in each bowl.
+            5. Steam. Place the bowls into a pot and add water until it reaches about half the height of the bowls. Cover with a lid and steam over medium heat for 15–20 minutes, until fully cooked.
+            6. Serve. Serve hot with chili oil, soy sauce, sesame seeds, or green onions, if desired.
+        b. https://www.tiktok.com/@jujumaoo/video/7597415871853661460
+            Expected Title: Beef Pares
+            Expected ingredients (there are some overlapping ingredients, the final list should combine them):
+            - 1 kg of beef shins
+            - 1 thumb of ginger, sliced
+            - 1 whole red onion, chopped
+            - 15-20 cloves of garlic, minced
+            - 1 stalk of onion leeks, sliced
+            - 130 ml of soy sauce
+            - 160g of brown sugar
+            - 2 tbsp oyster sauce
+            - Fish sauce to taste
+            - cornstarch slurry (2-3 tbsp of cornstarch)
+            - 5-6 star anise
+            - 2 small cinnamon sticks
+            - 1 tbsp cracked peppercorn
+            - 2-3 bay leaves
+            - 1 sachet of sibot (optional)
+            - 1/2 tsp of five spice
+            - 2:1 ratio of garlic to chili (adjust to spice tolerance)
+            - 2 tbsp of oyster sauce
+            - 1 1/2 cups of neutral oil (adjust as needed)
+            - Salt & pepper to taste
+            - 1/2 cup fried shallots (optional)
+            - 2-3 cups rice
+            - 2 tbsp garlic, minced
+            - 2 tbsp soy sauce
+            - egg noodles
+            Expected instructions:
+            - Start by searing the beef in a pot over medium-high heat until browned . set aside.
+            - In the same pot, add the garlic and sauté until golden. Add the onions, ginger, and onion leeks.
+            - Add the spices: star anise, cinnamon, peppercorns, and five spice. Toast briefly.
+            - Return the beef to the pot and add the beef broth, soy sauce, brown sugar, oyster sauce, bay leaves, and sibot. Season with fish sauce. Bring to a gentle boil, then lower to a simmer, cover, and cook for 1 to 2 hours, or until the beef is tender. Adjust seasoning to taste as it cooks.
+            - Pour in the cornstarch slurry while stirring until the soup thickens to your liking
+            - To make the chili garlic oil, blend the garlic and chilies. Transfer to a pan with oil and cook gently over low heat until garlic crispy. Stir in the oyster sauce and season with salt and pepper.
+            - Serve with garlic rice, chili garlic oil, crispy garlic, green onions and egg noodles if you want mami style. Enjoy!
+    B. a photo slideshow
+        a. https://www.tiktok.com/@feelgoodwith_fi/photo/7591549640609189150
+            Expected Title: Brothy Chicken Thighs
+            Expected ingredients: 
+            • 2 lbs boneless chicken thighs
+            • 1/4 cup coconut aminos
+            • 1/4 cup rice vinegar
+            • 6 garlic cloves
+            • 1 tbsp grated ginger
+            • Red pepper flakes
+            • Rice
+            • 2 bok choy
+            • 1 bunch of broccolini
+            • Black pepper, to taste
+            • 1/3 cup low-sodium chicken broth
+            • Dumpling wrappers
+            • Water (for steaming)
+            Expected instructions:
+            • marinate 2lb boneless skinless chicken thighs for a few hours or overnight
+            • Cut up your veggies
+            • Make rice
+            • cook thighs (either sear in a pan or bake in the oven)
+            • add veggies to the pan with leftover marinade and broth
+            • add chicken thights to the pan and bring to a simmer for a few minutes. Optional: add some honey to thicken it. 
+            • slice the chicken and serve over rice.
+            • spoon extra broth around the edges.
+            • garnish with green onion.
+    C. not an actual recipe. Just a random video (edgecase)
+        -https://www.tiktok.com/@rayanmroue/video/7598316560717008158
+        expected: return an error that the content is not a recipe
+
+2. Instagram
+    A. Post
+        a. https://www.instagram.com/p/C85B8AyPxe3/
+        Expected Title: California Burrito 
+        Expected indredients (there are some overlapping ingredients, the final list should combine them): 
+        2 lbs skirt steak
+        1/4 cup cilantro, chopped
+        Juice of 1 lime
+        Juice of 1 orange
+        2 tsp cumin
+        2 tsp oregano
+        1 tbsp soy sauce or coco aminos
+        3 garlic cloves, finely diced
+        1/2 tbsp salt
+        1/2 tsp black pepper
+        1/4 cup olive oil
+        2 lbs russet potatoes
+        1 tbsp oil
+        1 tbsp salt
+        2 tsp garlic powder
+        2 tsp onion powder
+        2 tsp paprika
+        2 ripe hass avocados
+        1/4 cup red onion, diced
+        3 tbsp cilantro, chopped
+        Juice of 1 lime
+        1 tsp salt
+        4-5 plum tomatoes, diced
+        1/3 cup red onion, diced
+        1/4 cup cilantro, chopped
+        2 tbsp jalapeño, diced
+        1 tsp salt
+        1/2 tsp black pepper   
+        100g gluten free flour
+        10g olive oil
+        60g water
+        Expected instructions:
+        - Combine 2 lbs skirt steak, 1/4 cup cilantro, chopped, Juice of 1 lime, Juice of 1 orange, 2 tsp cumin, 2 tsp oregano, 1 tbsp soy sauce or coco aminos, 3 garlic cloves, finely diced, 1/2 tbsp salt, 1/2 tsp black pepper,1/4 cup olive oil and marinate for at least 30 min. Sear for 1-2 min on each side. Slice against the grain then with the grain into chunks.
+        - Wash, rinse and peel potatoes. Cut into whatever shape you like. Dip into ice water for 10 minutes. Rinse water until it runs clear to remove starch. Dry thoroughly. Season with oil, salt, garlic powder, onion powder, paprika. Air fry 375F for 20 mins, shaking every 5 min.
+        - To make the guacamole, combine 2 ripe hass avocados, 1/4 cup red onion(diced), 3 tbsp cilantro (chopped), the Juice of 1 lime, and 1 tsp of salt. 
+        - To make the pico de gallo, combine 4-5 plum tomatoes (diced), 1/3 cup red onion (diced), 1/4 cup cilantro (chopped), 2 tbsp jalapeño (diced), 1 tsp salt and 1/2 tsp black pepper
+        - Combine 100g gluten free flour, 10g olive oil, 60g water until forming a dough. Roll out the dough thinly. Heat in dry pan until bubbly and flip.
+    B. Reel
+        a. https://www.instagram.com/reel/DUEqwk4EXpk/
+        Expected Title: High Protein Creamy Chicken Salad
+        Expected indredients: 
+        1 lb chicken breast
+        1 tbsp @spicexseasoning daily blend (SPG)
+        1 large or 2 medium cucumbers, halved and sliced
+        1 medium purple (red) onion, thinly sliced
+        3oz light cream cheese
+        1 cup nonfat Greek yogurt
+        Juice of 1 lemon
+        Salt, to taste 
+        Black pepper, to taste (optional)
+        Avocado oil spray (for the chicken)
+        Expected instructions:
+        1. Air fry the chicken: season chicken with @spicexseasoning Daily Blend and air fry at 400°F for 10–12 minutes, flip halfway, until cooked through and golden. Let it rest for 5 mins before cutting into cubes.
+        2. Prep the veggies: Slice cucumbers and purple onion and add them to a large bowl or meal prep container.
+        3.Make it creamy Add the cooked chicken, light cream cheese, Greek yogurt, lemon juice, salt, and pepper to the same bowl.
+        4. Shake until coated, taste and adjust seasoning/acidity. Add more lemon or salt if it needs it.
+3. Facebook
+    A. Picture Post
+        a. https://www.facebook.com/2days.delights/posts/pfbid032jCdYpXiLbgB4Re5DxFqRTE1fAtS6p8mYk29wdccCGK2FKboPRsnNAToKw2wr9VUl
+        Expected Title: Best Fluffy Pancake Recipe
+        Expected indredients:
+        - 1 ½ cups all-purpose flour
+        - 2 ½ teaspoons baking powder
+        - ½ teaspoon salt
+        - 1 tablespoon sugar
+        - 1 ¼ cups milk (any type)
+        - 1 egg
+        - 3 tablespoons melted butter
+        - 2 teaspoons vanilla extract (optional)
+        Expected instructions:
+        1. In a large bowl, sift together the flour, baking powder, salt, and sugar.
+        2. Add milk, egg, melted butter, and vanilla (if using). Mix until well combined.
+        3. Heat a non-stick griddle or pan over medium heat and grease it.
+        4. Pour ¼ cup of batter onto the griddle.
+        5. Cook until bubbles form and edges are set (about 2 minutes). Flip and cook for another minute.
+        6. Remove from pan and keep warm.
+        7. Top with your favorite toppings and enjoy!
+    B. Video Post
+        a. https://www.facebook.com/watch/?v=844972220821959&ref=sharing | https://fb.watch/F51QugOufg/ (shortened url)
+        Expected Title: No-Bake Cheesecake
+        Expected indredients:
+        1 sleeve Graham crackers 
+        3-5 TBS. Butter (melted)
+        16oz. Cream Cheese (softened)
+        2 TBS. Butter (softened)
+        1 tap. Vanilla 
+        1/2 C. Powdered Sugar
+        2 TBS. Lemon Juice 
+        1/2 C. Heavy Whipping Cream         
+        Expected instructions:
+        Smash crackers to make fine crumbs and mix with melted butter. Form into the bottom of a springform pan. 
+        Put in freezer when and make cream cheese filling.
+        In a bowl mix together cream cheese, butter, and vanilla until smooth. Add sugar and lemon juice, mix. Lastly mix in heavy cream mixing for a minute or two. 
+        Pour filling over crust evenly spread. Freeze for 30 minutes remove and refrigerate for 3+ hours until cheesecake is completely set. 
+        Top with your favorite toppings.
+    C. Reel
+        a. https://www.facebook.com/reel/1424149182756258
+        Expected Title: Fettuccine Alfredo
+        Expected indredients:
+        225g fettuccine
+        Salt to taste
+        1 tsp black pepper
+        1 tbsp garlic powder
+        1 tsp Italian seasoning
+        2 tbsp freshly minced parsley
+        1/2 cup butter
+        1 1/2 cup unsweetened heavy whipping cream
+        1 cup parmesan cheese
+        1 1/2 tbsp all-purpose flour
+        1 cup reserved pasta water
+        Expected instructions:
+        Bring a large pot of salted water to a boil. Cook the fettuccine according to package instructions until al dente. Reserve 1 cup of pasta water before draining.
+        In a large saucepan, melt the butter over medium heat.
+        Sprinkle flour over the butter mixture and whisk to combine. Cook for 1-2 minutes, stirring constantly.
+        Gradually pour in the heavy whipping cream, whisking continuously to prevent lumps. Bring the mixture to a simmer and cook for 2-3 minutes or until slightly thickened.
+        Remove the saucepan from the heat and stir in parmesan cheese until melted and smooth. Season with salt, black pepper, garlic powder and Italian seasoning.
+        Add the cooked fettuccine to the saucepan and toss to combine, adding reserved pasta water if needed to achieve a creamy consistency. Stir in freshly minced parsley and serve hot.
+4. Youtube
+    A. Video
+        a. https://www.youtube.com/watch?v=f-M3JN_7LGU&t=8s
+        Expected Title: Honeysuckle’s Brown Butter Chocolate Chip Cookies OR World's Best Chocolate Chip Cookies 
+        Expected indredients:
+        8 tbsp high-quality butter
+        1/2 cup white sugar
+        1/2 cup dark brown sugar
+        1 egg
+        1 tsp vanilla
+        1/2 tsp salt (kosher)
+        1/2 tsp baking soda
+        1 1/3 cups AP flour
+        1 cup large chocolate chips
+        Expected instructions:
+        Melt and carefully brown 8 tbsp high-quality butter
+        Then in a large bowl mix the melted butter, 1/2 cup white sugar, 1/2 cup dark brown sugar, 1 egg, 1 tsp vanilla, 1/2 tsp salt (kosher) and 1/2 tsp baking soda
+        Once it’s a ribbon-like consistency, add 1 1/3 cups AP flour and 1 cup large chocolate chips
+        Mix well, scoop into round dough balls on a parchment-lined baking sheet. 
+        Sprinkle with finishing salt if desired. 
+        Chill 10 minutes if you’d like and bake for 10-12 minutes at 350º F.
+        Cool and serve
+    B. Short
+        a. https://www.youtube.com/shorts/jMh8ZvK5qxk
+        Expected Title: Pancake Bowls
+        Expected indredients:
+        2 1/4 cups (lactose-free) low fat Greek yogurt (5 1/2 dl / 570g)
+        6 eggs
+        1 tablespoon maple syrup or sugar, or more to taste
+        1 tablespoon vanilla extract
+        1 cup all purpose (gluten-free) flour mix or oat flour (2 1/2 dl)
+        3 teaspoons baking powder
+        berries
+        Expected instructions:
+        1. Mix the wet ingredients together
+        2. Add the dry ingredients and stir to combine
+        3. Divide into three greased glass containers
+        4. Top with berries
+        5. Bake at 180 Celsius degrees / 350 in Fahrenheit for about 20-25 minutes
+        6. Store in the fridge
+        7. Reheat in the microwave before serving
+5. Pinterest
+    a. https://www.pinterest.com/pin/1337074890056439/
+    Expected Title: Peruvian Chicken and Rice with Green Sauce
+    Expected indredients (there are some overlapping ingredients, the final list should combine them):
+    4–6 chicken thighs, bone-in and skin-on
+    3 tablespoons lime juice (freshly squeezed)
+    3 garlic cloves, minced
+    1 teaspoon ground cumin
+    1 teaspoon paprika
+    1 teaspoon salt
+    ½ teaspoon black pepper
+    2 tablespoons olive oil
+    1 ½ cups jasmine or long-grain rice
+    2 ½ cups water or chicken broth
+    1 cup fresh cilantro leaves, packed
+    1 garlic clove
+    1 jalapeño or 1 aji amarillo, seeds removed for less heat
+    2 tablespoons lime juice
+    ¼ cup mayonnaise or Greek yogurt
+    2 tablespoons olive oil
+    Salt and black pepper, to taste
+    Water, as needed for consistency
+    Expected Instructions:
+    Prepare the Marinade: In a bowl, combine lime juice, minced garlic, cumin, paprika, salt, pepper, and olive oil. Toss the chicken thighs in this marinade and let them rest for at least 30 minutes, or overnight for deeper flavor.
+    Cook the Rice: Rinse the jasmine rice under cold water to remove excess starch. In a pot, cook the rice with water or chicken broth following package instructions until fluffy and tender.
+    Make the Green Sauce: In a blender, combine fresh cilantro, garlic, jalapeño, lime juice, mayonnaise or Greek yogurt, olive oil, salt, and pepper. Blend until smooth and creamy. Add water as needed to adjust the sauce to your preferred thickness.
+    Cook the Chicken: Heat a skillet over medium-high heat. Sear the marinated chicken thighs for about 6-7 minutes per side until cooked through and golden brown with a caramelized crust.
+    Plate and Serve: Place a generous serving of cooked rice on each plate. Top with the cooked chicken thighs, then drizzle the bright green sauce over the dish. Garnish with extra cilantro, lime wedges, or sliced avocado if desired.
+6. Cooking blog
+    a. https://theforkedspoon.com/buffalo-chicken-dip-recipe/
+    Expected Title:
+    Expected indredients:
+    3 large boneless skinless chicken breasts, boiled and shredded
+    8 ounces cream cheese, cubed
+    1 cup ranch dressing, homemade or store-bought
+    1 cup hot sauce, (I used Frank's RedHot), plus more as needed
+    1 teaspoon freshly ground black pepper
+    1 teaspoon garlic powder
+    ½ cup green onion, chopped
+    1.5 cups mozzarella cheese, shredded, divided
+    1.5 cups cheddar cheese, shredded, divided
+    Expected Instructions:
+    Cook the chicken. If your chicken is not yet cooked, bring a large pot of water to a boil over high heat. Add the chicken breasts to the pot and return to a boil. Remove from heat and cover with a tight-fitting lid. Allow your chicken to poach, covered, for approximately 25 minutes. When fully cooked, remove from the pot and allow to rest until cool enough to handle (note- the cooking time for the chicken is not included in the total cooking time for this dish).
+    Prep. Preheat your oven to 350 degrees F. and spray a 9x9-inch baking pan (or approximate size) with non-stick cooking spray.
+    Warm the sauce. To a medium saucepot over medium-low heat add the cubed cream cheese, ranch dressing, hot sauce, black pepper, and garlic powder. Whisk constantly until the cream cheese has dissolved in the ranch and hot sauce. Remove from heat.
+    Combine. Add the cooked and shredded chicken, green onion, 1 cup of the shredded mozzarella cheese, and one cup of the shredded cheddar cheese to the sauce pot. Mix well to combine. Transfer to your prepared baking pan and top with remain mozzarella and cheddar cheese.
+    Bake. Bake for approximately 20-30 minutes, or until the cheese has melted and the sides are starting to bubble. Set oven to BROIL. Allow your buffalo chicken dip to cook for an additional 2-3 minutes, or until the top is golden brown. Remove it immediately.
+    Serve. Serve with tortilla chips, vegetable sticks, crackers, or enjoy leftovers wrapped in a tortilla with all your favorite greens. 

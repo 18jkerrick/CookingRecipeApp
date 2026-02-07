@@ -183,10 +183,8 @@ export default function Cookbooks() {
     setIsExtracting(true)
     setUrl('') // Clear the input
 
-    // Simulate phase progression for better UX
+    // Keep extraction phase at 'text' - actual progress comes from backend
     setExtractionPhase('text')
-    setTimeout(() => setExtractionPhase('audio'), 2000) // After 2 seconds
-    setTimeout(() => setExtractionPhase('video'), 5000) // After 5 seconds
 
     try {
       // Create timeout controller
@@ -232,7 +230,10 @@ export default function Cookbooks() {
         const savedId = await saveRecipe(newRecipe, urlToExtract)
         console.log('Recipe save result:', savedId)
         
-        // Remove the processing card - the saved recipe will appear via React Query refetch
+        // Refetch recipes BEFORE removing processing card to prevent visual gap
+        await refetchRecipes()
+        
+        // Now remove the processing card - the saved recipe is already in the list
         setProcessingRecipes(prev => prev.filter(recipe => recipe.id !== processingId))
         
         console.log('Recipe extracted and saved successfully:', data)

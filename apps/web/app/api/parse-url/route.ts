@@ -17,6 +17,161 @@ import { getThumbnailUrl } from '@acme/core/utils/thumbnailExtractor';
 import { extractVideoTitle } from '@acme/core/utils/titleExtractor';
 import { parseIngredients, NormalizedIngredient, formatIngredient } from '@acme/core/parsers/ingredient-parser';
 import { normalizeIngredientsWithAIBatch, AINormalizedIngredient } from '@acme/core/ai/ingredient-normalizer';
+import { createExtractionServiceFromEnv, type ExtractionResult } from '@acme/core/extraction';
+import { deduplicateIngredients } from '@/lib/ingredient-deduplication';
+
+// Feature flag for new extraction service
+const USE_NEW_EXTRACTION_SERVICE = process.env.USE_NEW_EXTRACTION_SERVICE === 'true';
+
+/**
+ * Convert ExtractionResult from new service to legacy API response format
+ * This ensures backward compatibility while migrating to the new pipeline
+ */
+function convertToLegacyFormat(result: ExtractionResult): {
+  platform: string;
+  title: string;
+  thumbnail: string | null;
+  ingredients: string[];
+  instructions: string[];
+  normalizedIngredients: NormalizedIngredient[];
+  source: string;
+} {
+  const { recipe, platform, usedVisualFallback } = result;
+  
+  // Apply deduplication (keeps most specific version, see lib/ingredient-deduplication.ts)
+  const dedupedIngredients = deduplicateIngredients(recipe.ingredients, true);
+  
+  // Helper to convert decimal to fraction with tolerance
+  const toFraction = (qty: number): string => {
+    const tolerance = 0.02; // Allow 2% tolerance for matching
+    const wholeNumber = Math.floor(qty);
+    const fractionalPart = qty - wholeNumber;
+    
+    // Fraction mappings with their decimal values
+    const fractions: [number, string][] = [
+      [0, ''],
+      [0.125, '⅛'],
+      [0.25, '¼'],
+      [1/3, '⅓'],
+      [0.375, '⅜'],
+      [0.5, '½'],
+      [0.625, '⅝'],
+      [2/3, '⅔'],
+      [0.75, '¾'],
+      [0.875, '⅞'],
+    ];
+    
+    // Find closest fraction
+    let closestFraction = '';
+    let minDiff = Infinity;
+    
+    for (const [decimal, symbol] of fractions) {
+      const diff = Math.abs(fractionalPart - decimal);
+      if (diff < minDiff && diff <= tolerance) {
+        minDiff = diff;
+        closestFraction = symbol;
+      }
+    }
+    
+    // Build result
+    if (wholeNumber > 0 && closestFraction) {
+      return `${wholeNumber}${closestFraction}`;
+    } else if (wholeNumber > 0) {
+      // No fraction match, check if close to next whole number
+      if (fractionalPart > 0.95) {
+        return (wholeNumber + 1).toString();
+      }
+      return fractionalPart > 0.01 ? qty.toFixed(2).replace(/\.?0+$/, '') : wholeNumber.toString();
+    } else if (closestFraction) {
+      return closestFraction;
+    } else {
+      return qty.toFixed(2).replace(/\.?0+$/, '');
+    }
+  };
+
+  // Convert structured ingredients to display strings
+  const ingredientStrings = dedupedIngredients.map((ing) => {
+    const parts: string[] = [];
+    
+    if (ing.quantity && ing.quantity > 0) {
+      parts.push(toFraction(ing.quantity));
+    }
+    
+    // Filter out "none"/"null" strings that AI sometimes returns instead of null
+    const invalidValues = ['none', 'null', 'n/a', 'na', ''];
+    if (ing.unit && !invalidValues.includes(ing.unit.toLowerCase().trim())) {
+      parts.push(ing.unit.toLowerCase());
+    }
+    if (ing.name) parts.push(ing.name.toLowerCase());
+    if (ing.preparation && !invalidValues.includes(ing.preparation.toLowerCase().trim())) {
+      parts.push(`(${ing.preparation.toLowerCase()})`);
+    }
+    
+    let result = parts.join(' ') || ing.raw.toLowerCase();
+    
+    // Balance parentheses - close any unclosed opening parens
+    const openCount = (result.match(/\(/g) || []).length;
+    const closeCount = (result.match(/\)/g) || []).length;
+    if (openCount > closeCount) {
+      result += ')'.repeat(openCount - closeCount);
+    }
+    
+    return result;
+  });
+  
+  // Convert to NormalizedIngredient format
+  const normalizedIngredients: NormalizedIngredient[] = dedupedIngredients.map((ing) => {
+    const normalized: NormalizedIngredient = {
+      quantity: ing.quantity || 0,
+      ingredient: ing.name || '',
+      original: ing.raw,
+    };
+    // Filter out "none"/"null" strings that AI sometimes returns instead of null
+    const invalidVals = ['none', 'null', 'n/a', 'na', ''];
+    if (ing.unit && !invalidVals.includes(ing.unit.toLowerCase().trim())) {
+      normalized.unit = ing.unit;
+    }
+    if (ing.preparation && !invalidVals.includes(ing.preparation.toLowerCase().trim())) {
+      normalized.preparation = ing.preparation;
+    }
+    return normalized;
+  });
+  
+  // Map source
+  let source = 'extraction_service';
+  if (recipe.source === 'caption') source = 'captions';
+  else if (recipe.source === 'transcript') source = 'audio_transcript';
+  else if (recipe.source === 'visual') source = 'video_analysis';
+  else if (recipe.source === 'combined') source = usedVisualFallback ? 'merged_extraction' : 'captions';
+  
+  // Map platform
+  const platformMap: Record<string, string> = {
+    tiktok: 'TikTok',
+    youtube: 'YouTube',
+    instagram: 'Instagram',
+    facebook: 'Facebook',
+    pinterest: 'Pinterest',
+  };
+  
+  // Clean up instructions - remove redundant "Step X:" prefixes since UI shows step numbers
+  const cleanedInstructions = recipe.instructions.map((instruction) => {
+    // Remove patterns like "Step 1:", "Step 2:", "1.", "1)", "1:" at the start
+    return instruction
+      .replace(/^step\s*\d+\s*[:.\-)]\s*/i, '')  // "Step 1:", "Step 1.", "Step 1)"
+      .replace(/^\d+\s*[:.\-)]\s*/, '')          // "1:", "1.", "1)"
+      .trim();
+  });
+
+  return {
+    platform: platformMap[platform.toLowerCase()] || platform,
+    title: recipe.title || 'Unknown Recipe',
+    thumbnail: result.content.thumbnailUrl,
+    ingredients: ingredientStrings,
+    instructions: cleanedInstructions,
+    normalizedIngredients,
+    source,
+  };
+}
 
 interface Recipe {
   ingredients: string[];
@@ -299,11 +454,6 @@ async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
       // Ingredient name (keep lowercase as requested)
       parts.push(normalized.ingredient);
       
-      // Special debugging for turmeric
-      if (normalized.ingredient.includes('turmeric')) {
-        console.log(`🌟 TURMERIC DISPLAY: quantity=${normalized.quantity}, unit="${normalized.unit}", parts so far=[${parts.join(', ')}]`);
-      }
-      
       // Add preparation if exists (no parentheses to avoid extra ones)
       if (normalized.preparation && normalized.preparation.trim().length > 0) {
         const prep = normalized.preparation.trim().replace(/^\(+|\)+$/g, ''); // Remove any existing parentheses
@@ -322,21 +472,22 @@ async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
       
       let result = parts.join(' ');
       
-      // Final cleanup: remove stray closing parentheses (closing parens without opening parens)
-      result = result.replace(/([^(]*)\)/g, '$1'); // Remove closing paren if no opening paren before it
+      // Final cleanup: balance parentheses
+      const openCount = (result.match(/\(/g) || []).length;
+      const closeCount = (result.match(/\)/g) || []).length;
+      
+      if (openCount > closeCount) {
+        // Add missing closing parentheses
+        result += ')'.repeat(openCount - closeCount);
+      } else if (closeCount > openCount) {
+        // Remove stray closing parentheses from the end
+        const excessClose = closeCount - openCount;
+        for (let i = 0; i < excessClose; i++) {
+          result = result.replace(/\)(?=[^)]*$)/, ''); // Remove last closing paren
+        }
+      }
       
       return result;
-    });
-    
-    console.log(`✅ AI normalized ${validNormalized.length} valid ingredients`);
-    console.log(`📝 Sample AI normalized:`, validNormalized.slice(0, 2));
-    console.log(`📝 Sample display strings:`, cleanIngredients.slice(0, 2));
-    
-    // Debug range detection
-    validNormalized.forEach((ingredient, index) => {
-      if ((ingredient as any).range) {
-        console.log(`🔍 RANGE DETECTED: "${ingredient.original}" → range: ${JSON.stringify((ingredient as any).range)}, display: "${cleanIngredients[index]}"`);
-      }
     });
     
     const normalizedIngredients: NormalizedIngredient[] = validNormalized.map(
@@ -408,6 +559,37 @@ export async function POST(request: NextRequest) {
     console.log(`\n🚀 STARTING PIPELINE: ${isFastMode ? 'FAST' : 'FULL'} mode for URL: ${normalizedUrl}`);
     console.log(`📅 Timestamp: ${new Date().toISOString()}`);
 
+    // =========================================================================
+    // NEW EXTRACTION SERVICE (Feature-flagged)
+    // =========================================================================
+    if (USE_NEW_EXTRACTION_SERVICE && process.env.OPENAI_API_KEY) {
+      console.log('🔬 Using NEW ExtractionService pipeline');
+      try {
+        const extractionService = createExtractionServiceFromEnv({
+          enableVisualFallback: !isFastMode,
+          verbose: true,
+        });
+
+        const result = await extractionService.extract(normalizedUrl);
+        
+        // Convert ExtractionResult to legacy response format
+        const legacyResponse = convertToLegacyFormat(result);
+        
+        console.log(`✅ New extraction pipeline complete in ${result.timing.totalMs}ms`);
+        console.log(`   Confidence: ${(result.confidence.final * 100).toFixed(0)}%`);
+        console.log(`   Visual fallback used: ${result.usedVisualFallback}`);
+        
+        return NextResponse.json(legacyResponse);
+      } catch (newServiceError) {
+        console.error('❌ New extraction service failed, falling back to legacy:', newServiceError);
+        // Fall through to legacy pipeline
+      }
+    }
+
+    // =========================================================================
+    // LEGACY EXTRACTION PIPELINE
+    // =========================================================================
+
     // Detect platform first (before caption extraction)
     let platform: string;
     let actualUrl = normalizedUrl; // This might change for Pinterest redirects
@@ -418,7 +600,7 @@ export async function POST(request: NextRequest) {
       platform = 'TikTok';
     } else if (normalizedUrl.includes('instagram.com')) {
       platform = 'Instagram';
-    } else if (normalizedUrl.includes('pinterest.com')) {
+    } else if (normalizedUrl.includes('pinterest.com') || normalizedUrl.includes('pin.it')) {
       platform = 'Pinterest';
       console.log(`📌 Detected Pinterest, will extract source URL`);
       
@@ -439,10 +621,46 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ 
             error: `Pinterest pin links to non-cooking website: ${pinterestData.sourceUrl}` 
           }, { status: 400 });
-        } else {
-          console.log(`📌 No source URL found in Pinterest pin`);
+        } else if (pinterestData.imageUrl && pinterestData.description) {
+          // Original Pinterest pin - try to extract recipe from image + description using AI
+          console.log(`📌 Original Pinterest pin detected - extracting from image + description`);
+          console.log(`📌 Image URL: ${pinterestData.imageUrl}`);
+          console.log(`📌 Description: ${pinterestData.description?.substring(0, 100)}...`);
+          
+          // Combine title and description as context for AI extraction
+          const pinterestContent = [
+            pinterestData.title ? `Title: ${pinterestData.title}` : '',
+            pinterestData.description ? `Description: ${pinterestData.description}` : '',
+          ].filter(Boolean).join('\n\n');
+          
+          if (pinterestContent.length > 50) {
+            // Use the description as captions for AI extraction
+            const extractedRecipe = await extractRecipeFromCaption(pinterestContent);
+            
+            if (extractedRecipe && extractedRecipe.ingredients && extractedRecipe.ingredients.length > 0) {
+              console.log(`📌 Successfully extracted recipe from Pinterest content`);
+              
+              return NextResponse.json({
+                ingredients: extractedRecipe.ingredients,
+                instructions: extractedRecipe.instructions || ['See original pin for instructions'],
+                title: extractedRecipe.title || pinterestData.title || 'Pinterest Recipe',
+                thumbnail: pinterestData.imageUrl,
+                platform: 'Pinterest',
+                source: 'Pinterest Pin',
+                normalizedIngredients: extractedRecipe.normalizedIngredients || [],
+              });
+            }
+          }
+          
+          // If AI extraction failed, return error
+          console.log(`📌 Could not extract recipe from Pinterest pin content`);
           return NextResponse.json({ 
-            error: 'Could not find source URL in Pinterest pin' 
+            error: 'This Pinterest pin does not contain a complete recipe. Try a pin that links to a recipe website.' 
+          }, { status: 400 });
+        } else {
+          console.log(`📌 No source URL or extractable content found in Pinterest pin`);
+          return NextResponse.json({ 
+            error: 'Could not find recipe content in Pinterest pin. Try a pin that links to a recipe website.' 
           }, { status: 400 });
         }
       } catch (pinterestError) {
