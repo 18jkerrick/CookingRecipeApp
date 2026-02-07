@@ -237,7 +237,7 @@ This document covers testcases that we should have with URLs linked to real reci
         Chill 10 minutes if you’d like and bake for 10-12 minutes at 350º F.
         Cool and serve
     B. Short
-        a. https://www.youtube.com/watch?v=f-M3JN_7LGU&t=8s
+        a. https://www.youtube.com/shorts/jMh8ZvK5qxk
         Expected Title: Pancake Bowls
         Expected indredients:
         2 1/4 cups (lactose-free) low fat Greek yogurt (5 1/2 dl / 570g)
@@ -284,7 +284,7 @@ This document covers testcases that we should have with URLs linked to real reci
     Cook the Chicken: Heat a skillet over medium-high heat. Sear the marinated chicken thighs for about 6-7 minutes per side until cooked through and golden brown with a caramelized crust.
     Plate and Serve: Place a generous serving of cooked rice on each plate. Top with the cooked chicken thighs, then drizzle the bright green sauce over the dish. Garnish with extra cilantro, lime wedges, or sliced avocado if desired.
 6. Cooking blog
-    a. 
+    a. https://theforkedspoon.com/buffalo-chicken-dip-recipe/
     Expected Title:
     Expected indredients:
     3 large boneless skinless chicken breasts, boiled and shredded

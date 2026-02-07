@@ -68,6 +68,7 @@ const SYSTEM_PROMPT = `You are a recipe extraction expert. Your task is to extra
 - Common units: cups, tbsp, tsp, oz, lb, g, kg, ml, L, cloves, slices
 - If quantity unclear, set quantity and unit to null
 - Include preparation notes (diced, minced, melted, etc.)
+- If NO preparation method, set preparation to null (NOT strings like "none", "null", "n/a")
 
 **DEDUPLICATION RULES (CRITICAL)**:
 - NEVER list the same ingredient twice

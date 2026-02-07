@@ -60,6 +60,11 @@ export async function compressThumbnail(base64Input: string): Promise<string> {
     return base64Input;
   }
 
+  // Pass through URLs unchanged - only compress base64 data
+  if (base64Input.startsWith('http://') || base64Input.startsWith('https://')) {
+    return base64Input;
+  }
+
   // Check cache first
   const cacheKey = quickHash(base64Input);
   const cached = compressionCache.get(cacheKey);

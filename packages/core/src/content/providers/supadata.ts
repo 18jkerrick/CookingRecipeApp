@@ -39,6 +39,7 @@ interface SupadataMetadataResponse {
     type: string;
     duration?: number;
     thumbnailUrl?: string;
+    imageUrl?: string; // Facebook uses this field for image posts
     url?: string;
     items?: Array<{ type: string; url: string }>;
   };
@@ -112,6 +113,56 @@ const DEFAULT_CONFIG = {
   pollInterval: 1000,
 };
 
+/**
+ * Upgrade YouTube thumbnail URL to higher resolution
+ * Supadata returns default.jpg (120x90) but we want hqdefault.jpg (480x360)
+ */
+function upgradeYouTubeThumbnailUrl(url: string): string {
+  // Match YouTube thumbnail URLs and upgrade resolution
+  // https://i.ytimg.com/vi/VIDEO_ID/default.jpg → https://i.ytimg.com/vi/VIDEO_ID/hqdefault.jpg
+  if (url.includes('ytimg.com') && url.includes('/default.jpg')) {
+    const upgraded = url.replace('/default.jpg', '/hqdefault.jpg');
+    console.log(`[Supadata] Upgrading YouTube thumbnail: default.jpg → hqdefault.jpg`);
+    return upgraded;
+  }
+  return url;
+}
+
+/**
+ * Download an image from URL and convert to base64 data URL
+ * This is necessary because platform CDN URLs (especially Instagram) expire quickly
+ */
+async function downloadImageAsBase64(imageUrl: string, timeout = 10000): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    const response = await fetch(imageUrl, {
+      signal: controller.signal,
+      headers: {
+        // Some CDNs require a user agent
+        'User-Agent': 'Mozilla/5.0 (compatible; RecipeExtractor/1.0)',
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.warn(`[Supadata] Failed to download thumbnail: ${response.status}`);
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    
+    return `data:${contentType};base64,${base64}`;
+  } catch (error) {
+    console.warn('[Supadata] Error downloading thumbnail:', error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 // ============================================================================
 // Supadata Provider Implementation
 // ============================================================================
@@ -181,6 +232,14 @@ export class SupadataProvider implements ContentProvider {
       // Step 1: Get metadata (caption, title, description)
       const metadata = await this.fetchMetadata(url);
       const contentType = this.mapContentType(metadata.type, url, platform);
+      
+      // Debug log full metadata for troubleshooting missing thumbnails
+      console.log(`[Supadata] Full metadata for ${platform}:`, JSON.stringify({
+        type: metadata.type,
+        media: metadata.media,
+        hasAdditionalData: !!metadata.additionalData,
+        additionalDataKeys: metadata.additionalData ? Object.keys(metadata.additionalData) : [],
+      }, null, 2));
 
       // Step 2: For video content, try to get transcript
       let transcript: string | null = null;
@@ -189,6 +248,40 @@ export class SupadataProvider implements ContentProvider {
       }
 
       // Build result combining metadata and transcript
+      const imageUrls = this.extractImageUrls(metadata);
+      
+      // Determine thumbnail - check multiple possible locations depending on platform
+      let thumbnailUrl = metadata.media?.thumbnailUrl;
+      if (!thumbnailUrl && metadata.media?.imageUrl) {
+        // Facebook returns image URL in imageUrl field
+        thumbnailUrl = metadata.media.imageUrl;
+      }
+      if (!thumbnailUrl && imageUrls && imageUrls.length > 0) {
+        thumbnailUrl = imageUrls[0];
+      }
+      if (!thumbnailUrl && metadata.type === 'image' && metadata.media?.url) {
+        thumbnailUrl = metadata.media.url;
+      }
+      
+      console.log(`[Supadata] Content type: ${contentType}, thumbnailUrl: ${thumbnailUrl ? 'present' : 'missing'}, imageUrls: ${imageUrls?.length || 0}`);
+      
+      // Download thumbnail and convert to base64 to avoid CDN URL expiration
+      // (Instagram/TikTok CDN URLs expire quickly)
+      let thumbnailBase64: string | undefined;
+      if (thumbnailUrl) {
+        // Upgrade low-resolution thumbnails (e.g., YouTube default.jpg)
+        const upgradedUrl = upgradeYouTubeThumbnailUrl(thumbnailUrl);
+        console.log('[Supadata] Downloading thumbnail to convert to base64...');
+        const downloaded = await downloadImageAsBase64(upgradedUrl);
+        if (downloaded) {
+          thumbnailBase64 = downloaded;
+          console.log('[Supadata] Thumbnail downloaded and converted to base64');
+        } else {
+          console.warn('[Supadata] Failed to download thumbnail, falling back to URL');
+          thumbnailBase64 = thumbnailUrl; // Fallback to URL if download fails
+        }
+      }
+      
       return {
         url,
         platform,
@@ -198,9 +291,9 @@ export class SupadataProvider implements ContentProvider {
         description: metadata.description || undefined,
         caption: metadata.description || undefined, // Caption is in description field
         transcript: transcript || undefined,
-        thumbnailUrl: metadata.media?.thumbnailUrl,
+        thumbnailUrl: thumbnailBase64, // Use base64 version to avoid CDN URL expiration
         videoUrl: metadata.media?.url,
-        imageUrls: this.extractImageUrls(metadata),
+        imageUrls,
         metadata: {
           views: metadata.stats?.views || undefined,
           likes: metadata.stats?.likes || undefined,

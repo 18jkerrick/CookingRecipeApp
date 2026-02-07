@@ -97,11 +97,26 @@ function convertToLegacyFormat(result: ExtractionResult): {
       parts.push(toFraction(ing.quantity));
     }
     
-    if (ing.unit) parts.push(ing.unit.toLowerCase());
+    // Filter out "none"/"null" strings that AI sometimes returns instead of null
+    const invalidValues = ['none', 'null', 'n/a', 'na', ''];
+    if (ing.unit && !invalidValues.includes(ing.unit.toLowerCase().trim())) {
+      parts.push(ing.unit.toLowerCase());
+    }
     if (ing.name) parts.push(ing.name.toLowerCase());
-    if (ing.preparation) parts.push(`(${ing.preparation.toLowerCase()})`);
+    if (ing.preparation && !invalidValues.includes(ing.preparation.toLowerCase().trim())) {
+      parts.push(`(${ing.preparation.toLowerCase()})`);
+    }
     
-    return parts.join(' ') || ing.raw.toLowerCase();
+    let result = parts.join(' ') || ing.raw.toLowerCase();
+    
+    // Balance parentheses - close any unclosed opening parens
+    const openCount = (result.match(/\(/g) || []).length;
+    const closeCount = (result.match(/\)/g) || []).length;
+    if (openCount > closeCount) {
+      result += ')'.repeat(openCount - closeCount);
+    }
+    
+    return result;
   });
   
   // Convert to NormalizedIngredient format
@@ -111,8 +126,14 @@ function convertToLegacyFormat(result: ExtractionResult): {
       ingredient: ing.name || '',
       original: ing.raw,
     };
-    if (ing.unit) normalized.unit = ing.unit;
-    if (ing.preparation) normalized.preparation = ing.preparation;
+    // Filter out "none"/"null" strings that AI sometimes returns instead of null
+    const invalidVals = ['none', 'null', 'n/a', 'na', ''];
+    if (ing.unit && !invalidVals.includes(ing.unit.toLowerCase().trim())) {
+      normalized.unit = ing.unit;
+    }
+    if (ing.preparation && !invalidVals.includes(ing.preparation.toLowerCase().trim())) {
+      normalized.preparation = ing.preparation;
+    }
     return normalized;
   });
   
@@ -141,6 +162,11 @@ function convertToLegacyFormat(result: ExtractionResult): {
       .trim();
   });
 
+  console.log(`[convertToLegacyFormat] thumbnailUrl from result: ${result.content.thumbnailUrl ? 'present' : 'missing'}`);
+  if (result.content.thumbnailUrl) {
+    console.log(`[convertToLegacyFormat] thumbnailUrl value: ${result.content.thumbnailUrl.substring(0, 100)}...`);
+  }
+  
   return {
     platform: platformMap[platform.toLowerCase()] || platform,
     title: recipe.title || 'Unknown Recipe',
@@ -456,8 +482,20 @@ async function processRecipeIngredients(recipe: Recipe): Promise<Recipe> {
       
       let result = parts.join(' ');
       
-      // Final cleanup: remove stray closing parentheses (closing parens without opening parens)
-      result = result.replace(/([^(]*)\)/g, '$1'); // Remove closing paren if no opening paren before it
+      // Final cleanup: balance parentheses
+      const openCount = (result.match(/\(/g) || []).length;
+      const closeCount = (result.match(/\)/g) || []).length;
+      
+      if (openCount > closeCount) {
+        // Add missing closing parentheses
+        result += ')'.repeat(openCount - closeCount);
+      } else if (closeCount > openCount) {
+        // Remove stray closing parentheses from the end
+        const excessClose = closeCount - openCount;
+        for (let i = 0; i < excessClose; i++) {
+          result = result.replace(/\)(?=[^)]*$)/, ''); // Remove last closing paren
+        }
+      }
       
       return result;
     });
@@ -583,7 +621,7 @@ export async function POST(request: NextRequest) {
       platform = 'TikTok';
     } else if (normalizedUrl.includes('instagram.com')) {
       platform = 'Instagram';
-    } else if (normalizedUrl.includes('pinterest.com')) {
+    } else if (normalizedUrl.includes('pinterest.com') || normalizedUrl.includes('pin.it')) {
       platform = 'Pinterest';
       console.log(`📌 Detected Pinterest, will extract source URL`);
       
@@ -604,10 +642,46 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ 
             error: `Pinterest pin links to non-cooking website: ${pinterestData.sourceUrl}` 
           }, { status: 400 });
-        } else {
-          console.log(`📌 No source URL found in Pinterest pin`);
+        } else if (pinterestData.imageUrl && pinterestData.description) {
+          // Original Pinterest pin - try to extract recipe from image + description using AI
+          console.log(`📌 Original Pinterest pin detected - extracting from image + description`);
+          console.log(`📌 Image URL: ${pinterestData.imageUrl}`);
+          console.log(`📌 Description: ${pinterestData.description?.substring(0, 100)}...`);
+          
+          // Combine title and description as context for AI extraction
+          const pinterestContent = [
+            pinterestData.title ? `Title: ${pinterestData.title}` : '',
+            pinterestData.description ? `Description: ${pinterestData.description}` : '',
+          ].filter(Boolean).join('\n\n');
+          
+          if (pinterestContent.length > 50) {
+            // Use the description as captions for AI extraction
+            const extractedRecipe = await extractRecipeFromCaption(pinterestContent);
+            
+            if (extractedRecipe && extractedRecipe.ingredients && extractedRecipe.ingredients.length > 0) {
+              console.log(`📌 Successfully extracted recipe from Pinterest content`);
+              
+              return NextResponse.json({
+                ingredients: extractedRecipe.ingredients,
+                instructions: extractedRecipe.instructions || ['See original pin for instructions'],
+                title: extractedRecipe.title || pinterestData.title || 'Pinterest Recipe',
+                thumbnail: pinterestData.imageUrl,
+                platform: 'Pinterest',
+                source: 'Pinterest Pin',
+                normalizedIngredients: extractedRecipe.normalizedIngredients || [],
+              });
+            }
+          }
+          
+          // If AI extraction failed, return error
+          console.log(`📌 Could not extract recipe from Pinterest pin content`);
           return NextResponse.json({ 
-            error: 'Could not find source URL in Pinterest pin' 
+            error: 'This Pinterest pin does not contain a complete recipe. Try a pin that links to a recipe website.' 
+          }, { status: 400 });
+        } else {
+          console.log(`📌 No source URL or extractable content found in Pinterest pin`);
+          return NextResponse.json({ 
+            error: 'Could not find recipe content in Pinterest pin. Try a pin that links to a recipe website.' 
           }, { status: 400 });
         }
       } catch (pinterestError) {

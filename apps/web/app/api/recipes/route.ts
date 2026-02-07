@@ -140,11 +140,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, thumbnail, ingredients, instructions, platform, source, original_url, normalizedIngredients } = body;
     
-    console.log('📝 Saving recipe with normalized ingredients:', {
+    console.log('📝 Saving recipe:', {
       title,
+      thumbnail: thumbnail ? `${thumbnail.substring(0, 80)}...` : 'MISSING',
       ingredientCount: ingredients?.length,
       normalizedCount: normalizedIngredients?.length,
-      sampleNormalized: normalizedIngredients?.[0]
     });
 
     if (!title || !ingredients || !instructions || !platform || !source) {
