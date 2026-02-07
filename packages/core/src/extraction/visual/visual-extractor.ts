@@ -120,6 +120,71 @@ export class VisualExtractor {
   }
 
   /**
+   * Extract recipe information from images directly (for photo/slideshow content)
+   *
+   * Skips FrameExtractor entirely and analyzes provided image URLs directly.
+   * More efficient for slideshows/carousels where images are already available.
+   *
+   * @param imageUrls - Array of image URLs to analyze
+   * @returns Visual extraction result
+   */
+  async extractFromImages(imageUrls: string[]): Promise<VisualExtractionResult> {
+    this.log(`Starting image-based extraction (${imageUrls.length} images)...`);
+
+    if (imageUrls.length === 0) {
+      throw new Error('No image URLs provided for visual extraction');
+    }
+
+    // Step 1: Analyze images directly (skip FrameExtractor)
+    this.log('Step 1: Analyzing images with Vision API...');
+    let analysisResult: FrameAnalysisResult;
+
+    try {
+      analysisResult = await this.frameAnalyzer.analyzeImageUrls(imageUrls);
+      this.log(
+        `Analyzed ${analysisResult.successCount}/${imageUrls.length} images successfully`
+      );
+
+      if (analysisResult.failedFrames.length > 0) {
+        this.log(`Failed images: [${analysisResult.failedFrames.join(', ')}]`);
+      }
+    } catch (error) {
+      throw new Error(
+        `Image analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+
+    // Step 2: Consolidate analyses
+    this.log('Step 2: Consolidating image analyses...');
+    let consolidation: ConsolidatedVisualExtraction;
+
+    try {
+      consolidation = await this.frameConsolidator.consolidate(
+        analysisResult.analyses
+      );
+      this.log(
+        `Consolidation complete: ${consolidation.dishName} (confidence: ${(consolidation.confidence * 100).toFixed(0)}%)`
+      );
+    } catch (error) {
+      throw new Error(
+        `Consolidation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+
+    // Determine if result is usable
+    const isUsable = this.isResultUsable(consolidation, analysisResult);
+    this.log(`Image extraction ${isUsable ? 'successful' : 'insufficient'}`);
+
+    return {
+      extraction: consolidation,
+      framesExtracted: imageUrls.length, // Images provided
+      framesAnalyzed: analysisResult.successCount,
+      videoDuration: 0, // Not applicable for images
+      isUsable,
+    };
+  }
+
+  /**
    * Extract recipe information from video using visual analysis
    *
    * @param url - Video URL to analyze

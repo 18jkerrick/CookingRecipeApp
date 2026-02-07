@@ -73,6 +73,7 @@ export interface ExtractionResult {
     provider: string;
     hasCaption: boolean;
     hasTranscript: boolean;
+    thumbnailUrl: string | null;
   };
 
   /** Confidence assessment */
@@ -224,11 +225,21 @@ export class ExtractionService {
       this.visualExtractor &&
       this.shouldAttemptVisualExtraction(content)
     ) {
-      this.log('Step 4: Running visual extraction fallback...');
+      const isImageContent =
+        (content.contentType === 'photo' || content.contentType === 'slideshow') &&
+        this.hasImageUrls(content);
+
+      this.log(
+        `Step 4: Running visual extraction fallback (${isImageContent ? 'image analysis' : 'video frames'})...`
+      );
       const visualStart = Date.now();
 
       try {
-        const visualResult = await this.visualExtractor.extract(url);
+        // Use image extraction for photos/slideshows, video extraction otherwise
+        const visualResult = isImageContent
+          ? await this.visualExtractor.extractFromImages(content.imageUrls!)
+          : await this.visualExtractor.extract(url);
+
         visualExtractionMs = Date.now() - visualStart;
         usedVisualFallback = true;
 
@@ -265,6 +276,7 @@ export class ExtractionService {
         provider: content.provider,
         hasCaption: Boolean(content.caption),
         hasTranscript: Boolean(content.transcript),
+        thumbnailUrl: content.thumbnailUrl || null,
       },
       confidence: {
         initial: initialConfidence,
@@ -313,8 +325,28 @@ export class ExtractionService {
    * Check if visual extraction should be attempted
    */
   private shouldAttemptVisualExtraction(content: AcquiredContent): boolean {
-    // Only attempt visual extraction for video content
-    return content.contentType === 'video';
+    // For video content, always allow (uses frame extraction)
+    if (content.contentType === 'video') {
+      return true;
+    }
+
+    // For photo/slideshow, only if we have image URLs to analyze
+    if (
+      (content.contentType === 'photo' || content.contentType === 'slideshow') &&
+      content.imageUrls &&
+      content.imageUrls.length > 0
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if content has images available for direct analysis
+   */
+  private hasImageUrls(content: AcquiredContent): boolean {
+    return Boolean(content.imageUrls && content.imageUrls.length > 0);
   }
 
   /**

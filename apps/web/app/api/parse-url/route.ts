@@ -37,23 +37,60 @@ function convertToLegacyFormat(result: ExtractionResult): {
 } {
   const { recipe, platform, usedVisualFallback } = result;
   
+  // Helper to convert decimal to fraction with tolerance
+  const toFraction = (qty: number): string => {
+    const tolerance = 0.02; // Allow 2% tolerance for matching
+    const wholeNumber = Math.floor(qty);
+    const fractionalPart = qty - wholeNumber;
+    
+    // Fraction mappings with their decimal values
+    const fractions: [number, string][] = [
+      [0, ''],
+      [0.125, '⅛'],
+      [0.25, '¼'],
+      [1/3, '⅓'],
+      [0.375, '⅜'],
+      [0.5, '½'],
+      [0.625, '⅝'],
+      [2/3, '⅔'],
+      [0.75, '¾'],
+      [0.875, '⅞'],
+    ];
+    
+    // Find closest fraction
+    let closestFraction = '';
+    let minDiff = Infinity;
+    
+    for (const [decimal, symbol] of fractions) {
+      const diff = Math.abs(fractionalPart - decimal);
+      if (diff < minDiff && diff <= tolerance) {
+        minDiff = diff;
+        closestFraction = symbol;
+      }
+    }
+    
+    // Build result
+    if (wholeNumber > 0 && closestFraction) {
+      return `${wholeNumber}${closestFraction}`;
+    } else if (wholeNumber > 0) {
+      // No fraction match, check if close to next whole number
+      if (fractionalPart > 0.95) {
+        return (wholeNumber + 1).toString();
+      }
+      return fractionalPart > 0.01 ? qty.toFixed(2).replace(/\.?0+$/, '') : wholeNumber.toString();
+    } else if (closestFraction) {
+      return closestFraction;
+    } else {
+      return qty.toFixed(2).replace(/\.?0+$/, '');
+    }
+  };
+
   // Convert structured ingredients to display strings
   const ingredientStrings = recipe.ingredients.map((ing) => {
     const parts: string[] = [];
     
     if (ing.quantity && ing.quantity > 0) {
-      // Format quantity with fractions
-      const qty = ing.quantity;
-      if (qty === 0.25) parts.push('¼');
-      else if (qty === 0.33 || qty === 0.3) parts.push('⅓');
-      else if (qty === 0.5) parts.push('½');
-      else if (qty === 0.67) parts.push('⅔');
-      else if (qty === 0.75) parts.push('¾');
-      else if (qty === 1.5) parts.push('1½');
-      else if (qty === 2.5) parts.push('2½');
-      else if (qty === 3.5) parts.push('3½');
-      else if (qty % 1 === 0) parts.push(qty.toString());
-      else parts.push(qty.toString());
+      parts.push(toFraction(ing.quantity));
     }
     
     if (ing.unit) parts.push(ing.unit);
@@ -94,7 +131,7 @@ function convertToLegacyFormat(result: ExtractionResult): {
   return {
     platform: platformMap[platform.toLowerCase()] || platform,
     title: recipe.title || 'Unknown Recipe',
-    thumbnail: null, // Thumbnail extraction handled separately
+    thumbnail: result.content.thumbnailUrl,
     ingredients: ingredientStrings,
     instructions: recipe.instructions,
     normalizedIngredients,

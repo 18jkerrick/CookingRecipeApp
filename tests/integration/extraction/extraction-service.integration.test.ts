@@ -1,4 +1,6 @@
 /**
+ * @vitest-environment node
+ *
  * Integration tests for ExtractionService with real URLs
  *
  * These tests hit actual social media APIs and require network access.
@@ -11,7 +13,7 @@
  * Test cases sourced from: docs/recipe-extract-test-cases.txt
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   createExtractionServiceFromEnv,
   type ExtractionResult,
@@ -21,6 +23,7 @@ import {
   cosineSimilarity,
   getEmbedding,
 } from '../../utils/semantic-similarity';
+import { server } from '../../mocks/server';
 
 // ============================================================================
 // Test Configuration
@@ -365,6 +368,9 @@ describe.skipIf(SKIP_INTEGRATION)('ExtractionService Integration Tests', () => {
   let extractionService: ReturnType<typeof createExtractionServiceFromEnv>;
 
   beforeAll(() => {
+    // CRITICAL: Close MSW to allow real network requests for integration tests
+    server.close();
+
     // Verify required environment variables
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY environment variable required for integration tests');
@@ -375,6 +381,11 @@ describe.skipIf(SKIP_INTEGRATION)('ExtractionService Integration Tests', () => {
       verbose: true,
       fallbackThreshold: 0.6, // Lower threshold to trigger visual fallback more often
     });
+  });
+
+  afterAll(() => {
+    // Restore MSW for other tests
+    server.listen({ onUnhandledRequest: 'error' });
   });
 
   describe('TikTok Extraction', () => {

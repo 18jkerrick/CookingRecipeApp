@@ -22,7 +22,7 @@ export default function RecipeCard({
     const getPhaseMessage = () => {
       switch (extractionPhase) {
         case 'text':
-          return 'Getting Recipe from Text';
+          return 'Extracting Recipe...';
         case 'audio':
           return 'Listening to the Audio';
         case 'video':

@@ -228,6 +228,7 @@ export const PLATFORM_PATTERNS: Record<Platform, RegExp[]> = {
     /(?:www\.)?facebook\.com\/reel\/\d+/i,
     /(?:www\.)?facebook\.com\/watch\?v=[\w-]+/i,
     /(?:www\.)?fb\.watch\/[\w]+/i,
+    /(?:www\.)?facebook\.com\/[\w.-]+\/posts\/[\w]+/i, // Facebook posts (pfbid format)
   ],
   pinterest: [/(?:www\.)?pinterest\.com\/pin\/\d+/i],
   cooking_website: [], // Detected by exclusion

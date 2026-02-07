@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest'
 import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { server } from './tests/mocks/server'
+import { config } from 'dotenv'
+
+// Load environment variables from .env.local (for integration tests)
+config({ path: '.env.local' })
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({

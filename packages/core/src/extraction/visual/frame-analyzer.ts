@@ -147,6 +147,143 @@ export class FrameAnalyzer {
   }
 
   /**
+   * Analyze images from URLs directly (for photo/slideshow content)
+   *
+   * @param imageUrls - Array of image URLs to analyze
+   * @returns Analysis results for all images
+   */
+  async analyzeImageUrls(imageUrls: string[]): Promise<FrameAnalysisResult> {
+    const analyses: FrameAnalysis[] = [];
+    const failedFrames: number[] = [];
+
+    // Process in batches for parallel execution
+    for (let i = 0; i < imageUrls.length; i += this.config.maxConcurrent) {
+      const batch = imageUrls.slice(i, i + this.config.maxConcurrent);
+      const batchIndices = batch.map((_, idx) => i + idx);
+
+      // Process batch in parallel using Promise.allSettled
+      const batchPromises = batch.map((url, idx) =>
+        this.analyzeImageUrlWithRetry(url, batchIndices[idx], imageUrls.length)
+      );
+
+      const results = await Promise.allSettled(batchPromises);
+
+      // Process results
+      results.forEach((result, idx) => {
+        const frameIndex = batchIndices[idx];
+        if (result.status === 'fulfilled' && result.value) {
+          analyses.push(result.value);
+        } else {
+          failedFrames.push(frameIndex);
+        }
+      });
+
+      // Delay between batches to avoid rate limits
+      if (i + this.config.maxConcurrent < imageUrls.length) {
+        await this.delay(this.config.batchDelay);
+      }
+    }
+
+    // Sort analyses by frame index
+    analyses.sort((a, b) => a.frameIndex - b.frameIndex);
+
+    return {
+      analyses,
+      successCount: analyses.length,
+      failedFrames,
+    };
+  }
+
+  /**
+   * Analyze a single image URL with retry logic
+   */
+  private async analyzeImageUrlWithRetry(
+    imageUrl: string,
+    index: number,
+    total: number
+  ): Promise<FrameAnalysis | null> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < this.config.retryAttempts; attempt++) {
+      try {
+        return await this.analyzeImageUrl(imageUrl, index, total);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if it's a rate limit error
+        const isRateLimit =
+          error instanceof Error &&
+          (error.message.includes('429') || error.message.includes('rate'));
+
+        if (isRateLimit && attempt < this.config.retryAttempts - 1) {
+          // Exponential backoff for rate limits
+          const backoff = this.config.retryDelay * Math.pow(2, attempt);
+          await this.delay(backoff);
+        } else if (attempt < this.config.retryAttempts - 1) {
+          await this.delay(this.config.retryDelay);
+        }
+      }
+    }
+
+    console.error(
+      `Failed to analyze image ${index} after ${this.config.retryAttempts} attempts:`,
+      lastError?.message
+    );
+    return null;
+  }
+
+  /**
+   * Analyze a single image from URL
+   */
+  async analyzeImageUrl(
+    imageUrl: string,
+    index: number,
+    total: number
+  ): Promise<FrameAnalysis> {
+    const stage = this.getStage(index, total);
+    const prompt = this.buildPrompt(stage);
+
+    const response = await this.client.chat.completions.create({
+      model: this.config.model,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt,
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageUrl,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: this.config.maxTokens,
+      temperature: 0.2,
+    });
+
+    const content = response.choices[0]?.message?.content || '';
+
+    // Parse JSON response
+    const parsed = this.parseVisionResponse(content);
+
+    return {
+      frameIndex: index,
+      stage,
+      observations: parsed.observations,
+      ingredients: parsed.ingredients,
+      actions: parsed.actions,
+      equipment: parsed.equipment,
+      foodState: parsed.foodState,
+      hasText: parsed.hasTextOverlay,
+    };
+  }
+
+  /**
    * Analyze all frames with parallel processing
    *
    * @param frames - Array of frame buffers to analyze
